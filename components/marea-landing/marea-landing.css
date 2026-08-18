@@ -314,7 +314,7 @@ html {
 .ml-lead {
   font-size: 18px;
   color: rgb(var(--color-on-surface-muted));
-  margin: 16px 0 0;
+  margin: 10px 0 0;
 }
 
 /* About */
@@ -349,12 +349,12 @@ html {
    browse a category, short enough that the Offers heading is still
    reachable without scrolling through a full section of dead air. */
 #menu.ml-band {
-  padding: 64px 0 56px;
+  padding: 32px 0 28px;
 }
 .ml-menu-tabs {
   display: flex;
   justify-content: center;
-  margin-top: 24px;
+  margin-top: 20px;
 }
 .ml-menu-tabs > div {
   flex-wrap: wrap;
@@ -365,7 +365,7 @@ html {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 26px;
-  margin-top: 28px;
+  margin-top: 24px;
 }
 @keyframes ml-card-in {
   from {
@@ -404,13 +404,13 @@ html {
   }
 }
 .ml-dish-img {
-  aspect-ratio: 16/10;
+  aspect-ratio: 2.6/1;
 }
 .ml-dish-body {
-  padding: 20px 20px 22px;
+  padding: 16px 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   flex: 1;
 }
 .ml-dish h3 {
@@ -426,6 +426,10 @@ html {
   color: rgb(var(--color-on-surface-muted));
   line-height: 1.55;
   flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .ml-dish-foot {
   display: flex;
@@ -446,22 +450,23 @@ html {
 .ml-menu-actions {
   display: flex;
   justify-content: center;
-  margin-top: 28px;
+  margin-top: 20px;
 }
 
-/* Offers — four cards scattered around the central dish photo (not two
-   straight columns), each sized up and growing slightly on hover.
+/* Offers — four cards in two columns flanking the central dish photo.
    Card/media sizes and positions are all percentages of the stage so
-   the gaps between them stay proportional at any width — pos-1/2/3
-   never share the media's horizontal band at all (always clear,
-   regardless of width); pos-4 does overlap it horizontally by design
-   (matches the reference), so its `top` is anchored past the media's
-   bottom edge at the WIDEST supported stage (ml-wrap's 1272px content
-   box) — the worst case for how tall the (width-relative) circle gets. */
+   the gaps stay proportional at any width. Every card position is
+   horizontally clear of the media's band (0-26% and 73-99%, media
+   spans ~31.5-68.5%), so only card-vs-card vertical spacing matters
+   within each column — no dependency on the media's actual pixel
+   height the way a horizontally-overlapping position would need. */
+#offers.ml-band {
+  padding-top: 40px;
+}
 .ml-offer-stage {
   position: relative;
   margin-top: 64px;
-  min-height: 960px;
+  min-height: 660px;
 }
 .ml-offer-media {
   position: absolute;
@@ -493,8 +498,8 @@ html {
   top: 56%;
 }
 .ml-offer-pos-4 {
-  left: 40%;
-  top: 78%;
+  left: 73%;
+  top: 48%;
 }
 .ml-offer-card {
   width: 100%;
@@ -561,7 +566,7 @@ html {
    track renders the list twice back to back; animating exactly -50%
    loops seamlessly back to the start. */
 .ml-tmls-media {
-  width: 220px;
+  width: 300px;
   aspect-ratio: 1;
   border-radius: 50%;
   overflow: hidden;
