@@ -1,3 +1,5 @@
+import { ReactNode } from "react";
+
 export function SectionHead({
   eyebrow,
   title,
@@ -5,7 +7,7 @@ export function SectionHead({
   center = false,
 }: {
   eyebrow: string;
-  title: string;
+  title: ReactNode;
   lead?: string;
   center?: boolean;
 }) {

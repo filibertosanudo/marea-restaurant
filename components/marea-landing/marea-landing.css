@@ -170,8 +170,8 @@ html {
   font-size: clamp(38px, 4.9vw, 60px);
   margin: 14px 0 26px;
 }
-.ml-hero-right h1 .muted-word {
-  color: rgb(var(--color-on-surface-muted));
+.ml-highlight {
+  color: rgb(var(--color-primary));
 }
 .ml-hero-row {
   display: flex;

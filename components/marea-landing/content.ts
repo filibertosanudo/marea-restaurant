@@ -4,8 +4,9 @@ export const STR = {
   en: {
     hero: {
       eyebrow: "Boutique Seafood",
-      h1a: "Seafood ",
-      h1b: "Delicacies That Unveil the Flavor",
+      h1Before: "Seafood ",
+      h1Highlight: "Delicacies",
+      h1After: " That Unveil the Flavor",
       sub: "Dive into freshness — an ocean of flavors awaits at our restaurant.",
       book: "Book a Table",
       promoTitle: "Seafood from the ocean that will become your favorites",
@@ -42,33 +43,74 @@ export const STR = {
     ],
     dishes: [
       {
+        category: "starters",
+        price: "$16",
+        img: "Oyster Sampler",
+        name: "Oyster Sampler",
+        desc: "A chilled selection of six oysters on the half shell with mignonette and fresh lemon.",
+      },
+      {
+        category: "soups",
+        price: "$14",
+        img: "Lobster Bisque",
+        name: "Lobster Bisque",
+        desc: "Velvety lobster bisque finished with a touch of cream and cognac.",
+      },
+      {
+        category: "mains",
         price: "$42",
         img: "Lobster Thermidor",
         name: "Lobster Thermidor",
         desc: "Grilled lobster tail with creamy mustard sauce, Parmesan cheese, and garlic butter, served with truffle mashed potatoes.",
       },
       {
+        category: "mains",
         price: "$38",
         img: "Seared Chilean Sea Bass",
         name: "Seared Chilean Sea Bass",
         desc: "Tender Chilean sea bass fillet, seared to perfection, with lemon butter sauce, sautéed asparagus, and wild rice.",
       },
       {
+        category: "mains",
         price: "$36",
         img: "Seafood Paella Royale",
         name: "Seafood Paella Royale",
         desc: "Saffron-infused Spanish rice with jumbo shrimp, mussels, calamari and chorizo, garnished with fresh herbs.",
       },
       {
+        category: "mains",
         price: "$48",
         img: "Garlic Butter Crab Legs",
         name: "Garlic Butter Crab Legs",
         desc: "Juicy Alaskan king crab legs, drenched in garlic butter sauce, served with grilled corn and herb-roasted potatoes.",
       },
+      {
+        category: "sides",
+        price: "$9",
+        img: "Garlic Herb Fries",
+        name: "Garlic Herb Fries",
+        desc: "Crispy fries tossed in garlic butter and fresh herbs.",
+      },
+      {
+        category: "desserts",
+        price: "$10",
+        img: "Key Lime Tart",
+        name: "Key Lime Tart",
+        desc: "Tangy key lime custard on a buttery graham crust.",
+      },
+      {
+        category: "beverages",
+        price: "$8",
+        img: "Citrus Spritz",
+        name: "Citrus Spritz",
+        desc: "A refreshing non-alcoholic spritz with citrus and mint.",
+      },
     ],
     offers: {
       eyebrow: "Exclusive Offers",
-      title: "Exclusive Offers Just for You!",
+      titleBefore: "Exclusive ",
+      titleHighlight: "Offers",
+      titleAfter: " Just for You!",
       dish: "Signature dish",
       left: [
         {
@@ -129,6 +171,19 @@ export const STR = {
       commentsPh: "Allergies, special occasion, seating preference…",
       submit: "Reservation",
     },
+    preorder: {
+      name: "Name",
+      namePh: "Enter your name",
+      phone: "Phone number",
+      phonePh: "+1 555 000 0000",
+      guests: "Number of guests",
+      guestsPh: "e.g. 2",
+      date: "Date",
+      time: "Time",
+      comments: "Additional comments",
+      commentsPh: "Allergies, special occasion, seating preference…",
+      submit: "Preorder",
+    },
     footer: {
       connect: "Let's connect with us",
       emailPh: "Your email address",
@@ -148,8 +203,9 @@ export const STR = {
   es: {
     hero: {
       eyebrow: "Mariscos Boutique",
-      h1a: "Delicias del ",
-      h1b: "Mar que Revelan el Sabor",
+      h1Before: "",
+      h1Highlight: "Delicias",
+      h1After: " del Mar que Revelan el Sabor",
       sub: "Sumérgete en la frescura — un océano de sabores te espera en nuestro restaurante.",
       book: "Reservar Mesa",
       promoTitle: "Mariscos del océano que se volverán tus favoritos",
@@ -186,33 +242,74 @@ export const STR = {
     ],
     dishes: [
       {
+        category: "starters",
+        price: "$16",
+        img: "Ostras Surtidas",
+        name: "Ostras Surtidas",
+        desc: "Una selección fría de seis ostras en su concha con mignonette y limón fresco.",
+      },
+      {
+        category: "soups",
+        price: "$14",
+        img: "Bisque de Langosta",
+        name: "Bisque de Langosta",
+        desc: "Bisque de langosta aterciopelada con un toque de crema y coñac.",
+      },
+      {
+        category: "mains",
         price: "$42",
         img: "Langosta Thermidor",
         name: "Langosta Thermidor",
         desc: "Cola de langosta a la parrilla con cremosa salsa de mostaza, queso parmesano y mantequilla de ajo, con puré de papa trufado.",
       },
       {
+        category: "mains",
         price: "$38",
         img: "Róbalo Chileno Sellado",
         name: "Róbalo Chileno Sellado",
         desc: "Filete de róbalo chileno sellado a la perfección, con salsa de mantequilla al limón, espárragos salteados y arroz salvaje.",
       },
       {
+        category: "mains",
         price: "$36",
         img: "Paella de Mariscos Royale",
         name: "Paella de Mariscos Royale",
         desc: "Arroz español al azafrán con camarón jumbo, mejillones, calamar y chorizo, decorado con hierbas frescas.",
       },
       {
+        category: "mains",
         price: "$48",
         img: "Patas de Cangrejo al Ajo",
         name: "Patas de Cangrejo al Ajo",
         desc: "Jugosas patas de cangrejo real de Alaska bañadas en mantequilla de ajo, con elote a la parrilla y papas a las hierbas.",
       },
+      {
+        category: "sides",
+        price: "$9",
+        img: "Papas al Ajo y Hierbas",
+        name: "Papas al Ajo y Hierbas",
+        desc: "Papas crujientes bañadas en mantequilla de ajo y hierbas frescas.",
+      },
+      {
+        category: "desserts",
+        price: "$10",
+        img: "Tarta de Limón",
+        name: "Tarta de Limón",
+        desc: "Cremoso de limón agrio sobre una base de galleta amantequillada.",
+      },
+      {
+        category: "beverages",
+        price: "$8",
+        img: "Spritz Cítrico",
+        name: "Spritz Cítrico",
+        desc: "Un refrescante spritz sin alcohol con cítricos y menta.",
+      },
     ],
     offers: {
       eyebrow: "Ofertas Exclusivas",
-      title: "¡Ofertas Exclusivas Solo para Ti!",
+      titleBefore: "¡",
+      titleHighlight: "Ofertas",
+      titleAfter: " Exclusivas Solo para Ti!",
       dish: "Platillo insignia",
       left: [
         {
@@ -273,6 +370,19 @@ export const STR = {
       commentsPh: "Alergias, ocasión especial, preferencia de mesa…",
       submit: "Reservar",
     },
+    preorder: {
+      name: "Nombre",
+      namePh: "Escribe tu nombre",
+      phone: "Teléfono",
+      phonePh: "+52 55 0000 0000",
+      guests: "Número de personas",
+      guestsPh: "ej. 2",
+      date: "Fecha",
+      time: "Hora",
+      comments: "Comentarios adicionales",
+      commentsPh: "Alergias, ocasión especial, preferencia de mesa…",
+      submit: "Ordenar",
+    },
     footer: {
       connect: "Conéctate con nosotros",
       emailPh: "Tu correo electrónico",
@@ -290,6 +400,8 @@ export const STR = {
     },
   },
 } as const;
+
+export type Dish = (typeof STR)["en"]["dishes"][number];
 
 export const TIME_SLOTS = (() => {
   const out: { value: string; label: string }[] = [];

@@ -14,6 +14,7 @@ import { SectionHead } from "./SectionHead";
 import { Placeholder } from "./Placeholder";
 import { OfferCard } from "./OfferCard";
 import { Dish } from "./Dish";
+import { Highlight } from "./Highlight";
 import { ArrowIcon } from "./icons";
 import "./marea-landing.css";
 
@@ -71,8 +72,9 @@ export function MareaLandingPage() {
           <div className="ml-hero-right">
             <div className="ml-eyebrow">{t.hero.eyebrow}</div>
             <h1 className="ml-disp">
-              {t.hero.h1a}
-              <span className="muted-word">{t.hero.h1b}</span>
+              {t.hero.h1Before}
+              <Highlight>{t.hero.h1Highlight}</Highlight>
+              {t.hero.h1After}
             </h1>
             <div className="ml-hero-row">
               <p>{t.hero.sub}</p>
@@ -130,7 +132,17 @@ export function MareaLandingPage() {
       {/* OFFERS */}
       <section className="ml-band ocean ml-section" id="offers">
         <div className="ml-wrap">
-          <SectionHead center eyebrow={t.offers.eyebrow} title={t.offers.title} />
+          <SectionHead
+            center
+            eyebrow={t.offers.eyebrow}
+            title={
+              <>
+                {t.offers.titleBefore}
+                <Highlight>{t.offers.titleHighlight}</Highlight>
+                {t.offers.titleAfter}
+              </>
+            }
+          />
           <div className="ml-offer-stage">
             <div className="ml-offer-col">
               {t.offers.left.map((o) => (
