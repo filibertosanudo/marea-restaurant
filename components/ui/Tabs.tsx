@@ -19,7 +19,7 @@ export function Tabs({ items, value, onChange }: TabsProps) {
             className={`rounded-full px-md py-[8px] text-[14px] font-medium transition-colors ${
               active
                 ? "bg-primary text-on-primary"
-                : "text-on-surface-muted hover:bg-surface hover:text-on-surface"
+                : "text-on-surface-muted hover:bg-surface-ocean hover:text-on-surface"
             }`}
           >
             {item.label}

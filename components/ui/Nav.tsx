@@ -34,7 +34,7 @@ export function Nav({
             <button
               type="button"
               onClick={() => onLinkClick?.(link.id)}
-              className="cursor-pointer border-0 bg-transparent p-0 font-sans text-sm text-inherit hover:text-on-surface"
+              className="cursor-pointer rounded-full border-0 bg-transparent px-sm py-[6px] font-sans text-sm text-inherit transition-colors hover:bg-surface-ocean hover:text-on-surface"
             >
               {link.label}
             </button>
