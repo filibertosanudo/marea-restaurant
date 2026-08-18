@@ -151,7 +151,15 @@ html {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 130px 0 60px;
+  /* flex-direction:column makes align-items the HORIZONTAL centering —
+     justify-content is what centers vertically here. Without it the
+     content just sits at the top of the 100dvh box. */
+  justify-content: center;
+  /* Bigger heading + more inter-element spacing (per feedback) often
+     makes the content taller than 100dvh, which leaves justify-content
+     nothing to distribute — so keep this pair close to each other
+     rather than relying on centering slack that may not exist. */
+  padding: 120px 0 100px;
   background: linear-gradient(180deg, rgb(var(--color-surface)) 0%, rgb(var(--color-surface-ocean)) 100%);
 }
 /* The photo behaves like an atmospheric background layer bleeding off
@@ -186,8 +194,8 @@ html {
   max-width: 620px;
 }
 .ml-hero-right h1 {
-  font-size: clamp(38px, 4.9vw, 60px);
-  margin: 14px 0 26px;
+  font-size: clamp(42px, 5.8vw, 78px);
+  margin: 18px 0 36px;
 }
 .ml-highlight {
   color: rgb(var(--color-primary));
@@ -196,7 +204,7 @@ html {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 22px;
+  gap: 28px;
   flex-wrap: wrap;
 }
 .ml-hero-row p {
@@ -208,7 +216,7 @@ html {
   text-align: right;
 }
 .ml-promo {
-  margin-top: 26px;
+  margin-top: 36px;
   background: rgb(var(--color-surface));
   border: 1px solid rgb(var(--color-border));
   border-radius: 18px;
@@ -379,14 +387,15 @@ html {
   }
 }
 
-/* The photo is the dominant element (~square, no cap on how tall it
-   can get relative to width) with the text in its own smaller card
-   overlapping the bottom of it — not a bordered box split evenly
-   between a banner photo and a text block. overflow:hidden lives on
-   the image itself (not this container) so the overlapping text
-   card's own shadow isn't clipped by the photo's rounded corners. */
+/* The text card sits in NORMAL FLOW below the photo, not overlapping
+   it — only pulled up a few px via negative margin so its top padding
+   tucks against the photo's bottom edge. Normal document order makes
+   the text card paint over that small sliver automatically (no
+   position/z-index needed): everything below the tuck is plain page
+   flow, not covering the photo. */
 .ml-dish {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   animation: ml-card-in 0.4s ease both;
 }
 .ml-dish:nth-child(2) {
@@ -406,23 +415,26 @@ html {
 }
 .ml-dish-img {
   width: 100%;
-  aspect-ratio: 1/1.02;
+  aspect-ratio: 1/0.72;
   border-radius: 18px;
   overflow: hidden;
   box-shadow: 0 18px 40px -26px rgb(var(--shadow-color) / 0.22);
+  /* Explicit stacking so the tuck below always paints in front,
+     regardless of DOM/flex paint-order edge cases. */
+  position: relative;
+  z-index: 0;
 }
 .ml-dish-body {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
+  margin-top: -20px;
   background: rgb(var(--color-surface));
   border-radius: 14px;
-  padding: 14px 14px 12px;
+  padding: 14px 16px 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  box-shadow: 0 14px 30px -16px rgb(var(--shadow-color) / 0.4);
+  box-shadow: 0 10px 22px -16px rgb(var(--shadow-color) / 0.3);
+  position: relative;
+  z-index: 1;
 }
 .ml-dish h3 {
   font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
@@ -433,11 +445,15 @@ html {
 }
 .ml-dish p {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   color: rgb(var(--color-on-surface-muted));
   line-height: 1.5;
+  /* Fixed to exactly 3 lines' worth of space (not just capped at 3) —
+     a min-height so a short description still reserves the same room
+     a long one does, keeping every card in the row the same height. */
+  min-height: calc(1.5 * 3 * 13px);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
