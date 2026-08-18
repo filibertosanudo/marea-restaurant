@@ -379,14 +379,14 @@ html {
   }
 }
 
+/* The photo is the dominant element (~square, no cap on how tall it
+   can get relative to width) with the text in its own smaller card
+   overlapping the bottom of it — not a bordered box split evenly
+   between a banner photo and a text block. overflow:hidden lives on
+   the image itself (not this container) so the overlapping text
+   card's own shadow isn't clipped by the photo's rounded corners. */
 .ml-dish {
-  display: flex;
-  flex-direction: column;
-  background: rgb(var(--color-surface));
-  border: 1px solid rgb(var(--color-border));
-  border-radius: 18px;
-  overflow: hidden;
-  box-shadow: 0 18px 40px -26px rgb(var(--shadow-color) / 0.22);
+  position: relative;
   animation: ml-card-in 0.4s ease both;
 }
 .ml-dish:nth-child(2) {
@@ -405,28 +405,37 @@ html {
   }
 }
 .ml-dish-img {
-  aspect-ratio: 2.6/1;
+  width: 100%;
+  aspect-ratio: 1/1.02;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 18px 40px -26px rgb(var(--shadow-color) / 0.22);
 }
 .ml-dish-body {
-  padding: 16px 16px 18px;
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  background: rgb(var(--color-surface));
+  border-radius: 14px;
+  padding: 14px 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  flex: 1;
+  gap: 6px;
+  box-shadow: 0 14px 30px -16px rgb(var(--shadow-color) / 0.4);
 }
 .ml-dish h3 {
   font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
   font-weight: 600;
-  font-size: 18px;
+  font-size: 16px;
   margin: 0;
   color: rgb(var(--color-on-surface));
 }
 .ml-dish p {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 12.5px;
   color: rgb(var(--color-on-surface-muted));
-  line-height: 1.55;
-  flex: 1;
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -436,13 +445,15 @@ html {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 .ml-price {
+  /* Deliberately not the primary accent — only the Preorder button
+     should read as the accented element on this card. */
   font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
   font-weight: 600;
-  font-size: 22px;
-  color: rgb(var(--color-primary));
+  font-size: 18px;
+  color: rgb(var(--color-on-surface));
 }
 .ml-dish-foot button {
   padding: 9px 20px !important;
