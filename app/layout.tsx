@@ -27,6 +27,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
+      <head>
+        <script
+          // Set data-theme before paint so there's no flash of the wrong
+          // theme while React hydrates.
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('marea-theme')==='dark'){document.documentElement.setAttribute('data-theme','dark')}}catch(e){}",
+          }}
+        />
+      </head>
       <body
         className={`${montserratAlternates.variable} ${poppins.variable} font-sans`}
       >

@@ -5,27 +5,32 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        surface: "#FFFFFF",
-        "surface-subtle": "#F8F9FA",
-        "surface-ocean": "#ECF5F8",
-        "surface-ocean-border": "#D6E9EF",
-        "on-surface": "#232C3B",
-        "on-surface-muted": "#57646C",
-        border: "#E2E5E8",
+        // rgb(var(--x) / <alpha-value>) lets Tailwind opacity modifiers
+        // (e.g. bg-on-surface/40) keep working while the underlying value
+        // switches with [data-theme="dark"] — see styles/tokens.css.
+        surface: "rgb(var(--color-surface) / <alpha-value>)",
+        "surface-subtle": "rgb(var(--color-surface-subtle) / <alpha-value>)",
+        "surface-ocean": "rgb(var(--color-surface-ocean) / <alpha-value>)",
+        "surface-ocean-border":
+          "rgb(var(--color-surface-ocean-border) / <alpha-value>)",
+        "on-surface": "rgb(var(--color-on-surface) / <alpha-value>)",
+        "on-surface-muted":
+          "rgb(var(--color-on-surface-muted) / <alpha-value>)",
+        border: "rgb(var(--color-border) / <alpha-value>)",
         primary: {
-          DEFAULT: "#1B367B",
-          hover: "#16295F",
+          DEFAULT: "rgb(var(--color-primary) / <alpha-value>)",
+          hover: "rgb(var(--color-primary-hover) / <alpha-value>)",
         },
-        "on-primary": "#FFFFFF",
+        "on-primary": "rgb(var(--color-on-primary) / <alpha-value>)",
         "accent-warm": {
-          DEFAULT: "#F0E7D5",
-          border: "#D8CCB4",
+          DEFAULT: "rgb(var(--color-accent-warm) / <alpha-value>)",
+          border: "rgb(var(--color-accent-warm-border) / <alpha-value>)",
         },
-        "on-accent-warm": "#6F6A5C",
-        success: "#1F8A5F",
-        warning: "#C77D19",
-        error: "#C0392B",
-        info: "#2C6FBB",
+        "on-accent-warm": "rgb(var(--color-on-accent-warm) / <alpha-value>)",
+        success: "rgb(var(--color-success) / <alpha-value>)",
+        warning: "rgb(var(--color-warning) / <alpha-value>)",
+        error: "rgb(var(--color-error) / <alpha-value>)",
+        info: "rgb(var(--color-info) / <alpha-value>)",
       },
       fontFamily: {
         display: ["var(--font-montserrat-alternates)", "sans-serif"],
@@ -48,9 +53,9 @@ const config: Config = {
         "4xl": "96px",
       },
       boxShadow: {
-        1: "0 2px 10px rgba(27, 54, 123, 0.10)",
-        2: "0 10px 28px rgba(27, 54, 123, 0.18)",
-        hero: "0 30px 60px rgba(27, 54, 123, 0.24)",
+        1: "0 2px 10px rgb(var(--shadow-color) / 0.10)",
+        2: "0 10px 28px rgb(var(--shadow-color) / 0.18)",
+        hero: "0 30px 60px rgb(var(--shadow-color) / 0.24)",
       },
     },
   },
