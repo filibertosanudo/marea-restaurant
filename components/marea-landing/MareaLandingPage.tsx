@@ -118,10 +118,12 @@ export function MareaLandingPage() {
           <div className="ml-menu-tabs">
             <Tabs items={t.categories as unknown as { id: string; label: string }[]} value={cat} onChange={setCat} />
           </div>
-          <div className="ml-menu-grid">
-            {t.dishes.map((d) => (
-              <Dish key={d.name} dish={d} cta={t.menu.preorder} />
-            ))}
+          <div className="ml-menu-grid" key={cat}>
+            {t.dishes
+              .filter((d) => d.category === cat)
+              .map((d) => (
+                <Dish key={d.name} dish={d} cta={t.menu.preorder} />
+              ))}
           </div>
           <div className="ml-menu-actions">
             <Button variant="primary">{t.menu.book}</Button>
