@@ -12,7 +12,7 @@ html {
 
 .ml-wrap {
   width: 100%;
-  max-width: 1160px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: 0 24px;
 }
@@ -141,11 +141,16 @@ html {
   color: rgb(var(--color-on-primary) / 0.72);
 }
 
-/* Hero */
+/* Hero — fills the viewport on load so About Us doesn't peek in below
+   the fold; the fixed nav pill floats over the top padding. */
 .ml-hero {
   position: relative;
   overflow: hidden;
-  padding: 150px 0 90px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  padding: 130px 0 60px;
   background: linear-gradient(180deg, rgb(var(--color-surface)) 0%, rgb(var(--color-surface-ocean)) 100%);
 }
 /* The photo behaves like an atmospheric background layer bleeding off
@@ -159,9 +164,16 @@ html {
   -webkit-mask-image: linear-gradient(to right, black 55%, transparent 100%);
   mask-image: linear-gradient(to right, black 55%, transparent 100%);
 }
+/* Not a .ml-wrap: the text is deliberately NOT capped by the shared
+   content container here — it pushes toward the true right edge of
+   the viewport (within edge padding) instead of stopping at the same
+   1320px box every other section uses, since the bled background on
+   the left already makes this section's layout asymmetric on purpose. */
 .ml-hero-inner {
   position: relative;
   z-index: 1;
+  width: 100%;
+  padding: 0 clamp(24px, 5vw, 96px);
 }
 .ml-hero-right {
   display: flex;
@@ -170,7 +182,7 @@ html {
   text-align: right;
   justify-content: center;
   margin-left: auto;
-  max-width: 560px;
+  max-width: 620px;
 }
 .ml-hero-right h1 {
   font-size: clamp(38px, 4.9vw, 60px);
@@ -525,11 +537,17 @@ html {
   -webkit-mask-image: linear-gradient(to right, black 60%, transparent 100%);
   mask-image: linear-gradient(to right, black 60%, transparent 100%);
 }
-.ml-reserve-form-wrap {
+/* Not .ml-wrap, same reasoning as .ml-hero-inner: pushes to the real
+   edge instead of stopping at the shared content container. */
+.ml-reserve-inner {
   position: relative;
   z-index: 1;
+  width: 100%;
+  padding: 0 clamp(24px, 5vw, 96px);
+}
+.ml-reserve-form-wrap {
   margin-left: auto;
-  max-width: 560px;
+  max-width: 620px;
 }
 .ml-form-card {
   background: rgb(var(--color-surface));

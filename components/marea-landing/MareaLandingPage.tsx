@@ -63,7 +63,7 @@ export function MareaLandingPage() {
     <>
       <Controls theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} />
       <div className="ml-navbar">
-        <Nav onCtaClick={() => scrollToId("contact")} onLinkClick={scrollToId} />
+        <Nav onCtaClick={() => scrollToId("reservation")} onLinkClick={scrollToId} />
       </div>
 
       {/* HERO */}
@@ -71,7 +71,7 @@ export function MareaLandingPage() {
         <div className="ml-hero-bg">
           <Placeholder label={t.hero.photo} navy />
         </div>
-        <div className="ml-wrap ml-hero-inner">
+        <div className="ml-hero-inner">
           <div className="ml-hero-right">
             <div className="ml-eyebrow">{t.hero.eyebrow}</div>
             <h1 className="ml-disp">
@@ -81,7 +81,7 @@ export function MareaLandingPage() {
             </h1>
             <div className="ml-hero-row">
               <p>{t.hero.sub}</p>
-              <Button variant="primary" onClick={() => scrollToId("contact")}>
+              <Button variant="primary" onClick={() => scrollToId("reservation")}>
                 {t.hero.book}
               </Button>
             </div>
@@ -136,7 +136,7 @@ export function MareaLandingPage() {
               ))}
           </div>
           <div className="ml-menu-actions">
-            <Button variant="primary" onClick={() => scrollToId("contact")}>
+            <Button variant="primary" onClick={() => scrollToId("reservation")}>
               {t.menu.book}
             </Button>
           </div>
@@ -160,7 +160,7 @@ export function MareaLandingPage() {
           <div className="ml-offer-stage">
             <div className="ml-offer-col">
               {t.offers.left.map((o) => (
-                <OfferCard key={o.title} offer={o} onArrowClick={() => scrollToId("contact")} />
+                <OfferCard key={o.title} offer={o} onArrowClick={() => scrollToId("reservation")} />
               ))}
             </div>
             <div className="ml-offer-media">
@@ -168,7 +168,7 @@ export function MareaLandingPage() {
             </div>
             <div className="ml-offer-col">
               {t.offers.right.map((o) => (
-                <OfferCard key={o.title} offer={o} onArrowClick={() => scrollToId("contact")} />
+                <OfferCard key={o.title} offer={o} onArrowClick={() => scrollToId("reservation")} />
               ))}
             </div>
           </div>
@@ -193,11 +193,11 @@ export function MareaLandingPage() {
       </section>
 
       {/* RESERVATION */}
-      <section className="ml-band subtle ml-section ml-reserve-section" id="contact">
+      <section className="ml-band subtle ml-section ml-reserve-section" id="reservation">
         <div className="ml-reserve-media">
           <Placeholder label={t.reserve.media} />
         </div>
-        <div className="ml-wrap">
+        <div className="ml-reserve-inner">
           <div className="ml-reserve-form-wrap">
             <SectionHead eyebrow={t.reserve.eyebrow} title={t.reserve.title} />
             <form
@@ -248,7 +248,7 @@ export function MareaLandingPage() {
         </div>
       </section>
 
-      <footer className="ml-footer">
+      <footer className="ml-footer ml-section" id="contact">
         <div className="ml-wrap">
           <div className="ml-foot-top">
             <h3>{t.footer.connect}</h3>
@@ -280,7 +280,7 @@ export function MareaLandingPage() {
               <a href="tel:+15551234567">+1 (555) 123-4567</a>
               <a href="mailto:hello@marea.com">hello@marea.com</a>
               <a href="#menu">{t.footer.ourMenu}</a>
-              <a href="#contact">{t.footer.reservations}</a>
+              <a href="#reservation">{t.footer.reservations}</a>
             </div>
           </div>
           <div className="ml-foot-bottom">
