@@ -450,43 +450,51 @@ html {
 }
 
 /* Offers — four cards scattered around the central dish photo (not two
-   straight columns), each sized up and growing slightly on hover. */
+   straight columns), each sized up and growing slightly on hover.
+   Card/media sizes and positions are all percentages of the stage so
+   the gaps between them stay proportional at any width — pos-1/2/3
+   never share the media's horizontal band at all (always clear,
+   regardless of width); pos-4 does overlap it horizontally by design
+   (matches the reference), so its `top` is anchored past the media's
+   bottom edge at the WIDEST supported stage (ml-wrap's 1272px content
+   box) — the worst case for how tall the (width-relative) circle gets. */
 .ml-offer-stage {
   position: relative;
   margin-top: 64px;
-  min-height: 640px;
+  min-height: 960px;
 }
 .ml-offer-media {
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 320px;
+  width: 37%;
   aspect-ratio: 1;
   border-radius: 50%;
+  overflow: hidden;
   box-shadow: 0 30px 60px -22px rgb(var(--shadow-color) / 0.3);
   z-index: 0;
 }
 .ml-offer-pos {
   position: absolute;
-  width: min(320px, 34vw);
+  width: 26%;
   z-index: 1;
 }
 .ml-offer-pos-1 {
-  left: 2%;
-  top: 2%;
+  left: 0%;
+  top: 0%;
 }
 .ml-offer-pos-2 {
-  left: 60%;
-  top: 18%;
+  left: 73%;
+  top: 7%;
 }
 .ml-offer-pos-3 {
   left: 0%;
-  top: 58%;
+  top: 56%;
 }
 .ml-offer-pos-4 {
   left: 40%;
-  top: 74%;
+  top: 78%;
 }
 .ml-offer-card {
   width: 100%;
@@ -553,9 +561,10 @@ html {
    track renders the list twice back to back; animating exactly -50%
    loops seamlessly back to the start. */
 .ml-tmls-media {
-  width: 140px;
+  width: 220px;
   aspect-ratio: 1;
   border-radius: 50%;
+  overflow: hidden;
   margin: 32px auto 0;
   box-shadow: 0 24px 50px -24px rgb(var(--shadow-color) / 0.3);
 }
