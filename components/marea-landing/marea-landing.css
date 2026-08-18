@@ -148,16 +148,20 @@ html {
   padding: 150px 0 90px;
   background: linear-gradient(180deg, rgb(var(--color-surface)) 0%, rgb(var(--color-surface-ocean)) 100%);
 }
-.ml-hero-inner {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
-  align-items: stretch;
+/* The photo behaves like an atmospheric background layer bleeding off
+   the left edge, fading into the hero gradient, rather than a boxed
+   thumbnail — the text sits above it in normal flow. */
+.ml-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 60%;
+  z-index: 0;
+  -webkit-mask-image: linear-gradient(to right, black 55%, transparent 100%);
+  mask-image: linear-gradient(to right, black 55%, transparent 100%);
 }
-.ml-hero-photo {
-  min-height: 560px;
-  border-radius: 24px;
-  box-shadow: 0 34px 70px -30px rgb(var(--shadow-color) / 0.4);
+.ml-hero-inner {
+  position: relative;
+  z-index: 1;
 }
 .ml-hero-right {
   display: flex;
@@ -165,6 +169,8 @@ html {
   align-items: flex-end;
   text-align: right;
   justify-content: center;
+  margin-left: auto;
+  max-width: 560px;
 }
 .ml-hero-right h1 {
   font-size: clamp(38px, 4.9vw, 60px);
@@ -505,17 +511,25 @@ html {
   box-shadow: 0 24px 50px -24px rgb(var(--shadow-color) / 0.3);
 }
 
-/* Reservation */
-.ml-reserve-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 56px;
-  align-items: center;
+/* Reservation — same "photo as background" treatment as the hero:
+   bleeds off the left edge behind the form instead of a boxed thumb. */
+.ml-reserve-section {
+  position: relative;
+  overflow: hidden;
 }
 .ml-reserve-media {
-  aspect-ratio: 5/4;
-  border-radius: 22px;
-  box-shadow: 0 30px 60px -30px rgb(var(--shadow-color) / 0.35);
+  position: absolute;
+  inset: 0;
+  width: 42%;
+  z-index: 0;
+  -webkit-mask-image: linear-gradient(to right, black 60%, transparent 100%);
+  mask-image: linear-gradient(to right, black 60%, transparent 100%);
+}
+.ml-reserve-form-wrap {
+  position: relative;
+  z-index: 1;
+  margin-left: auto;
+  max-width: 560px;
 }
 .ml-form-card {
   background: rgb(var(--color-surface));
@@ -791,17 +805,25 @@ html {
   }
 }
 @media (max-width: 900px) {
-  .ml-hero-inner,
-  .ml-about-grid,
-  .ml-reserve-grid {
+  .ml-about-grid {
     grid-template-columns: 1fr;
     gap: 40px;
   }
-  .ml-hero-photo {
-    min-height: 340px;
-    order: -1;
+  /* Below 900px the bled background doesn't have room to breathe next
+     to the text — fall back to a boxed image stacked above it. */
+  .ml-hero-bg {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 340px;
+    -webkit-mask-image: none;
+    mask-image: none;
+    border-radius: 24px;
+    margin-bottom: 24px;
   }
   .ml-hero-right {
+    margin-left: 0;
+    max-width: 100%;
     align-items: center;
     text-align: center;
   }
@@ -813,6 +835,20 @@ html {
     justify-content: center;
   }
   .ml-promo {
+    max-width: 100%;
+  }
+  .ml-reserve-media {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 300px;
+    -webkit-mask-image: none;
+    mask-image: none;
+    border-radius: 22px;
+    margin-bottom: 24px;
+  }
+  .ml-reserve-form-wrap {
+    margin-left: 0;
     max-width: 100%;
   }
   .ml-offer-stage {

@@ -68,10 +68,10 @@ export function MareaLandingPage() {
 
       {/* HERO */}
       <header className="ml-hero ml-section" id="home">
+        <div className="ml-hero-bg">
+          <Placeholder label={t.hero.photo} navy />
+        </div>
         <div className="ml-wrap ml-hero-inner">
-          <div className="ml-hero-photo">
-            <Placeholder label={t.hero.photo} />
-          </div>
           <div className="ml-hero-right">
             <div className="ml-eyebrow">{t.hero.eyebrow}</div>
             <h1 className="ml-disp">
@@ -193,12 +193,12 @@ export function MareaLandingPage() {
       </section>
 
       {/* RESERVATION */}
-      <section className="ml-band subtle ml-section" id="contact">
-        <div className="ml-wrap ml-reserve-grid">
-          <div className="ml-reserve-media">
-            <Placeholder label={t.reserve.media} />
-          </div>
-          <div>
+      <section className="ml-band subtle ml-section ml-reserve-section" id="contact">
+        <div className="ml-reserve-media">
+          <Placeholder label={t.reserve.media} />
+        </div>
+        <div className="ml-wrap">
+          <div className="ml-reserve-form-wrap">
             <SectionHead eyebrow={t.reserve.eyebrow} title={t.reserve.title} />
             <form
               className="ml-form-card"
