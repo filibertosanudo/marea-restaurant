@@ -2,6 +2,14 @@ export type Lang = "en" | "es";
 
 export const STR = {
   en: {
+    nav: {
+      home: "Home",
+      about: "About Us",
+      menu: "Our Menu",
+      testimonials: "Testimonials",
+      contact: "Contact",
+      book: "Book a Table",
+    },
     hero: {
       eyebrow: "Boutique Seafood",
       h1Before: "Seafood ",
@@ -201,6 +209,14 @@ export const STR = {
     },
   },
   es: {
+    nav: {
+      home: "Inicio",
+      about: "Sobre Nosotros",
+      menu: "Nuestro Menú",
+      testimonials: "Testimonios",
+      contact: "Contacto",
+      book: "Reservar Mesa",
+    },
     hero: {
       eyebrow: "Mariscos Boutique",
       h1Before: "",

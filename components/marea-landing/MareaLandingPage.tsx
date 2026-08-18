@@ -63,7 +63,18 @@ export function MareaLandingPage() {
     <>
       <Controls theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} />
       <div className="ml-navbar">
-        <Nav onCtaClick={() => scrollToId("reservation")} onLinkClick={scrollToId} />
+        <Nav
+          links={[
+            { id: "home", label: t.nav.home },
+            { id: "about", label: t.nav.about },
+            { id: "menu", label: t.nav.menu },
+            { id: "testimonials", label: t.nav.testimonials },
+            { id: "contact", label: t.nav.contact },
+          ]}
+          ctaLabel={t.nav.book}
+          onCtaClick={() => scrollToId("reservation")}
+          onLinkClick={scrollToId}
+        />
       </div>
 
       {/* HERO */}
