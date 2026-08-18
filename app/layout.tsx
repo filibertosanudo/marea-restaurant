@@ -26,7 +26,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
+    // suppressHydrationWarning: the inline script below sets data-theme
+    // before React hydrates, which otherwise reports a (harmless, expected)
+    // hydration mismatch on this element every load.
+    <html lang="es" suppressHydrationWarning>
       <head>
         <script
           // Set data-theme before paint so there's no flash of the wrong
