@@ -401,7 +401,13 @@ export const STR = {
   },
 } as const;
 
-export type Dish = (typeof STR)["en"]["dishes"][number];
+export type Dish = {
+  category: string;
+  price: string;
+  img: string;
+  name: string;
+  desc: string;
+};
 
 export const TIME_SLOTS = (() => {
   const out: { value: string; label: string }[] = [];

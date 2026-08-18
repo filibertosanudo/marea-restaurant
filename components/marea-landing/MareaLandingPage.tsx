@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { Tabs } from "@/components/ui/Tabs";
 import { TestimonialCard } from "@/components/ui/TestimonialCard";
 import { StatItem } from "@/components/ui/StatItem";
-import { STR, TIME_SLOTS, type Lang } from "./content";
+import { STR, TIME_SLOTS, type Dish as DishData, type Lang } from "./content";
 import { Controls } from "./Controls";
 import { Dropdown } from "./Dropdown";
 import { SectionHead } from "./SectionHead";
@@ -15,6 +15,7 @@ import { Placeholder } from "./Placeholder";
 import { OfferCard } from "./OfferCard";
 import { Dish } from "./Dish";
 import { Highlight } from "./Highlight";
+import { PreorderModal } from "./PreorderModal";
 import { ArrowIcon } from "./icons";
 import "./marea-landing.css";
 
@@ -26,6 +27,7 @@ export function MareaLandingPage() {
   const [time, setTime] = useState("19:00");
   const [lang, setLang] = useState<Lang>("en");
   const [theme, setTheme] = useState<Theme>("light");
+  const [preorderDish, setPreorderDish] = useState<DishData | null>(null);
 
   useEffect(() => {
     const storedLang = localStorage.getItem("marea-lang") as Lang | null;
@@ -122,7 +124,12 @@ export function MareaLandingPage() {
             {t.dishes
               .filter((d) => d.category === cat)
               .map((d) => (
-                <Dish key={d.name} dish={d} cta={t.menu.preorder} />
+                <Dish
+                  key={d.name}
+                  dish={d}
+                  cta={t.menu.preorder}
+                  onPreorder={() => setPreorderDish(d)}
+                />
               ))}
           </div>
           <div className="ml-menu-actions">
@@ -277,6 +284,8 @@ export function MareaLandingPage() {
           </div>
         </div>
       </footer>
+
+      <PreorderModal dish={preorderDish} lang={lang} onClose={() => setPreorderDish(null)} />
     </>
   );
 }

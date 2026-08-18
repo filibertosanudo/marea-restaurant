@@ -624,6 +624,61 @@ html {
   color: rgb(var(--color-on-primary));
 }
 
+/* Preorder modal */
+.ml-preorder-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ml-preorder-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+.ml-preorder-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.ml-preorder-price {
+  font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
+  font-weight: 600;
+  font-size: 22px;
+  color: rgb(var(--color-on-surface));
+}
+.ml-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 999px;
+  padding: 8px 16px;
+  flex: 0 0 auto;
+}
+.ml-qty button {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: rgb(var(--color-on-surface));
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ml-qty span {
+  min-width: 16px;
+  text-align: center;
+  font-weight: 600;
+  color: rgb(var(--color-on-surface));
+}
+
 .ml-ta-field {
   display: flex;
   flex-direction: column;
