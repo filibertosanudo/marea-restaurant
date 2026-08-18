@@ -16,6 +16,7 @@ import { OfferCard } from "./OfferCard";
 import { Dish } from "./Dish";
 import { Highlight } from "./Highlight";
 import { PreorderModal } from "./PreorderModal";
+import { scrollToId } from "./scroll";
 import { ArrowIcon } from "./icons";
 import "./marea-landing.css";
 
@@ -62,7 +63,7 @@ export function MareaLandingPage() {
     <>
       <Controls theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} />
       <div className="ml-navbar">
-        <Nav />
+        <Nav onCtaClick={() => scrollToId("contact")} onLinkClick={scrollToId} />
       </div>
 
       {/* HERO */}
@@ -80,7 +81,9 @@ export function MareaLandingPage() {
             </h1>
             <div className="ml-hero-row">
               <p>{t.hero.sub}</p>
-              <Button variant="primary">{t.hero.book}</Button>
+              <Button variant="primary" onClick={() => scrollToId("contact")}>
+                {t.hero.book}
+              </Button>
             </div>
             <div className="ml-promo">
               <h3>{t.hero.promoTitle}</h3>
@@ -133,7 +136,9 @@ export function MareaLandingPage() {
               ))}
           </div>
           <div className="ml-menu-actions">
-            <Button variant="primary">{t.menu.book}</Button>
+            <Button variant="primary" onClick={() => scrollToId("contact")}>
+              {t.menu.book}
+            </Button>
           </div>
         </div>
       </section>
@@ -155,7 +160,7 @@ export function MareaLandingPage() {
           <div className="ml-offer-stage">
             <div className="ml-offer-col">
               {t.offers.left.map((o) => (
-                <OfferCard key={o.title} offer={o} />
+                <OfferCard key={o.title} offer={o} onArrowClick={() => scrollToId("contact")} />
               ))}
             </div>
             <div className="ml-offer-media">
@@ -163,7 +168,7 @@ export function MareaLandingPage() {
             </div>
             <div className="ml-offer-col">
               {t.offers.right.map((o) => (
-                <OfferCard key={o.title} offer={o} />
+                <OfferCard key={o.title} offer={o} onArrowClick={() => scrollToId("contact")} />
               ))}
             </div>
           </div>
