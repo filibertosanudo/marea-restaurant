@@ -548,23 +548,57 @@ html {
   bottom: 20px;
 }
 
-/* Testimonials */
-.ml-tmls {
-  display: grid;
-  grid-template-columns: 1.35fr 0.65fr;
-  gap: 44px;
-  align-items: center;
-  margin-top: 44px;
-}
-.ml-tmls-cards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px;
-}
+/* Testimonials — a small circular accent, then an auto-scrolling
+   marquee so six+ quotes fit without stretching the section tall. The
+   track renders the list twice back to back; animating exactly -50%
+   loops seamlessly back to the start. */
 .ml-tmls-media {
+  width: 140px;
   aspect-ratio: 1;
   border-radius: 50%;
+  margin: 32px auto 0;
   box-shadow: 0 24px 50px -24px rgb(var(--shadow-color) / 0.3);
+}
+.ml-tmls-track-wrap {
+  margin-top: 40px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
+}
+.ml-tmls-track {
+  display: flex;
+  gap: 24px;
+  width: max-content;
+  animation: ml-marquee 36s linear infinite;
+}
+.ml-tmls-track-wrap:hover .ml-tmls-track {
+  animation-play-state: paused;
+}
+@keyframes ml-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ml-tmls-track {
+    animation: none;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+  }
+  /* The track holds the item list twice for the loop — hide the
+     duplicate half (assumes 6 source testimonials) so a static wrap
+     doesn't show every quote twice. */
+  .ml-tmls-track > :nth-child(n + 7) {
+    display: none;
+  }
+  .ml-tmls-track-wrap {
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
 }
 
 /* Reservation — same "photo as background" treatment as the hero:
@@ -938,13 +972,6 @@ html {
     position: static;
     width: 100%;
     max-width: 420px;
-  }
-  .ml-tmls {
-    grid-template-columns: 1fr;
-  }
-  .ml-tmls-media {
-    max-width: 320px;
-    margin: 0 auto;
   }
   .ml-foot-top,
   .ml-foot-mid {

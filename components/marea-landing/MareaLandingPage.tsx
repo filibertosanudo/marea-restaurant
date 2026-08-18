@@ -187,14 +187,14 @@ export function MareaLandingPage() {
       <section className="ml-band ml-section" id="testimonials">
         <div className="ml-wrap">
           <SectionHead center eyebrow={t.tmls.eyebrow} title={t.tmls.title} />
-          <div className="ml-tmls">
-            <div className="ml-tmls-cards">
-              {t.tmls.items.map((it) => (
-                <TestimonialCard key={it.name} quote={it.quote} name={it.name} />
+          <div className="ml-tmls-media">
+            <Placeholder label={t.tmls.media} />
+          </div>
+          <div className="ml-tmls-track-wrap">
+            <div className="ml-tmls-track">
+              {[...t.tmls.items, ...t.tmls.items].map((it, i) => (
+                <TestimonialCard key={`${it.name}-${i}`} quote={it.quote} name={it.name} />
               ))}
-            </div>
-            <div className="ml-tmls-media">
-              <Placeholder label={t.tmls.media} />
             </div>
           </div>
         </div>

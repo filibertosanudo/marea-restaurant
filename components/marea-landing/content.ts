@@ -159,6 +159,26 @@ export const STR = {
           quote: "Every dish tastes like it came straight from the ocean.",
           name: "Andriy Kovalenko",
         },
+        {
+          quote:
+            "This place redefined what I thought seafood could taste like — impeccable freshness in every bite.",
+          name: "Marco Dubois",
+        },
+        {
+          quote:
+            "The lobster thermidor alone is worth the trip. Service was warm and attentive all night.",
+          name: "Sofia Ramirez",
+        },
+        {
+          quote:
+            "A true gem by the water — the paella rivals anything I've had on the coast of Spain.",
+          name: "James Whitfield",
+        },
+        {
+          quote:
+            "From the oysters to the dessert, everything felt thoughtfully crafted. We'll be back.",
+          name: "Nadia Osei",
+        },
       ],
     },
     reserve: {
@@ -365,6 +385,26 @@ export const STR = {
         {
           quote: "Cada platillo sabe como si viniera directo del océano.",
           name: "Andriy Kovalenko",
+        },
+        {
+          quote:
+            "Este lugar redefinió lo que pensaba que podía saber el marisco — frescura impecable en cada bocado.",
+          name: "Marco Dubois",
+        },
+        {
+          quote:
+            "La langosta thermidor por sí sola vale el viaje. El servicio fue cálido y atento toda la noche.",
+          name: "Sofia Ramirez",
+        },
+        {
+          quote:
+            "Una verdadera joya junto al mar — la paella rivaliza con cualquiera que haya probado en la costa de España.",
+          name: "James Whitfield",
+        },
+        {
+          quote:
+            "Desde las ostras hasta el postre, todo se sintió cuidadosamente elaborado. Volveremos.",
+          name: "Nadia Osei",
         },
       ],
     },
