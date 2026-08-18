@@ -169,19 +169,16 @@ export function MareaLandingPage() {
             }
           />
           <div className="ml-offer-stage">
-            <div className="ml-offer-col">
-              {t.offers.left.map((o) => (
-                <OfferCard key={o.title} offer={o} onArrowClick={() => scrollToId("reservation")} />
-              ))}
-            </div>
             <div className="ml-offer-media">
               <Placeholder label={t.offers.dish} />
             </div>
-            <div className="ml-offer-col">
-              {t.offers.right.map((o) => (
-                <OfferCard key={o.title} offer={o} onArrowClick={() => scrollToId("reservation")} />
-              ))}
-            </div>
+            {[t.offers.left[0], t.offers.right[0], t.offers.left[1], t.offers.right[1]].map(
+              (o, i) => (
+                <div className={`ml-offer-pos ml-offer-pos-${i + 1}`} key={o.title}>
+                  <OfferCard offer={o} onArrowClick={() => scrollToId("reservation")} />
+                </div>
+              )
+            )}
           </div>
         </div>
       </section>
