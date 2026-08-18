@@ -28,7 +28,7 @@ export function Nav({
       <span className="font-display text-lg font-semibold text-primary">
         Marea
       </span>
-      <ul className="hidden gap-md text-sm text-on-surface-muted sm:flex">
+      <ul className="hidden gap-md text-sm text-on-surface-muted xl:flex">
         {links.map((link) => (
           <li key={link.id}>
             <button
