@@ -1,0 +1,25 @@
+# dependencies
+node_modules
+
+# next.js
+.next
+out
+next-env.d.ts
+
+# build output
+dist
+build
+
+# misc
+*.log
+.env*.local
+.DS_Store
+*.tsbuildinfo
+
+# Claude Code / AI tooling — not part of the shipped app
+.agents/
+.claude/
+.design-sync/
+.ds-sync/
+ds-bundle/
+skills-lock.json

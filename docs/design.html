@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marea — Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat+Alternates:wght@500;600;700&family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* colors */
+    --color-surface: #FFFFFF;
+    --color-surface-subtle: #F8F9FA;
+    --color-surface-ocean: #ECF5F8;
+    --color-surface-ocean-border: #D6E9EF;
+    --color-on-surface: #232C3B;
+    --color-on-surface-muted: #57646C;
+    --color-border: #E2E5E8;
+    --color-primary: #1B367B;
+    --color-primary-hover: #16295F;
+    --color-on-primary: #FFFFFF;
+    --color-accent-warm: #F0E7D5;
+    --color-accent-warm-border: #D8CCB4;
+    --color-on-accent-warm: #6F6A5C;
+    --color-success: #1F8A5F;
+    --color-warning: #C77D19;
+    --color-error: #C0392B;
+    --color-info: #2C6FBB;
+
+    /* typography */
+    --font-display: 'Montserrat Alternates', sans-serif;
+    --font-body: 'Poppins', sans-serif;
+
+    --type-display-size: 64px;
+    --type-display-weight: 600;
+    --type-display-lh: 1.05;
+    --type-display-ls: -0.01em;
+
+    --type-h1-size: 40px;
+    --type-h1-weight: 600;
+    --type-h1-lh: 1.15;
+    --type-h1-ls: -0.005em;
+
+    --type-h2-size: 28px;
+    --type-h2-weight: 600;
+    --type-h2-lh: 1.2;
+
+    --type-h3-size: 20px;
+    --type-h3-weight: 600;
+    --type-h3-lh: 1.3;
+
+    --type-body-lg-size: 18px;
+    --type-body-lg-weight: 300;
+    --type-body-lg-lh: 1.6;
+
+    --type-body-size: 16px;
+    --type-body-weight: 400;
+    --type-body-lh: 1.6;
+
+    --type-caption-size: 13px;
+    --type-caption-weight: 400;
+    --type-caption-lh: 1.4;
+    --type-caption-ls: 0.01em;
+
+    --type-button-size: 15px;
+    --type-button-weight: 500;
+    --type-button-lh: 1;
+    --type-button-ls: 0.01em;
+
+    /* rounded */
+    --rounded-sm: 8px;
+    --rounded-md: 12px;
+    --rounded-lg: 20px;
+    --rounded-xl: 28px;
+    --rounded-full: 999px;
+
+    /* spacing */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --space-2xl: 48px;
+    --space-3xl: 64px;
+    --space-4xl: 96px;
+
+    /* elevation */
+    --shadow-1: 0 2px 10px rgba(27, 54, 123, 0.10);
+    --shadow-2: 0 10px 28px rgba(27, 54, 123, 0.18);
+    --shadow-hero: 0 30px 60px rgba(27, 54, 123, 0.24);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--color-surface-subtle);
+    color: var(--color-on-surface);
+    font-family: var(--font-body);
+    font-size: var(--type-body-size);
+    font-weight: var(--type-body-weight);
+    line-height: var(--type-body-lh);
+  }
+
+  .wrap {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: var(--space-2xl) var(--space-lg) var(--space-4xl);
+  }
+
+  header.hero {
+    background: linear-gradient(160deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+    color: var(--color-on-primary);
+    padding: var(--space-3xl) var(--space-lg);
+    border-radius: 0 0 var(--rounded-xl) var(--rounded-xl);
+  }
+  header.hero .inner { max-width: 1040px; margin: 0 auto; }
+  header.hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(36px, 6vw, var(--type-display-size));
+    font-weight: var(--type-display-weight);
+    line-height: var(--type-display-lh);
+    letter-spacing: var(--type-display-ls);
+    margin: 0 0 var(--space-sm);
+  }
+  header.hero p.sub {
+    font-size: var(--type-body-lg-size);
+    font-weight: var(--type-body-lg-weight);
+    line-height: var(--type-body-lg-lh);
+    color: var(--color-surface-ocean);
+    max-width: 640px;
+    margin: 0 0 var(--space-xs);
+  }
+  header.hero p.mirror-note {
+    font-size: var(--type-caption-size);
+    letter-spacing: var(--type-caption-ls);
+    color: rgba(255,255,255,0.7);
+    margin-top: var(--space-lg);
+  }
+
+  section { margin-top: var(--space-4xl); }
+  section > h2.section-title {
+    font-family: var(--font-display);
+    font-size: var(--type-h1-size);
+    font-weight: var(--type-h1-weight);
+    letter-spacing: var(--type-h1-ls);
+    margin: 0 0 var(--space-xs);
+    color: var(--color-primary);
+  }
+  section > p.section-desc {
+    color: var(--color-on-surface-muted);
+    margin: 0 0 var(--space-xl);
+    max-width: 640px;
+  }
+
+  /* Colors */
+  .swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--space-md);
+  }
+  .swatch {
+    border: 1px solid var(--color-border);
+    border-radius: var(--rounded-md);
+    overflow: hidden;
+    background: var(--color-surface);
+  }
+  .swatch .block {
+    height: 88px;
+    display: flex;
+    align-items: flex-end;
+    padding: var(--space-sm);
+    font-size: var(--type-caption-size);
+  }
+  .swatch .meta { padding: var(--space-sm) var(--space-md) var(--space-md); }
+  .swatch .meta .name { font-weight: 500; font-size: 14px; }
+  .swatch .meta .hex { color: var(--color-on-surface-muted); font-size: 13px; font-family: monospace; }
+
+  /* Typography */
+  .type-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-xl);
+    padding: var(--space-lg) 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .type-row:last-child { border-bottom: none; }
+  .type-row .sample { flex: 1; color: var(--color-on-surface); }
+  .type-row .spec {
+    width: 260px;
+    flex-shrink: 0;
+    font-size: 13px;
+    color: var(--color-on-surface-muted);
+    font-family: monospace;
+    line-height: 1.7;
+  }
+  .type-row .spec .token { color: var(--color-primary); font-weight: 600; }
+
+  /* Spacing */
+  .space-row { display: flex; align-items: center; gap: var(--space-lg); margin-bottom: var(--space-sm); }
+  .space-row .bar { background: var(--color-primary); border-radius: var(--rounded-sm); height: 20px; }
+  .space-row .label { width: 140px; font-family: monospace; font-size: 13px; color: var(--color-on-surface-muted); }
+
+  /* Radius */
+  .radius-grid { display: flex; gap: var(--space-lg); flex-wrap: wrap; }
+  .radius-item { text-align: center; }
+  .radius-item .box {
+    width: 96px; height: 96px;
+    background: var(--color-primary);
+    margin-bottom: var(--space-sm);
+  }
+  .radius-item .label { font-family: monospace; font-size: 13px; color: var(--color-on-surface-muted); }
+
+  /* Elevation */
+  .elevation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-xl); }
+  .elevation-card {
+    background: var(--color-surface);
+    border-radius: var(--rounded-lg);
+    padding: var(--space-xl);
+    text-align: center;
+  }
+  .elevation-card .label { margin-top: var(--space-md); font-size: 14px; font-weight: 500; }
+  .elevation-card .val { font-family: monospace; font-size: 12px; color: var(--color-on-surface-muted); }
+
+  /* Components */
+  .comp-block { margin-bottom: var(--space-2xl); }
+  .comp-block h3 {
+    font-family: var(--font-display);
+    font-size: var(--type-h3-size);
+    color: var(--color-on-surface);
+    margin-bottom: var(--space-md);
+  }
+  .comp-row { display: flex; gap: var(--space-md); flex-wrap: wrap; align-items: center; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--font-body);
+    font-size: var(--type-button-size);
+    font-weight: var(--type-button-weight);
+    letter-spacing: var(--type-button-ls);
+    border-radius: var(--rounded-full);
+    padding: 14px 28px;
+    border: none; cursor: pointer;
+  }
+  .btn-primary { background: var(--color-primary); color: var(--color-on-primary); }
+  .btn-primary.is-hover { background: var(--color-primary-hover); }
+  .btn-secondary { background: var(--color-surface); color: var(--color-primary); border: 1px solid var(--color-border); }
+  .btn-secondary.is-hover { background: var(--color-surface-ocean); border-color: var(--color-surface-ocean-border); }
+
+  .field-label { font-size: 13px; color: var(--color-on-surface-muted); display: block; margin-bottom: 6px; }
+  .input {
+    width: 220px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-size);
+    padding: 12px 16px;
+    border-radius: var(--rounded-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-on-surface);
+  }
+  .input.is-focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(27,54,123,0.15); outline: none; }
+
+  .card-menu {
+    background: var(--color-surface);
+    border-radius: var(--rounded-lg);
+    padding: var(--space-md);
+    width: 220px;
+    box-shadow: var(--shadow-1);
+  }
+  .card-menu .thumb { height: 110px; border-radius: var(--rounded-md); background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-surface-ocean) 100%); margin-bottom: var(--space-sm); }
+  .card-menu .name { font-weight: 500; margin-bottom: 2px; }
+  .card-menu .price { color: var(--color-primary); font-weight: 600; font-size: 14px; }
+
+  .card-testimonial {
+    background: var(--color-surface-ocean);
+    border: 1px solid var(--color-surface-ocean-border);
+    border-radius: var(--rounded-lg);
+    padding: var(--space-lg);
+    width: 260px;
+  }
+  .card-testimonial .avatar { width: 40px; height: 40px; border-radius: var(--rounded-full); background: var(--color-primary); margin-bottom: var(--space-sm); }
+  .card-testimonial .quote { font-size: 14px; color: var(--color-on-surface); }
+  .card-testimonial .name { margin-top: var(--space-sm); font-weight: 500; font-size: 13px; }
+
+  .badge-offer {
+    display: inline-flex; align-items: center;
+    background: var(--color-accent-warm);
+    color: var(--color-on-accent-warm);
+    border: 1px solid var(--color-accent-warm-border);
+    font-size: var(--type-caption-size);
+    letter-spacing: var(--type-caption-ls);
+    border-radius: var(--rounded-full);
+    padding: 6px 14px;
+  }
+
+  .stat-item {
+    background: var(--color-surface);
+    border-radius: var(--rounded-md);
+    padding: var(--space-md);
+    text-align: center;
+    box-shadow: var(--shadow-1);
+    width: 130px;
+  }
+  .stat-item .num { font-family: var(--font-display); font-size: var(--type-h2-size); font-weight: var(--type-h2-weight); color: var(--color-primary); }
+  .stat-item .cap { font-size: 12px; color: var(--color-on-surface-muted); margin-top: 4px; }
+
+  .nav-pill {
+    display: flex; align-items: center; gap: var(--space-lg);
+    background: var(--color-surface);
+    border-radius: var(--rounded-full);
+    padding: 12px 24px;
+    box-shadow: var(--shadow-1);
+    width: fit-content;
+    font-size: 14px;
+  }
+  .nav-pill .logo { font-family: var(--font-display); font-weight: 600; color: var(--color-primary); }
+  .nav-pill .links { display: flex; gap: var(--space-md); color: var(--color-on-surface-muted); }
+
+  /* Do's / Don'ts */
+  .dd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-xl); }
+  .dd-col h3 { font-family: var(--font-display); font-size: var(--type-h3-size); margin-bottom: var(--space-md); }
+  .dd-col.do h3 { color: var(--color-success); }
+  .dd-col.dont h3 { color: var(--color-error); }
+  .dd-col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-sm); }
+  .dd-col li {
+    background: var(--color-surface);
+    border-radius: var(--rounded-md);
+    padding: var(--space-md);
+    font-size: 14px;
+    border-left: 3px solid var(--color-success);
+  }
+  .dd-col.dont li { border-left-color: var(--color-error); }
+
+  @media (max-width: 640px) {
+    .dd-grid { grid-template-columns: 1fr; }
+    .type-row { flex-direction: column; align-items: flex-start; gap: var(--space-sm); }
+    .type-row .spec { width: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="inner">
+    <h1>Marea</h1>
+    <p class="sub">Sistema de diseño del proyecto insignia "Grupo 1 — Comida y Bebida" (restaurante de mariscos) del portafolio de Filiberto Sañudo.</p>
+    <p class="mirror-note">Este archivo es el mirror visual de <strong>docs/design.md</strong> — misma fuente de verdad, renderizada para humanos.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section id="colors">
+    <h2 class="section-title">Colors</h2>
+    <p class="section-desc">Navy anclado al navy del portafolio (#1B367B), superficie ocean tomada de la referencia, acento cálido compartido con el portafolio.</p>
+    <div class="swatch-grid">
+
+      <div class="swatch"><div class="block" style="background:var(--color-primary); color:var(--color-on-primary)">primary</div><div class="meta"><div class="name">primary</div><div class="hex">#1B367B</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-primary-hover); color:var(--color-on-primary)">primary-hover</div><div class="meta"><div class="name">primary-hover</div><div class="hex">#16295F</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-on-primary); color:var(--color-primary); border-bottom:1px solid var(--color-border)">on-primary</div><div class="meta"><div class="name">on-primary</div><div class="hex">#FFFFFF</div></div></div>
+
+      <div class="swatch"><div class="block" style="background:var(--color-surface); color:var(--color-on-surface); border-bottom:1px solid var(--color-border)">surface</div><div class="meta"><div class="name">surface</div><div class="hex">#FFFFFF</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-surface-subtle); color:var(--color-on-surface)">surface-subtle</div><div class="meta"><div class="name">surface-subtle</div><div class="hex">#F8F9FA</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-surface-ocean); color:var(--color-on-surface)">surface-ocean</div><div class="meta"><div class="name">surface-ocean</div><div class="hex">#ECF5F8</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-surface-ocean-border); color:var(--color-on-surface)">surface-ocean-border</div><div class="meta"><div class="name">surface-ocean-border</div><div class="hex">#D6E9EF</div></div></div>
+
+      <div class="swatch"><div class="block" style="background:var(--color-on-surface); color:#fff">on-surface</div><div class="meta"><div class="name">on-surface</div><div class="hex">#232C3B</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-on-surface-muted); color:#fff">on-surface-muted</div><div class="meta"><div class="name">on-surface-muted</div><div class="hex">#57646C</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-border); color:var(--color-on-surface)">border</div><div class="meta"><div class="name">border</div><div class="hex">#E2E5E8</div></div></div>
+
+      <div class="swatch"><div class="block" style="background:var(--color-accent-warm); color:var(--color-on-accent-warm)">accent-warm</div><div class="meta"><div class="name">accent-warm</div><div class="hex">#F0E7D5</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-accent-warm-border); color:var(--color-on-accent-warm)">accent-warm-border</div><div class="meta"><div class="name">accent-warm-border</div><div class="hex">#D8CCB4</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-on-accent-warm); color:#fff">on-accent-warm</div><div class="meta"><div class="name">on-accent-warm</div><div class="hex">#6F6A5C</div></div></div>
+
+      <div class="swatch"><div class="block" style="background:var(--color-success); color:#fff">success</div><div class="meta"><div class="name">success</div><div class="hex">#1F8A5F</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-warning); color:#fff">warning</div><div class="meta"><div class="name">warning</div><div class="hex">#C77D19</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-error); color:#fff">error</div><div class="meta"><div class="name">error</div><div class="hex">#C0392B</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-info); color:#fff">info</div><div class="meta"><div class="name">info</div><div class="hex">#2C6FBB</div></div></div>
+
+    </div>
+  </section>
+
+  <section id="typography">
+    <h2 class="section-title">Typography</h2>
+    <p class="section-desc">Montserrat Alternates para display/headings, Poppins para body y UI. Light se reserva para body-lg por legibilidad.</p>
+
+    <div class="type-row">
+      <div class="sample" style="font-family:var(--font-display); font-size:clamp(32px,5vw,var(--type-display-size)); font-weight:var(--type-display-weight); line-height:var(--type-display-lh); letter-spacing:var(--type-display-ls); color:var(--color-primary)">Seafood Delicacies</div>
+      <div class="spec"><span class="token">display</span><br>Montserrat Alternates · 600<br>64px / 1.05 / -0.01em</div>
+    </div>
+    <div class="type-row">
+      <div class="sample" style="font-family:var(--font-display); font-size:var(--type-h1-size); font-weight:var(--type-h1-weight); line-height:var(--type-h1-lh); letter-spacing:var(--type-h1-ls)">Our Menu</div>
+      <div class="spec"><span class="token">h1</span><br>Montserrat Alternates · 600<br>40px / 1.15</div>
+    </div>
+    <div class="type-row">
+      <div class="sample" style="font-family:var(--font-display); font-size:var(--type-h2-size); font-weight:var(--type-h2-weight); line-height:var(--type-h2-lh)">Exclusive Offers</div>
+      <div class="spec"><span class="token">h2</span><br>Montserrat Alternates · 600<br>28px / 1.2</div>
+    </div>
+    <div class="type-row">
+      <div class="sample" style="font-family:var(--font-display); font-size:var(--type-h3-size); font-weight:var(--type-h3-weight); line-height:var(--type-h3-lh)">Testimonials</div>
+      <div class="spec"><span class="token">h3</span><br>Montserrat Alternates · 600<br>20px / 1.3</div>
+    </div>
+    <div class="type-row">
+      <div class="sample" style="font-family:var(--font-body); font-size:var(--type-body-lg-size); font-weight:var(--type-body-lg-weight); line-height:var(--type-body-lg-lh)">"Dive into freshness — an ocean of flavors awaits at our restaurant."</div>
+      <div class="spec"><span class="token">body-lg</span><br>Poppins Light · 300<br>18px / 1.6</div>
+    </div>
+    <div class="type-row">
+      <div class="sample" style="font-family:var(--font-body); font-size:var(--type-body-size); font-weight:var(--type-body-weight); line-height:var(--type-body-lh)">Fresh, delicately prepared seafood sourced daily from local waters.</div>
+      <div class="spec"><span class="token">body</span><br>Poppins Regular · 400<br>16px / 1.6</div>
+    </div>
+    <div class="type-row">
+      <div class="sample" style="font-family:var(--font-body); font-size:var(--type-caption-size); font-weight:var(--type-caption-weight); letter-spacing:var(--type-caption-ls); color:var(--color-on-surface-muted)">ONLY FRESH SEAFOOD</div>
+      <div class="spec"><span class="token">caption</span><br>Poppins Regular · 400<br>13px / 1.4</div>
+    </div>
+    <div class="type-row">
+      <div class="sample" style="font-family:var(--font-body); font-size:var(--type-button-size); font-weight:var(--type-button-weight); letter-spacing:var(--type-button-ls)">Book a Table</div>
+      <div class="spec"><span class="token">button-label</span><br>Poppins Medium · 500<br>15px</div>
+    </div>
+  </section>
+
+  <section id="spacing">
+    <h2 class="section-title">Spacing</h2>
+    <p class="section-desc">Escala 4→96px para un ritmo cómodo-generoso, consistente entre padding pequeño y separación de secciones.</p>
+    <div class="space-row"><div class="label">xs · 4px</div><div class="bar" style="width:var(--space-xs)"></div></div>
+    <div class="space-row"><div class="label">sm · 8px</div><div class="bar" style="width:var(--space-sm)"></div></div>
+    <div class="space-row"><div class="label">md · 16px</div><div class="bar" style="width:var(--space-md)"></div></div>
+    <div class="space-row"><div class="label">lg · 24px</div><div class="bar" style="width:var(--space-lg)"></div></div>
+    <div class="space-row"><div class="label">xl · 32px</div><div class="bar" style="width:var(--space-xl)"></div></div>
+    <div class="space-row"><div class="label">2xl · 48px</div><div class="bar" style="width:var(--space-2xl)"></div></div>
+    <div class="space-row"><div class="label">3xl · 64px</div><div class="bar" style="width:var(--space-3xl)"></div></div>
+    <div class="space-row"><div class="label">4xl · 96px</div><div class="bar" style="width:var(--space-4xl)"></div></div>
+  </section>
+
+  <section id="radius">
+    <h2 class="section-title">Radius</h2>
+    <p class="section-desc">Lenguaje suave-redondeado: píldora en CTAs, esquinas generosas en cards, más contenido en inputs/badges.</p>
+    <div class="radius-grid">
+      <div class="radius-item"><div class="box" style="border-radius:var(--rounded-sm)"></div><div class="label">sm · 8px</div></div>
+      <div class="radius-item"><div class="box" style="border-radius:var(--rounded-md)"></div><div class="label">md · 12px</div></div>
+      <div class="radius-item"><div class="box" style="border-radius:var(--rounded-lg)"></div><div class="label">lg · 20px</div></div>
+      <div class="radius-item"><div class="box" style="border-radius:var(--rounded-xl)"></div><div class="label">xl · 28px</div></div>
+      <div class="radius-item"><div class="box" style="border-radius:var(--rounded-full)"></div><div class="label">full · 999px</div></div>
+    </div>
+  </section>
+
+  <section id="elevation">
+    <h2 class="section-title">Elevation &amp; Depth</h2>
+    <p class="section-desc">Sombras suaves con tinte azulado (no negro puro) — sensación de agua/vidrio en vez de peso corporativo.</p>
+    <div class="elevation-grid">
+      <div class="elevation-card" style="box-shadow:var(--shadow-1)"><div class="label">Nivel 1 — reposo</div><div class="val">0 2px 10px rgba(27,54,123,.10)</div></div>
+      <div class="elevation-card" style="box-shadow:var(--shadow-2)"><div class="label">Nivel 2 — hover / foco</div><div class="val">0 10px 28px rgba(27,54,123,.18)</div></div>
+      <div class="elevation-card" style="box-shadow:var(--shadow-hero)"><div class="label">Hero — mockup destacado</div><div class="val">0 30px 60px rgba(27,54,123,.24)</div></div>
+    </div>
+  </section>
+
+  <section id="components">
+    <h2 class="section-title">Components</h2>
+    <p class="section-desc">Cada componente referencia tokens de color, tipografía y radio — no valores sueltos.</p>
+
+    <div class="comp-block">
+      <h3>Buttons</h3>
+      <div class="comp-row">
+        <button class="btn btn-primary">Book a Table</button>
+        <button class="btn btn-primary is-hover">Book a Table (hover)</button>
+        <button class="btn btn-secondary">View Full Menu</button>
+        <button class="btn btn-secondary is-hover">View Full Menu (hover)</button>
+      </div>
+    </div>
+
+    <div class="comp-block">
+      <h3>Input</h3>
+      <div class="comp-row">
+        <div><span class="field-label">Name</span><input class="input" placeholder="Tu nombre" readonly></div>
+        <div><span class="field-label">Name — focus</span><input class="input is-focus" placeholder="Tu nombre" readonly></div>
+      </div>
+    </div>
+
+    <div class="comp-block">
+      <h3>Card — Menu</h3>
+      <div class="comp-row">
+        <div class="card-menu">
+          <div class="thumb"></div>
+          <div class="name">Lobster Thermidor</div>
+          <div class="price">$28.00</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="comp-block">
+      <h3>Card — Testimonial</h3>
+      <div class="comp-row">
+        <div class="card-testimonial">
+          <div class="avatar"></div>
+          <div class="quote">"The freshest seafood I've had — the ambiance matched the flavor perfectly."</div>
+          <div class="name">Elena Petrenko</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="comp-block">
+      <h3>Badge — Offer</h3>
+      <div class="comp-row">
+        <span class="badge-offer">20% OFF · Weekends</span>
+      </div>
+    </div>
+
+    <div class="comp-block">
+      <h3>Stat item</h3>
+      <div class="comp-row">
+        <div class="stat-item"><div class="num">25+</div><div class="cap">Years of Experience</div></div>
+        <div class="stat-item"><div class="num">10K+</div><div class="cap">Happy Customers</div></div>
+      </div>
+    </div>
+
+    <div class="comp-block">
+      <h3>Nav</h3>
+      <div class="comp-row">
+        <div class="nav-pill">
+          <span class="logo">Marea</span>
+          <span class="links">Home · Menu · Reservations</span>
+          <button class="btn btn-primary" style="padding:8px 18px; font-size:13px;">Book</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="dos-donts">
+    <h2 class="section-title">Do's and Don'ts</h2>
+    <div class="dd-grid">
+      <div class="dd-col do">
+        <h3>✓ Do</h3>
+        <ul>
+          <li>Usar <code>primary</code> (#1B367B) como único azul de marca — es el ancla visual con el portafolio.</li>
+          <li>Reservar <code>accent-warm</code> para momentos puntuales de calidez (ofertas, badges).</li>
+          <li>Mantener el radio píldora en todos los CTAs, incluso en thumbnail.</li>
+          <li>Dejar que la fotografía real de comida sea la protagonista visual.</li>
+          <li>Cumplir AA en todos los pares texto/fondo, sobre todo con <code>body-lg</code>.</li>
+        </ul>
+      </div>
+      <div class="dd-col dont">
+        <h3>✗ Don't</h3>
+        <ul>
+          <li>Introducir un segundo azul (p. ej. 1C3F6C/003093 literal) — rompe el ancla con el portafolio.</li>
+          <li>Usar Poppins Light por debajo de 18px en texto de lectura.</li>
+          <li>Aplanar las sombras a "flat design" total — se pierde la sensación de agua/vidrio.</li>
+          <li>Mezclar esquinas rectas de golpe en un componente puntual.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

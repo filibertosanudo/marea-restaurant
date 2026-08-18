@@ -1,0 +1,40 @@
+{
+  "name": "marea-restaurant",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "build:lib": "tsup components/index.ts --format esm,cjs --dts --out-dir dist --tsconfig tsconfig.lib.json",
+    "build:css": "tailwindcss -i ./styles/lib.css -o ./dist/styles.css --minify"
+  },
+  "dependencies": {
+    "next": "16.3.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "16.3.1",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.0"
+  }
+}
