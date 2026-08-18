@@ -149,6 +149,7 @@ html {
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   padding: 130px 0 60px;
   background: linear-gradient(180deg, rgb(var(--color-surface)) 0%, rgb(var(--color-surface-ocean)) 100%);
