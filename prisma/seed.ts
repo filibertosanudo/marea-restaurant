@@ -15,6 +15,15 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, Prisma } from "../lib/generated/prisma/client";
 // Prisma 6:  import { PrismaClient, Prisma } from "@prisma/client";
+import { hashPassword } from "../lib/auth/password";
+
+// Contraseñas de desarrollo para el personal sembrado — documentadas en el
+// README. Nunca uses estos valores fuera de un entorno local.
+const DEV_PASSWORDS: Record<string, string> = {
+  "super@marea.test": "MareaSuper123!",
+  "admin@marea.test": "MareaAdmin123!",
+  "mesero@marea.test": "MareaTemp123!", // mustChangePassword: true — ver abajo
+};
 
 // Prisma 7: PrismaClient ya no acepta la URL directa, necesita un driver
 // adapter. Aquí sí usamos DIRECT_URL (no el pooler) porque el seed corre
@@ -322,22 +331,27 @@ async function main() {
     [
       { email: "super@marea.test", name: "Platform Admin", role: "SUPER_ADMIN" as const },
       { email: "admin@marea.test", name: "Camila Ortega", role: "BUSINESS_ADMIN" as const },
-      { email: "mesero@marea.test", name: "Diego Fuentes", role: "STAFF" as const },
+      { email: "mesero@marea.test", name: "Diego Fuentes", role: "STAFF" as const, mustChangePassword: true },
       { email: "mesera@marea.test", name: "Renata Ibarra", role: "STAFF" as const },
       { email: "cliente@marea.test", name: "Fili Sañudo", role: "CUSTOMER" as const },
-    ].map((u) =>
-      prisma.user.upsert({
+    ].map(async (u) => {
+      const plainPassword = DEV_PASSWORDS[u.email];
+      const passwordHash = plainPassword ? await hashPassword(plainPassword) : null;
+      const mustChangePassword = "mustChangePassword" in u ? u.mustChangePassword : false;
+      return prisma.user.upsert({
         where: { email: u.email },
-        update: {},
+        update: passwordHash ? { passwordHash, mustChangePassword } : {},
         create: {
           email: u.email,
           name: u.name,
           role: u.role,
           emailVerified: new Date(),
           locale: u.role === "CUSTOMER" ? "es" : "es",
+          passwordHash,
+          mustChangePassword,
         },
-      })
-    )
+      });
+    })
   );
 
   const [, admin, waiter, , customer] = users;
