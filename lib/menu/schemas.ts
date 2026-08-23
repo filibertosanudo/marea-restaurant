@@ -6,16 +6,32 @@ import type { Lang } from "@/lib/i18n/lang";
 // default locale as a parameter instead of hardcoding "es" so this stays
 // correct if Business.defaultLocale ever changes — see docs/DATABASE.md.
 
-function localizedText(defaultLocale: Lang, extra?: Record<string, z.ZodTypeAny>) {
+function localizedText(defaultLocale: Lang) {
   const required = z.object({
     name: z.string().min(1, "Required").max(120),
     description: z.string().max(2000).optional().default(""),
-    ...extra,
   });
   const optional = z.object({
     name: z.string().max(120).optional().default(""),
     description: z.string().max(2000).optional().default(""),
-    ...extra,
+  });
+  return z.object({
+    en: defaultLocale === "en" ? required : optional,
+    es: defaultLocale === "es" ? required : optional,
+  });
+}
+
+function localizedTextWithImageAlt(defaultLocale: Lang) {
+  const imageAlt = z.string().max(200).optional().default("");
+  const required = z.object({
+    name: z.string().min(1, "Required").max(120),
+    description: z.string().max(2000).optional().default(""),
+    imageAlt,
+  });
+  const optional = z.object({
+    name: z.string().max(120).optional().default(""),
+    description: z.string().max(2000).optional().default(""),
+    imageAlt,
   });
   return z.object({
     en: defaultLocale === "en" ? required : optional,
@@ -47,9 +63,7 @@ export function buildMenuItemSchema(defaultLocale: Lang) {
     imageUrl: z.string().url().optional().or(z.literal("")),
     isAvailable: z.boolean().default(true),
     isFeatured: z.boolean().default(false),
-    translations: localizedText(defaultLocale, {
-      imageAlt: z.string().max(200).optional().default(""),
-    }),
+    translations: localizedTextWithImageAlt(defaultLocale),
     tagIds: z.array(z.string()).default([]),
     modifierGroupIds: z.array(z.string()).default([]),
   });
