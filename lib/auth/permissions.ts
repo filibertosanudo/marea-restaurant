@@ -1,4 +1,5 @@
 import "server-only";
+import { redirect } from "next/navigation";
 import { UserRole } from "@/lib/generated/prisma/client";
 import { auth } from "@/auth";
 import type { Session } from "next-auth";
@@ -44,6 +45,22 @@ export async function requireRole(
   }
   if (!roles.includes(session.user.role)) {
     throw new ForbiddenError("Insufficient role");
+  }
+  return session;
+}
+
+/**
+ * Page-level guard for Server Components. Unlike requireRole (which throws
+ * for Server Actions), this redirects — a STAFF member hitting an
+ * admin-only URL directly should land somewhere real, not an error page.
+ */
+export async function requirePageRole(
+  redirectTo: string,
+  ...roles: UserRole[]
+): Promise<Session> {
+  const session = await auth();
+  if (!session?.user || session.user.mustChangePassword || !roles.includes(session.user.role)) {
+    redirect(redirectTo);
   }
   return session;
 }
