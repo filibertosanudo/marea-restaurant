@@ -1,4 +1,4 @@
-export type Lang = "en" | "es";
+export type { Lang } from "@/lib/i18n/lang";
 
 export const STR = {
   en: {
