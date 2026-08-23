@@ -111,8 +111,13 @@ export const en = {
       newOption: "New option",
       optionName: "Option name",
       priceDelta: "Price delta",
+      isDefault: "Default option",
       appliedTo: "Applied to",
       appliedToCount: "{count} dishes",
+      noGroupsYet: "No modifier groups yet.",
+      deleteGroupBlocked: "This group is applied to dishes — remove it from them first.",
+      deleteGroupConfirmBody: "This modifier group will be removed — this can't be undone.",
+      deleteOptionConfirmBody: "This option will be removed — this can't be undone.",
     },
     team: {
       title: "Team",
@@ -132,6 +137,7 @@ export const en = {
     common: {
       save: "Save",
       cancel: "Cancel",
+      edit: "Edit",
       delete: "Delete",
       confirm: "Confirm",
       search: "Search",

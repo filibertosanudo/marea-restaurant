@@ -113,8 +113,13 @@ export const es = {
       newOption: "Nueva opción",
       optionName: "Nombre de la opción",
       priceDelta: "Delta de precio",
+      isDefault: "Opción por defecto",
       appliedTo: "Aplicado a",
       appliedToCount: "{count} platillos",
+      noGroupsYet: "Todavía no hay grupos de modificadores.",
+      deleteGroupBlocked: "Este grupo está aplicado a platillos — quítalo de ellos primero.",
+      deleteGroupConfirmBody: "Este grupo de modificadores se eliminará — esto no se puede deshacer.",
+      deleteOptionConfirmBody: "Esta opción se eliminará — esto no se puede deshacer.",
     },
     team: {
       title: "Equipo",
@@ -134,6 +139,7 @@ export const es = {
     common: {
       save: "Guardar",
       cancel: "Cancelar",
+      edit: "Editar",
       delete: "Eliminar",
       confirm: "Confirmar",
       search: "Buscar",
