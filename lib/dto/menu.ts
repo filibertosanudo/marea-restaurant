@@ -160,10 +160,13 @@ export function toMenuItemListDTO(item: MenuItemWithRelations, lang: Lang): Menu
 export type ModifierOptionDTO = {
   id: string;
   slug: string;
+  groupId: string;
   name: string;
   priceDelta: string;
   isAvailable: boolean;
   isDefault: boolean;
+  missingLocales: Lang[];
+  translations: Record<Lang, { name: string }>;
 };
 
 export function toModifierOptionDTO(
@@ -174,10 +177,16 @@ export function toModifierOptionDTO(
   return {
     id: option.id,
     slug: option.slug,
+    groupId: option.groupId,
     name: map[lang]?.name ?? map.en?.name ?? option.slug,
     priceDelta: decimalToString(option.priceDelta) ?? "0.00",
     isAvailable: option.isAvailable,
     isDefault: option.isDefault,
+    missingLocales: missingLocales(option.translations),
+    translations: {
+      en: { name: map.en?.name ?? "" },
+      es: { name: map.es?.name ?? "" },
+    },
   };
 }
 
@@ -185,12 +194,15 @@ export type ModifierGroupDTO = {
   id: string;
   slug: string;
   name: string;
+  helpText: string;
   selectionType: "SINGLE" | "MULTIPLE";
   isRequired: boolean;
   minSelections: number;
   maxSelections: number | null;
   options: ModifierOptionDTO[];
   appliedToCount: number;
+  missingLocales: Lang[];
+  translations: Record<Lang, { name: string }>;
 };
 
 export function toModifierGroupDTO(
@@ -206,11 +218,17 @@ export function toModifierGroupDTO(
     id: group.id,
     slug: group.slug,
     name: map[lang]?.name ?? map.en?.name ?? group.slug,
+    helpText: map[lang]?.helpText ?? map.en?.helpText ?? "",
     selectionType: group.selectionType,
     isRequired: group.isRequired,
     minSelections: group.minSelections,
     maxSelections: group.maxSelections,
     options: group.options.map((o) => toModifierOptionDTO(o, lang)),
     appliedToCount: group._count.menuItems,
+    missingLocales: missingLocales(group.translations),
+    translations: {
+      en: { name: map.en?.name ?? "" },
+      es: { name: map.es?.name ?? "" },
+    },
   };
 }
