@@ -9,8 +9,8 @@ export function LangSwitch({ lang }: { lang: Lang }) {
 
   function pick(next: Lang) {
     if (next === lang || pending) return;
-    startTransition(() => {
-      setAdminLangAction(next);
+    startTransition(async () => {
+      await setAdminLangAction(next);
     });
   }
 
