@@ -69,27 +69,40 @@ export function buildMenuItemSchema(defaultLocale: Lang) {
   });
 }
 
-export const modifierGroupSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(1, "Required").max(80),
-  helpText: z.string().max(200).optional().default(""),
-  selectionType: z.enum(["SINGLE", "MULTIPLE"]),
-  isRequired: z.boolean().default(false),
-  minSelections: z.coerce.number().int().min(0).default(0),
-  maxSelections: z.coerce.number().int().min(1).optional(),
-});
+function localizedName(defaultLocale: Lang, maxLen: number) {
+  const required = z.object({ name: z.string().min(1, "Required").max(maxLen) });
+  const optional = z.object({ name: z.string().max(maxLen).optional().default("") });
+  return z.object({
+    en: defaultLocale === "en" ? required : optional,
+    es: defaultLocale === "es" ? required : optional,
+  });
+}
 
-export const modifierOptionSchema = z.object({
-  id: z.string().optional(),
-  groupId: z.string().min(1),
-  name: z.string().min(1, "Required").max(80),
-  priceDelta: z
-    .string()
-    .regex(/^-?\d+(\.\d{1,2})?$/, "Invalid amount")
-    .default("0"),
-  isAvailable: z.boolean().default(true),
-  isDefault: z.boolean().default(false),
-});
+export function buildModifierGroupSchema(defaultLocale: Lang) {
+  return z.object({
+    id: z.string().optional(),
+    translations: localizedName(defaultLocale, 80),
+    helpText: z.string().max(200).optional().default(""),
+    selectionType: z.enum(["SINGLE", "MULTIPLE"]),
+    isRequired: z.boolean().default(false),
+    minSelections: z.coerce.number().int().min(0).default(0),
+    maxSelections: z.coerce.number().int().min(1).optional(),
+  });
+}
+
+export function buildModifierOptionSchema(defaultLocale: Lang) {
+  return z.object({
+    id: z.string().optional(),
+    groupId: z.string().min(1),
+    translations: localizedName(defaultLocale, 80),
+    priceDelta: z
+      .string()
+      .regex(/^-?\d+(\.\d{1,2})?$/, "Invalid amount")
+      .default("0"),
+    isAvailable: z.boolean().default(true),
+    isDefault: z.boolean().default(false),
+  });
+}
 
 export const teamMemberSchema = z.object({
   name: z.string().min(1, "Required").max(120),
