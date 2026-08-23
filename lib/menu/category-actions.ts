@@ -7,6 +7,7 @@ import { getCurrentBusiness } from "@/lib/business";
 import { buildCategorySchema } from "@/lib/menu/schemas";
 import { UserRole } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
+import { slugify } from "@/lib/menu/slugify";
 
 const ADMIN_ROLES = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
 
@@ -14,19 +15,6 @@ export type CategoryFormState =
   | { success: true }
   | { error: string; fieldErrors?: Record<string, string> }
   | undefined;
-
-// Strips Unicode combining diacritical marks (U+0300-U+036F) left behind by
-// NFD normalization, so "Café" -> "cafe" instead of "café".
-const COMBINING_DIACRITICS = /[̀-ͯ]/g;
-
-function slugify(input: string) {
-  return input
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(COMBINING_DIACRITICS, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
 
 function readTranslationsFromForm(formData: FormData) {
   return {
