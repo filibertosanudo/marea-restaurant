@@ -8,6 +8,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { TestimonialCard } from "@/components/ui/TestimonialCard";
 import { StatItem } from "@/components/ui/StatItem";
 import { STR, TIME_SLOTS, type Dish as DishData, type Lang } from "./content";
+import type { PublicMenuByLang } from "@/lib/menu/public-menu";
 import { Controls } from "./Controls";
 import { Dropdown } from "./Dropdown";
 import { SectionHead } from "./SectionHead";
@@ -22,7 +23,7 @@ import "./marea-landing.css";
 
 type Theme = "light" | "dark";
 
-export function MareaLandingPage() {
+export function MareaLandingPage({ menuByLang }: { menuByLang: PublicMenuByLang }) {
   const [cat, setCat] = useState("mains");
   const [guests, setGuests] = useState("2");
   const [time, setTime] = useState("19:00");
@@ -132,10 +133,10 @@ export function MareaLandingPage() {
         <div className="ml-wrap">
           <SectionHead center eyebrow={t.menu.eyebrow} title={t.menu.title} lead={t.menu.lead} />
           <div className="ml-menu-tabs">
-            <Tabs items={t.categories as unknown as { id: string; label: string }[]} value={cat} onChange={setCat} />
+            <Tabs items={menuByLang[lang].categories} value={cat} onChange={setCat} />
           </div>
           <div className="ml-menu-grid" key={cat}>
-            {t.dishes
+            {menuByLang[lang].dishes
               .filter((d) => d.category === cat)
               .map((d) => (
                 <Dish
