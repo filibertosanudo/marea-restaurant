@@ -79,6 +79,7 @@ export async function createCategoryAction(
   });
 
   revalidatePath("/admin/menu/categorias");
+  revalidatePath("/");
   return { success: true };
 }
 
@@ -130,6 +131,7 @@ export async function updateCategoryAction(
   ]);
 
   revalidatePath("/admin/menu/categorias");
+  revalidatePath("/");
   return { success: true };
 }
 
@@ -141,6 +143,7 @@ export async function toggleCategoryActiveAction(id: string, isActive: boolean) 
     data: { isActive },
   });
   revalidatePath("/admin/menu/categorias");
+  revalidatePath("/");
 }
 
 export async function reorderCategoriesAction(orderedIds: string[]) {
@@ -155,6 +158,7 @@ export async function reorderCategoriesAction(orderedIds: string[]) {
     )
   );
   revalidatePath("/admin/menu/categorias");
+  revalidatePath("/");
 }
 
 export async function deleteCategoryAction(
@@ -175,6 +179,7 @@ export async function deleteCategoryAction(
     data: { deletedAt: new Date(), isActive: false },
   });
   revalidatePath("/admin/menu/categorias");
+  revalidatePath("/");
   return { blocked: false };
 }
 

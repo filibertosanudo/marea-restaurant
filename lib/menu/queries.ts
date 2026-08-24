@@ -119,3 +119,25 @@ export async function getModifierGroupByIdRaw(businessId: string, id: string) {
     },
   });
 }
+
+/**
+ * The public-facing menu (landing page): only active categories and
+ * available dishes, per docs/DATABASE.md's documented query. Translations
+ * for every locale come back in one round trip (not filtered to a single
+ * `locale`) so the caller can serve the landing's client-side EN/ES switch
+ * without a second fetch per language — see lib/menu/public-menu.ts.
+ */
+export async function getPublicMenuRaw(businessId: string) {
+  return prisma.menuCategory.findMany({
+    where: { businessId, isActive: true, deletedAt: null },
+    orderBy: { sortOrder: "asc" },
+    include: {
+      translations: true,
+      items: {
+        where: { isAvailable: true, deletedAt: null },
+        orderBy: { sortOrder: "asc" },
+        include: { translations: true },
+      },
+    },
+  });
+}

@@ -412,7 +412,7 @@ async function main() {
   for (const [i, d] of DISHES.entries()) {
     const item = await prisma.menuItem.upsert({
       where: { businessId_slug: { businessId: business.id, slug: d.slug } },
-      update: { basePrice: D(d.price), isFeatured: d.featured },
+      update: { basePrice: D(d.price), isFeatured: d.featured, isAvailable: true },
       create: {
         businessId: business.id,
         categoryId: categoryMap.get(d.category)!,

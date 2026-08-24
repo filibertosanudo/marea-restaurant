@@ -100,6 +100,7 @@ export async function createMenuItemAction(
   });
 
   revalidatePath("/admin/menu");
+  revalidatePath("/");
   return { success: true };
 }
 
@@ -167,6 +168,7 @@ export async function updateMenuItemAction(
   ]);
 
   revalidatePath("/admin/menu");
+  revalidatePath("/");
   return { success: true };
 }
 
@@ -178,6 +180,7 @@ export async function toggleAvailabilityAction(id: string, isAvailable: boolean)
     data: { isAvailable },
   });
   revalidatePath("/admin/menu");
+  revalidatePath("/");
 }
 
 export async function softDeleteMenuItemAction(id: string) {
@@ -188,6 +191,7 @@ export async function softDeleteMenuItemAction(id: string) {
     data: { deletedAt: new Date(), isAvailable: false },
   });
   revalidatePath("/admin/menu");
+  revalidatePath("/");
 }
 
 function flatten(error: { issues: { path: PropertyKey[]; message: string }[] }) {

@@ -41,79 +41,6 @@ export const STR = {
       preorder: "Preorder",
       book: "Book a Table",
     },
-    categories: [
-      { id: "starters", label: "Starters" },
-      { id: "soups", label: "Soups & Salads" },
-      { id: "mains", label: "Main Dishes" },
-      { id: "sides", label: "Side Dishes" },
-      { id: "desserts", label: "Desserts" },
-      { id: "beverages", label: "Beverages" },
-    ],
-    dishes: [
-      {
-        category: "starters",
-        price: "$16",
-        img: "Oyster Sampler",
-        name: "Oyster Sampler",
-        desc: "A chilled selection of six oysters on the half shell with mignonette and fresh lemon.",
-      },
-      {
-        category: "soups",
-        price: "$14",
-        img: "Lobster Bisque",
-        name: "Lobster Bisque",
-        desc: "Velvety lobster bisque finished with a touch of cream and cognac.",
-      },
-      {
-        category: "mains",
-        price: "$42",
-        img: "Lobster Thermidor",
-        name: "Lobster Thermidor",
-        desc: "Grilled lobster tail with creamy mustard sauce, Parmesan cheese, and garlic butter, served with truffle mashed potatoes.",
-      },
-      {
-        category: "mains",
-        price: "$38",
-        img: "Seared Chilean Sea Bass",
-        name: "Seared Chilean Sea Bass",
-        desc: "Tender Chilean sea bass fillet, seared to perfection, with lemon butter sauce, sautéed asparagus, and wild rice.",
-      },
-      {
-        category: "mains",
-        price: "$36",
-        img: "Seafood Paella Royale",
-        name: "Seafood Paella Royale",
-        desc: "Saffron-infused Spanish rice with jumbo shrimp, mussels, calamari and chorizo, garnished with fresh herbs.",
-      },
-      {
-        category: "mains",
-        price: "$48",
-        img: "Garlic Butter Crab Legs",
-        name: "Garlic Butter Crab Legs",
-        desc: "Juicy Alaskan king crab legs, drenched in garlic butter sauce, served with grilled corn and herb-roasted potatoes.",
-      },
-      {
-        category: "sides",
-        price: "$9",
-        img: "Garlic Herb Fries",
-        name: "Garlic Herb Fries",
-        desc: "Crispy fries tossed in garlic butter and fresh herbs.",
-      },
-      {
-        category: "desserts",
-        price: "$10",
-        img: "Key Lime Tart",
-        name: "Key Lime Tart",
-        desc: "Tangy key lime custard on a buttery graham crust.",
-      },
-      {
-        category: "beverages",
-        price: "$8",
-        img: "Citrus Spritz",
-        name: "Citrus Spritz",
-        desc: "A refreshing non-alcoholic spritz with citrus and mint.",
-      },
-    ],
     offers: {
       eyebrow: "Exclusive Offers",
       titleBefore: "Exclusive ",
@@ -268,79 +195,6 @@ export const STR = {
       preorder: "Ordenar",
       book: "Reservar Mesa",
     },
-    categories: [
-      { id: "starters", label: "Entradas" },
-      { id: "soups", label: "Sopas y Ensaladas" },
-      { id: "mains", label: "Platos Fuertes" },
-      { id: "sides", label: "Guarniciones" },
-      { id: "desserts", label: "Postres" },
-      { id: "beverages", label: "Bebidas" },
-    ],
-    dishes: [
-      {
-        category: "starters",
-        price: "$16",
-        img: "Ostras Surtidas",
-        name: "Ostras Surtidas",
-        desc: "Una selección fría de seis ostras en su concha con mignonette y limón fresco.",
-      },
-      {
-        category: "soups",
-        price: "$14",
-        img: "Bisque de Langosta",
-        name: "Bisque de Langosta",
-        desc: "Bisque de langosta aterciopelada con un toque de crema y coñac.",
-      },
-      {
-        category: "mains",
-        price: "$42",
-        img: "Langosta Thermidor",
-        name: "Langosta Thermidor",
-        desc: "Cola de langosta a la parrilla con cremosa salsa de mostaza, queso parmesano y mantequilla de ajo, con puré de papa trufado.",
-      },
-      {
-        category: "mains",
-        price: "$38",
-        img: "Róbalo Chileno Sellado",
-        name: "Róbalo Chileno Sellado",
-        desc: "Filete de róbalo chileno sellado a la perfección, con salsa de mantequilla al limón, espárragos salteados y arroz salvaje.",
-      },
-      {
-        category: "mains",
-        price: "$36",
-        img: "Paella de Mariscos Royale",
-        name: "Paella de Mariscos Royale",
-        desc: "Arroz español al azafrán con camarón jumbo, mejillones, calamar y chorizo, decorado con hierbas frescas.",
-      },
-      {
-        category: "mains",
-        price: "$48",
-        img: "Patas de Cangrejo al Ajo",
-        name: "Patas de Cangrejo al Ajo",
-        desc: "Jugosas patas de cangrejo real de Alaska bañadas en mantequilla de ajo, con elote a la parrilla y papas a las hierbas.",
-      },
-      {
-        category: "sides",
-        price: "$9",
-        img: "Papas al Ajo y Hierbas",
-        name: "Papas al Ajo y Hierbas",
-        desc: "Papas crujientes bañadas en mantequilla de ajo y hierbas frescas.",
-      },
-      {
-        category: "desserts",
-        price: "$10",
-        img: "Tarta de Limón",
-        name: "Tarta de Limón",
-        desc: "Cremoso de limón agrio sobre una base de galleta amantequillada.",
-      },
-      {
-        category: "beverages",
-        price: "$8",
-        img: "Spritz Cítrico",
-        name: "Spritz Cítrico",
-        desc: "Un refrescante spritz sin alcohol con cítricos y menta.",
-      },
-    ],
     offers: {
       eyebrow: "Ofertas Exclusivas",
       titleBefore: "¡",
@@ -457,6 +311,11 @@ export const STR = {
   },
 } as const;
 
+// Categories and dishes used to live here (STR.en/es.categories/dishes) —
+// they're now served from the database (lib/menu/public-menu.ts,
+// fetched in app/page.tsx) so the admin panel's menu editor is the real
+// source of truth. The Dish shape stays here since Dish.tsx and
+// PreorderModal still type against it.
 export type Dish = {
   category: string;
   price: string;

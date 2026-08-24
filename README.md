@@ -29,14 +29,20 @@ npm run lint    # eslint
 ## Project structure
 
 ```
-app/            → pages (Next.js App Router)
-components/ui/  → Marea design system components:
-                  Button, Input, Select, Modal, Table, Tabs, Toast,
-                  Nav, MenuCard, StatItem, TestimonialCard, OfferBadge
-docs/           → design system spec
-                  design.md  — tokens + rationale (source of truth)
-                  design.html — visual style guide, open it in a browser
-styles/         → shared stylesheet for the component library build
+app/               → pages (Next.js App Router)
+  admin/(auth)/     → login, forced password change
+  admin/(shell)/    → sidebar+topbar shell, menu/categorías/modificadores, equipo
+components/ui/      → published design system components (Button, Input, Select,
+                       Modal, Table, Tabs, Toast, Nav, MenuCard, StatItem,
+                       TestimonialCard, OfferBadge) — synced to Claude Design
+components/admin/   → admin-only components (denser variant of the same tokens)
+lib/auth/           → Auth.js config, password hashing, role/permission helpers
+lib/menu/, lib/team/→ Server Actions, Zod schemas, and centralized queries
+lib/dto/            → Prisma.Decimal → string conversion at the client boundary
+docs/               → design system spec + database rationale
+                       design.md/.html — tokens (source of truth + visual guide)
+                       DATABASE.md — schema rationale
+styles/             → shared stylesheet for the component library build
 ```
 
 ## Database
@@ -54,6 +60,8 @@ Needs `DATABASE_URL` and `DIRECT_URL` in `.env` (see `.env.example`). For local 
 ## Admin panel
 
 `/admin` — staff-only, no public signup. Auth.js (NextAuth v5) with a Credentials provider, argon2id password hashing, JWT sessions.
+
+Built so far: menu management (`/admin/menu` dishes, `/admin/menu/categorias` with drag-to-reorder, `/admin/menu/modificadores`) and `/admin/equipo` (team, BUSINESS_ADMIN/SUPER_ADMIN only). STAFF gets a read-only dish list with just the availability toggle — the one catalog edit their role is allowed. Orders, reservations, promotions, tables/QR, testimonials, and settings are visible in the sidebar (locked) but not built yet.
 
 Dev accounts (seeded, password hash regenerated on every `npm run db:seed`):
 
@@ -75,10 +83,10 @@ Brand anchor: navy `#1B367B`, matched to the author's portfolio site so this pro
 
 - [x] Landing page (hero, about, menu, offers, testimonials, reservation form)
 - [x] Component library (Button, Input, Select, Modal, Table, Tabs, Toast, Nav, MenuCard, StatItem, TestimonialCard, OfferBadge)
-- [ ] Dark mode
-- [ ] Digital menu with QR codes and categories
-- [ ] Live order cart (realtime status)
-- [ ] Admin panel (menu management)
+- [x] Dark mode
+- [x] Admin panel: auth, shell, menu management (categories, dishes, modifiers, team) — the landing's menu now reads from the database instead of `content.ts`
+- [ ] Digital menu with QR codes
+- [ ] Live order cart (realtime status) and kitchen order board
 - [ ] Stripe payments
 - [ ] Table reservations backend
 - [ ] Optional AI assistant for FAQs
