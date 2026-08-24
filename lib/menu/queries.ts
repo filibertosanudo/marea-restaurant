@@ -121,11 +121,16 @@ export async function getModifierGroupByIdRaw(businessId: string, id: string) {
 }
 
 /**
- * The public-facing menu (landing page): only active categories and
- * available dishes, per docs/DATABASE.md's documented query. Translations
- * for every locale come back in one round trip (not filtered to a single
- * `locale`) so the caller can serve the landing's client-side EN/ES switch
+ * The public-facing menu (landing page + /t/[qrToken] + /menu): only active
+ * categories and available dishes, per docs/DATABASE.md's documented query.
+ * Translations for every locale come back in one round trip (not filtered to
+ * a single `locale`) so the caller can serve the client-side EN/ES switch
  * without a second fetch per language — see lib/menu/public-menu.ts.
+ *
+ * Includes tags and modifier groups/options (with their own translations)
+ * because the order flow needs both to render a dish's detail sheet and to
+ * validate a selection server-side — extended in place rather than
+ * duplicated, per this module's own convention.
  */
 export async function getPublicMenuRaw(businessId: string) {
   return prisma.menuCategory.findMany({
@@ -136,7 +141,56 @@ export async function getPublicMenuRaw(businessId: string) {
       items: {
         where: { isAvailable: true, deletedAt: null },
         orderBy: { sortOrder: "asc" },
-        include: { translations: true },
+        include: {
+          translations: true,
+          tags: { include: { tag: { include: { translations: true } } } },
+          modifierGroups: {
+            orderBy: { sortOrder: "asc" },
+            include: {
+              group: {
+                include: {
+                  translations: true,
+                  options: {
+                    where: { deletedAt: null },
+                    orderBy: { sortOrder: "asc" },
+                    include: { translations: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+/**
+ * A single available dish by id, with the same shape getPublicMenuRaw's
+ * items have — used to re-read live price/availability/modifiers when
+ * adding to cart or validating a cart line. Never trust a price or
+ * modifier delta the client sends; this is what gets re-read instead.
+ */
+export async function getPublicMenuItemRaw(businessId: string, id: string) {
+  return prisma.menuItem.findFirst({
+    where: { id, businessId, deletedAt: null, category: { isActive: true, deletedAt: null } },
+    include: {
+      translations: true,
+      tags: { include: { tag: { include: { translations: true } } } },
+      modifierGroups: {
+        orderBy: { sortOrder: "asc" },
+        include: {
+          group: {
+            include: {
+              translations: true,
+              options: {
+                where: { deletedAt: null },
+                orderBy: { sortOrder: "asc" },
+                include: { translations: true },
+              },
+            },
+          },
+        },
       },
     },
   });
