@@ -163,6 +163,20 @@ export function ItemSheet({
               </fieldset>
             ))}
 
+            <div className="mb-lg">
+              <label htmlFor="itemNotes" className="sr-only">
+                {dict.notesPlaceholder}
+              </label>
+              <textarea
+                id="itemNotes"
+                name="notes"
+                rows={2}
+                maxLength={280}
+                placeholder={dict.notesPlaceholder}
+                className="w-full resize-none rounded-md border border-border/40 bg-surface-subtle px-md py-[10px] text-[13px] text-on-surface outline-none focus:border-primary"
+              />
+            </div>
+
             {state && "error" in state && state.error && (
               <p role="alert" className="mb-md text-[12.5px] font-medium text-error">
                 {errorMessage(state.error, dict)}
