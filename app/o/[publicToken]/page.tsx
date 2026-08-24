@@ -6,6 +6,7 @@ import { getOrderLang } from "@/lib/i18n/cookie";
 import { getOrderDictionary } from "@/lib/i18n/dictionaries";
 import { formatMoney } from "@/lib/dto/money";
 import { StatusStepper } from "@/components/order/StatusStepper";
+import { OrderStreamListener } from "@/components/order/OrderStreamListener";
 import type { OrderDictionary } from "@/lib/i18n/dictionaries";
 
 const MESSAGE_BY_STATUS: Record<string, { title: keyof OrderDictionary; sub: keyof OrderDictionary }> = {
@@ -30,9 +31,11 @@ export default async function OrderTrackingPage({
 
   const order = toTrackedOrderDTO(raw);
   const isCancelled = order.status === "CANCELLED";
+  const isTerminal = isCancelled || order.status === "DELIVERED";
 
   return (
     <div className="flex min-h-screen flex-col items-center bg-surface-subtle px-lg pb-lg pt-[40px] text-center">
+      {!isTerminal && <OrderStreamListener publicToken={publicToken} />}
       <div className="mb-[36px] flex items-center gap-[7px] opacity-70">
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary font-display text-[10px] font-bold text-on-primary">
           M

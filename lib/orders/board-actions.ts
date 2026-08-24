@@ -2,13 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { UserRole } from "@/lib/generated/prisma/client";
 import { requireRole, ForbiddenError } from "@/lib/auth/permissions";
+import { STAFF_ROLES, ADMIN_ROLES } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
 import { getNextStatus, isCancellable } from "@/lib/orders/state-machine";
-
-const STAFF_UP = [UserRole.STAFF, UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
-const ADMIN_UP = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
 
 export type BoardActionState = { error?: string } | undefined;
 
@@ -21,7 +18,7 @@ export type BoardActionState = { error?: string } | undefined;
  * enqueue in one transaction, per the module's money/state rule.
  */
 export async function advanceOrderStatusAction(orderId: string): Promise<BoardActionState> {
-  const session = await requireRole(...STAFF_UP);
+  const session = await requireRole(...STAFF_ROLES);
   const business = await getCurrentBusiness();
 
   const result = await prisma.$transaction(async (tx) => {
@@ -98,7 +95,7 @@ export async function cancelOrderAction(
 ): Promise<BoardActionState> {
   let session;
   try {
-    session = await requireRole(...ADMIN_UP);
+    session = await requireRole(...ADMIN_ROLES);
   } catch (err) {
     if (err instanceof ForbiddenError) return { error: "forbidden" };
     throw err;
@@ -158,7 +155,7 @@ export async function cancelOrderAction(
 
 /** "Cobrar en efectivo" — STAFF and up, per the matrix. Only ever touches this order's own CASH_REGISTER/PENDING payment. */
 export async function collectCashPaymentAction(orderId: string): Promise<BoardActionState> {
-  const session = await requireRole(...STAFF_UP);
+  const session = await requireRole(...STAFF_ROLES);
   const business = await getCurrentBusiness();
 
   const payment = await prisma.payment.findFirst({

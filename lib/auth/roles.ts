@@ -22,3 +22,15 @@ export function getEffectiveRole(user: UserLike): UserRole {
   const membership = user.memberships.find((m) => m.isActive);
   return membership?.role ?? UserRole.CUSTOMER;
 }
+
+/**
+ * The two role groupings the orders module checks over and over (board
+ * actions, the SSE route) — defined once so a future role change can't
+ * desync "who can act on an order" from "who can watch the live stream".
+ */
+export const STAFF_ROLES: UserRole[] = [
+  UserRole.STAFF,
+  UserRole.BUSINESS_ADMIN,
+  UserRole.SUPER_ADMIN,
+];
+export const ADMIN_ROLES: UserRole[] = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN];

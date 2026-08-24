@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams, usePathname } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { BoardOrderDTO } from "@/lib/orders/dto";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import type { Lang } from "@/lib/i18n/lang";
@@ -11,6 +11,8 @@ import { KanbanColumn } from "./KanbanColumn";
 import { CancelOrderDialog } from "./CancelOrderDialog";
 import { BOARD_COLUMNS } from "@/lib/orders/state-machine";
 import { SoundOnIcon, SoundOffIcon } from "./icons";
+import { useEventStream } from "@/lib/realtime/useEventStream";
+import { playChime, primeAudio } from "@/lib/realtime/chime";
 
 const COLUMN_LABEL_KEY = {
   PENDING: "columnPending",
@@ -59,12 +61,48 @@ export function OrdersBoard({
     if (stored !== null) setSoundEnabled(stored === "1");
   }, []);
   function onToggleSound() {
+    primeAudio();
     setSoundEnabled((prev) => {
       const next = !prev;
       localStorage.setItem("marea-orders-sound", next ? "1" : "0");
       return next;
     });
   }
+
+  // Sound defaults on, so most staff never touch the toggle button — priming
+  // only there would leave the AudioContext permanently "suspended" and the
+  // chime would silently never play. Browsers unlock audio on ANY user
+  // gesture, so listen for the first one anywhere on the page instead.
+  useEffect(() => {
+    function primeOnce() {
+      primeAudio();
+      window.removeEventListener("pointerdown", primeOnce);
+      window.removeEventListener("keydown", primeOnce);
+    }
+    window.addEventListener("pointerdown", primeOnce);
+    window.addEventListener("keydown", primeOnce);
+    return () => {
+      window.removeEventListener("pointerdown", primeOnce);
+      window.removeEventListener("keydown", primeOnce);
+    };
+  }, []);
+
+  const router = useRouter();
+  const streamUrl = "/api/orders/stream";
+  const streamStatus = useEventStream(streamUrl, () => router.refresh());
+
+  // Chime only for a genuinely NEW order arriving, not every status click —
+  // detected by diffing the set of order ids this render got against the
+  // previous one, after a stream-triggered refresh brings fresh props in.
+  const knownOrderIds = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const currentIds = new Set(boardOrders.map((o) => o.id));
+    if (knownOrderIds.current) {
+      const hasNewOrder = [...currentIds].some((id) => !knownOrderIds.current!.has(id));
+      if (hasNewOrder && soundEnabled) playChime();
+    }
+    knownOrderIds.current = currentIds;
+  }, [boardOrders, soundEnabled]);
 
   const activeType = searchParams.get("type");
   const activeTable = searchParams.get("table");
@@ -146,6 +184,17 @@ export function OrdersBoard({
           <h1 className="font-display text-[24px] font-semibold text-on-surface md:text-[26px]">
             {dict.title}
           </h1>
+          {streamStatus === "offline" ? (
+            <span className="inline-flex items-center gap-[6px] rounded-sm bg-error/12 px-sm py-[5px] text-[12.5px] font-semibold text-error">
+              <span className="h-[7px] w-[7px] rounded-full bg-error" />
+              {dict.offline}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-[6px] rounded-sm bg-success/12 px-sm py-[5px] text-[12.5px] font-semibold text-success">
+              <span className="h-[7px] w-[7px] animate-pulse rounded-full bg-success" />
+              {dict.live}
+            </span>
+          )}
           {tabsBar}
         </div>
         {filterBar}
