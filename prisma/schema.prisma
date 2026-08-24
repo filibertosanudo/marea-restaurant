@@ -791,7 +791,15 @@ model Order {
   /// (/o/<publicToken>). NO uses `id` ni `orderNumber` en esa URL: el folio es
   /// adivinable y expondría los pedidos de otros clientes a cualquiera que
   /// cuente hacia arriba. Es el mismo patrón que Reservation.confirmationCode.
-  publicToken String @unique @default(cuid())
+  ///
+  /// cuid(2) y no cuid() a propósito: el cuid() por defecto de Prisma es
+  /// CUID v1, un id ESTRUCTURADO (timestamp + contador + huella del proceso
+  /// + poco random) — bueno como PK ordenable, malo como capability token
+  /// público sin auth, porque acota mucho el espacio de búsqueda de alguien
+  /// que ya tiene un token propio y quiere adivinar el de otro pedido hecho
+  /// casi al mismo tiempo. cuid(2) es el mismo formato de string, drop-in,
+  /// pero diseñado para no ser adivinable.
+  publicToken String @unique @default(cuid(2))
 
   type   OrderType   @default(TAKEAWAY)
   status OrderStatus @default(PENDING)
