@@ -1,0 +1,1333 @@
+// ============================================================================
+//  Marea — Prisma schema
+//  Plantilla de base de datos para el giro "comida y bebida"
+//  (mariscos, cafeterías, food trucks, panaderías, pizzerías, bares)
+//
+//  Convenciones globales de este esquema:
+//
+//  1) PK con cuid(): string ordenable-ish, corto, generado en la app.
+//     Se prefiere sobre autoincrement para poder crear registros offline /
+//     en cliente y para que un futuro merge entre tenants no colisione IDs.
+//     (Si prefieres uuid nativo de Postgres: cambia a
+//      @default(dbgenerated("gen_random_uuid()")) @db.Uuid — el resto del
+//      esquema no cambia.)
+//
+//  2) businessId en toda tabla que represente datos "del negocio".
+//     En v1 existe un solo Business y todos los queries pueden ignorarlo,
+//     pero la columna ya está para que multi-tenant no requiera reescribir
+//     el esquema (sólo agregar el filtro / RLS).
+//
+//  3) deletedAt (soft delete) SOLO donde borrar de verdad rompería historial:
+//     catálogo (platillos, categorías, modificadores), mesas, promociones y
+//     testimonios. Pedidos y pagos NO se borran nunca: se cancelan.
+//
+//  4) Enums de Prisma para todo estado de máquina. Nunca strings libres.
+//
+//  5) Idioma: `locale` es String ("en", "es", "en-US"), NO enum, para poder
+//     agregar un idioma sin migración. Los estados sí son enum porque cambiar
+//     la máquina de estados SÍ debe requerir una migración deliberada.
+//
+//  6) Dinero: Decimal(10,2) + columna `currency` (ISO-4217). Nunca Float.
+//     En TypeScript esto llega como Prisma.Decimal — usa .toString() para
+//     mostrar y conviértelo a centavos enteros justo antes de hablar con
+//     Stripe (Stripe siempre trabaja en la unidad mínima).
+// ============================================================================
+
+generator client {
+  // Prisma 7: el generador moderno emite TypeScript a una ruta tuya.
+  // Se importa con:  import { PrismaClient } from "@/lib/generated/prisma/client"
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+
+  // Prisma 6 usaba en su lugar:
+  //   provider = "prisma-client-js"   (import desde "@prisma/client")
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7: las URLs YA NO van aquí. Viven en prisma.config.ts
+  // (migraciones) y en el adapter que le pasas a `new PrismaClient()`.
+  // Supabase: usa el pooler (pgbouncer, :6543) para la app y la conexión
+  // directa (:5432) para `prisma migrate`.
+  //
+  // Si te quedas en Prisma 6, borra este comentario y agrega aquí:
+  //   url       = env("DATABASE_URL")
+  //   directUrl = env("DIRECT_URL")
+}
+
+// ============================================================================
+//  ENUMS
+// ============================================================================
+
+/// Rol efectivo del usuario.
+/// v1: se lee User.role directamente.
+/// Multi-tenant: el rol real es el de BusinessMembership del negocio activo;
+/// User.role queda como fallback y como única fuente de verdad para SUPER_ADMIN
+/// (que es un rol de plataforma, no de un negocio).
+enum UserRole {
+  CUSTOMER // cliente final
+  STAFF // mesero / cocina / caja
+  BUSINESS_ADMIN // dueño o gerente del negocio
+  SUPER_ADMIN // administrador de la plataforma (todos los negocios)
+}
+
+/// Giro del negocio. Permite que la misma base sirva a varios verticales
+/// y que la UI decida qué módulos mostrar (un food truck no tiene mesas).
+enum BusinessType {
+  SEAFOOD_RESTAURANT
+  RESTAURANT
+  CAFE
+  FOOD_TRUCK
+  BAKERY
+  PIZZERIA
+  BAR
+}
+
+enum OrderType {
+  DINE_IN // en mesa (requiere tableId)
+  TAKEAWAY // para llevar / mostrador
+  PICKUP // ordenado en línea, se recoge a una hora
+  DELIVERY // reservado para v2
+}
+
+/// Máquina de estados del pedido. Toda transición se registra en
+/// OrderStatusEvent — el campo Order.status es sólo el "cache" del último.
+enum OrderStatus {
+  PENDING // pendiente: creado, aún no aceptado por cocina
+  PREPARING // en preparación
+  READY // listo para entregar / recoger
+  DELIVERED // entregado al cliente
+  CANCELLED // cancelado (por el cliente o por el negocio)
+}
+
+enum PaymentProvider {
+  STRIPE
+  CASH_REGISTER // "pagar en caja"
+  CARD_TERMINAL // terminal física en el local
+}
+
+enum PaymentStatus {
+  PENDING // creado, sin cobrar (caso típico de "pagar en caja")
+  PROCESSING // payment intent creado, esperando confirmación
+  REQUIRES_ACTION // 3D Secure / SCA
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum ReservationStatus {
+  PENDING // solicitada, sin confirmar
+  CONFIRMED
+  SEATED // el cliente ya está en la mesa
+  COMPLETED
+  CANCELLED
+  NO_SHOW // no se presentó (métrica importante para el negocio)
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  OUT_OF_SERVICE
+}
+
+enum PromotionType {
+  PERCENTAGE // value = 50 → 50% de descuento
+  FIXED_AMOUNT // value = 100 → $100 menos
+  BUNDLE_PRICE // value = precio final del combo (ej. $59 para 2)
+  FREE_ITEM // regalo al cumplir la condición
+}
+
+/// Cómo se selecciona dentro de un grupo de modificadores.
+enum ModifierSelectionType {
+  SINGLE // radio: tamaño chico/mediano/grande
+  MULTIPLE // checkbox: extras
+}
+
+enum ReviewStatus {
+  PENDING // esperando moderación
+  APPROVED
+  REJECTED
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+  PUSH
+  IN_APP
+}
+
+/// Estado de un job en la cola. QUEUED + runAfter es lo que consulta el worker.
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+// ============================================================================
+//  TENANCY — el negocio
+// ============================================================================
+
+/// El "tenant". En v1 hay exactamente una fila (Marea) y el código puede
+/// resolverla por slug o por env var. Todo lo demás cuelga de aquí, así que
+/// activar multi-tenant después es agregar el filtro, no rehacer tablas.
+model Business {
+  id           String       @id @default(cuid())
+  slug         String       @unique // "marea" → usado en rutas /[business]/...
+  name         String
+  type         BusinessType @default(RESTAURANT)
+
+  // i18n del negocio
+  defaultLocale    String   @default("es") @db.VarChar(10)
+  supportedLocales String[] @default(["en", "es"])
+
+  // Dinero y tiempo: viven en el negocio, no hardcodeados en la app,
+  // porque el segundo tenant puede facturar en otra moneda / zona horaria.
+  currency String @default("MXN") @db.VarChar(3)
+  timezone String @default("America/Hermosillo")
+  taxRate  Decimal @default(0) @db.Decimal(5, 4) // 0.1600 = IVA 16%
+
+  // Contacto público (lo que hoy vive en el footer de content.ts)
+  email        String?
+  phone        String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  country      String? @db.VarChar(2)
+  latitude     Decimal? @db.Decimal(9, 6)
+  longitude    Decimal? @db.Decimal(9, 6)
+
+  // Stripe: cada negocio cobra a su propia cuenta (Stripe Connect en v2).
+  stripeAccountId       String?
+  stripePublishableKey  String?
+
+  // Ajustes de operación usados por reservaciones y pedidos
+  defaultReservationMinutes Int @default(90)
+  maxPartySize              Int @default(12)
+  acceptsOnlinePayment      Boolean @default(true)
+  acceptsPayAtCounter       Boolean @default(true)
+
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  translations   BusinessTranslation[]
+  memberships    BusinessMembership[]
+  openingHours   OpeningHour[]
+  closures       BusinessClosure[]
+  categories     MenuCategory[]
+  menuItems      MenuItem[]
+  modifierGroups ModifierGroup[]
+  tags           Tag[]
+  tables         RestaurantTable[]
+  carts          Cart[]
+  orders         Order[]
+  payments       Payment[]
+  reservations   Reservation[]
+  promotions     Promotion[]
+  testimonials   Testimonial[]
+  notifications  NotificationJob[]
+  subscribers    NewsletterSubscriber[]
+
+  @@index([isActive])
+}
+
+/// Textos del negocio que sí cambian por idioma (tagline, "sobre nosotros").
+/// Tabla aparte y no columnas nameEs/nameEn: agregar portugués mañana es
+/// insertar filas, no correr una migración.
+model BusinessTranslation {
+  id         String @id @default(cuid())
+  businessId String
+  locale     String @db.VarChar(10)
+
+  tagline      String? // "Frescura del océano, todos los días."
+  shortBlurb   String? // texto del footer
+  aboutTitle   String?
+  aboutBody    String? @db.Text
+  metaTitle    String? // SEO por idioma
+  metaDescription String?
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, locale])
+}
+
+/// Horario semanal. Necesario para validar reservaciones y para mostrar
+/// "Abierto Mar–Dom · 12pm–11pm" sin hardcodearlo.
+/// Las horas se guardan como minutos desde medianoche (720 = 12:00) para que
+/// comparar rangos sea aritmética de enteros y no manejo de DateTime con TZ.
+model OpeningHour {
+  id         String  @id @default(cuid())
+  businessId String
+  dayOfWeek  Int // 0 = domingo … 6 = sábado (compatible con Date.getDay())
+  opensAt    Int // minutos desde 00:00
+  closesAt   Int // puede ser > 1440 si cierra después de medianoche (bar)
+  isClosed   Boolean @default(false)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  // Un negocio puede tener dos bloques el mismo día (comida y cena), por eso
+  // la unicidad incluye opensAt en vez de ser sólo (businessId, dayOfWeek).
+  @@unique([businessId, dayOfWeek, opensAt])
+  @@index([businessId, dayOfWeek])
+}
+
+/// Excepciones al horario: días festivos, vacaciones, evento privado.
+model BusinessClosure {
+  id         String   @id @default(cuid())
+  businessId String
+  startsAt   DateTime
+  endsAt     DateTime
+  reason     String?
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, startsAt, endsAt])
+}
+
+// ============================================================================
+//  AUTENTICACIÓN — modelos del adaptador de Auth.js (NextAuth) + rol
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  phone         String?   @unique
+  locale        String    @default("es") @db.VarChar(10) // idioma preferido para notificaciones
+
+  /// Hash de contraseña (argon2id o bcrypt) para el login del panel.
+  /// Nullable a propósito: los clientes que ordenan como invitados y las
+  /// cuentas creadas por OAuth nunca tienen contraseña. Sólo el personal
+  /// (STAFF / BUSINESS_ADMIN / SUPER_ADMIN) la usa.
+  ///
+  /// OJO con Auth.js: el Credentials provider NO funciona con sesiones en
+  /// base de datos, obliga a `session: { strategy: "jwt" }`. La tabla
+  /// `Session` queda sin usar hasta que agregues un provider OAuth — no la
+  /// borres, es parte del adaptador.
+  passwordHash        String?
+  /// Fuerza el cambio de contraseña en el primer login, cuando el admin creó
+  /// la cuenta del empleado con una contraseña temporal.
+  mustChangePassword  Boolean   @default(false)
+  lastLoginAt         DateTime?
+
+  /// Rol de plataforma. v1 lee esto directo en el middleware.
+  /// El rol por-negocio vive en BusinessMembership; SUPER_ADMIN siempre gana.
+  role UserRole @default(CUSTOMER)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // baja de cuenta sin romper pedidos históricos
+
+  accounts     Account[]
+  sessions     Session[]
+  memberships  BusinessMembership[]
+  carts        Cart[]
+  orders       Order[]              @relation("OrderCustomer")
+  servedOrders Order[]              @relation("OrderStaff")
+  statusEvents OrderStatusEvent[]
+  reservations Reservation[]
+  testimonials Testimonial[]
+  refunds      Refund[]
+  notifications NotificationJob[]
+
+  @@index([role])
+}
+
+/// Auth.js exige estos nombres de campo en snake_case — no los renombres
+/// aunque rompan la convención del resto del esquema.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/// La costura del multi-tenant: un usuario puede ser mesero en un negocio y
+/// cliente en otro. En v1 creas una fila por cada empleado y ya.
+model BusinessMembership {
+  id         String   @id @default(cuid())
+  userId     String
+  businessId String
+  role       UserRole @default(STAFF)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, businessId])
+  @@index([businessId, role])
+}
+
+// ============================================================================
+//  CATÁLOGO DE MENÚ
+// ============================================================================
+
+/// Categoría del menú ("starters", "mains"…). El `slug` es el id estable que
+/// usa el front (hoy es `categories[].id` en content.ts); el nombre visible
+/// vive en la tabla de traducciones.
+model MenuCategory {
+  id         String  @id @default(cuid())
+  businessId String
+  slug       String // "starters", "mains", "beverages"
+  imageUrl   String?
+  sortOrder  Int     @default(0)
+  isActive   Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  business     Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  translations MenuCategoryTranslation[]
+  items        MenuItem[]
+
+  @@unique([businessId, slug])
+  @@index([businessId, isActive, sortOrder])
+}
+
+model MenuCategoryTranslation {
+  id          String  @id @default(cuid())
+  categoryId  String
+  locale      String  @db.VarChar(10)
+  name        String // "Main Dishes" / "Platos Fuertes"
+  description String?
+
+  category MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, locale])
+  @@index([locale])
+}
+
+/// Platillo / producto. Nunca se borra físicamente: `deletedAt` lo saca del
+/// menú pero conserva la fila para que los OrderItem históricos sigan
+/// pudiendo apuntar a él (aunque el nombre y precio ya estén copiados ahí).
+model MenuItem {
+  id         String @id @default(cuid())
+  businessId String
+  categoryId String
+  slug       String // "lobster-thermidor"
+  sku        String? // para negocios que ya manejan inventario/POS
+
+  /// Precio base, sin modificadores. El precio final de una línea de pedido
+  /// se calcula como basePrice + suma de priceDelta de los modificadores,
+  /// y se congela en OrderItem.unitPrice al momento de ordenar.
+  basePrice Decimal @db.Decimal(10, 2)
+  /// Precio tachado ("antes $X"). Null = sin precio de lista.
+  compareAtPrice Decimal? @db.Decimal(10, 2)
+
+  imageUrl String?
+
+  // Disponibilidad e inventario.
+  // isAvailable = interruptor manual ("hoy no hay langosta").
+  // trackInventory + stockQuantity = control real de existencias; si
+  // trackInventory es false, stockQuantity se ignora. Se separan porque la
+  // mayoría de los platillos NO llevan inventario y forzar stock a 0 los
+  // ocultaría por accidente.
+  isAvailable    Boolean @default(true)
+  trackInventory Boolean @default(false)
+  stockQuantity  Int     @default(0)
+
+  isFeatured        Boolean @default(false) // "platillo insignia"
+  preparationMinutes Int?   @default(15) // para estimar tiempo de entrega
+  calories          Int?
+  sortOrder         Int     @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  business       Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category       MenuCategory              @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  translations   MenuItemTranslation[]
+  modifierGroups MenuItemModifierGroup[]
+  tags           MenuItemTag[]
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
+  promotions     PromotionMenuItem[]
+
+  @@unique([businessId, slug])
+  // El índice que resuelve la consulta más común del sitio:
+  // "dame los platillos visibles de esta categoría, ordenados".
+  @@index([businessId, categoryId, isAvailable, sortOrder])
+  @@index([businessId, isFeatured])
+  @@index([deletedAt])
+}
+
+model MenuItemTranslation {
+  id          String  @id @default(cuid())
+  menuItemId  String
+  locale      String  @db.VarChar(10)
+  name        String
+  description String? @db.Text
+  imageAlt    String? // accesibilidad y SEO, también por idioma
+
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, locale])
+  @@index([locale, name]) // búsqueda de platillos por nombre en un idioma
+}
+
+/// Etiquetas transversales: "vegano", "sin gluten", "picante", "nuevo".
+/// Tabla propia (y no un String[] en MenuItem) porque necesitan traducción,
+/// icono, y filtrar por ellas con un join barato.
+model Tag {
+  id         String  @id @default(cuid())
+  businessId String
+  slug       String
+  icon       String?
+  color      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business     Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  translations TagTranslation[]
+  menuItems    MenuItemTag[]
+
+  @@unique([businessId, slug])
+}
+
+model TagTranslation {
+  id     String @id @default(cuid())
+  tagId  String
+  locale String @db.VarChar(10)
+  label  String
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, locale])
+}
+
+/// Pivote muchos-a-muchos explícito. Prisma podría generar la tabla implícita
+/// con `Tag[]` de los dos lados, pero se declara a mano para poder agregarle
+/// columnas después (ej. sortOrder) sin una migración destructiva.
+model MenuItemTag {
+  menuItemId String
+  tagId      String
+
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([menuItemId, tagId])
+  @@index([tagId])
+}
+
+// ----------------------------------------------------------------------------
+//  Modificadores / variantes
+// ----------------------------------------------------------------------------
+
+/// Grupo de opciones ("Tamaño", "Extras", "Término de cocción").
+/// Vive a nivel negocio y se conecta a los platillos por pivote, porque
+/// "Extras de queso" suele aplicar a 20 platillos y no quieres duplicarlo.
+model ModifierGroup {
+  id            String                @id @default(cuid())
+  businessId    String
+  slug          String
+  selectionType ModifierSelectionType @default(SINGLE)
+  isRequired    Boolean               @default(false)
+  /// Para SINGLE normalmente min=1,max=1. Para MULTIPLE, "elige hasta 3".
+  minSelections Int                   @default(0)
+  maxSelections Int?
+  sortOrder     Int                   @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  business     Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  translations ModifierGroupTranslation[]
+  options      ModifierOption[]
+  menuItems    MenuItemModifierGroup[]
+
+  @@unique([businessId, slug])
+}
+
+model ModifierGroupTranslation {
+  id      String @id @default(cuid())
+  groupId String
+  locale  String @db.VarChar(10)
+  name    String
+  helpText String?
+
+  group ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, locale])
+}
+
+model ModifierOption {
+  id      String @id @default(cuid())
+  groupId String
+  slug    String
+
+  /// Delta sobre el precio base: +$0 chico, +$40 grande, +$25 queso extra.
+  /// Se guarda como delta y no como precio absoluto para que el mismo grupo
+  /// sirva a platillos de distinto precio.
+  priceDelta  Decimal @default(0) @db.Decimal(10, 2)
+  isAvailable Boolean @default(true)
+  isDefault   Boolean @default(false)
+  sortOrder   Int     @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  group        ModifierGroup               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  translations ModifierOptionTranslation[]
+  cartItemMods CartItemModifier[]
+  orderItemMods OrderItemModifier[]
+
+  @@unique([groupId, slug])
+  @@index([groupId, sortOrder])
+}
+
+model ModifierOptionTranslation {
+  id       String @id @default(cuid())
+  optionId String
+  locale   String @db.VarChar(10)
+  name     String
+
+  option ModifierOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([optionId, locale])
+}
+
+/// Qué grupos de modificadores aplican a qué platillo, y en qué orden se
+/// muestran para ESE platillo (por eso el pivote tiene columnas propias).
+model MenuItemModifierGroup {
+  menuItemId String
+  groupId    String
+  sortOrder  Int     @default(0)
+  isRequired Boolean? // override del isRequired del grupo para este platillo
+
+  menuItem MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  group    ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([menuItemId, groupId])
+  @@index([groupId])
+}
+
+// ============================================================================
+//  MESAS Y CÓDIGOS QR
+// ============================================================================
+
+/// Mesa física. `qrToken` es lo que va dentro de la URL del QR
+/// (/t/<qrToken>), NO el id: así puedes rotar el token si alguien fotografía
+/// el código y sigue ordenando desde su casa, sin perder el historial de la
+/// mesa ni reimprimir su identidad interna.
+model RestaurantTable {
+  id         String      @id @default(cuid())
+  businessId String
+  code       String // etiqueta visible: "M-04", "Terraza 2"
+  zone       String? // "Terraza", "Barra", "Salón principal"
+  seats      Int         @default(2)
+  qrToken    String      @unique @default(cuid())
+  qrRotatedAt DateTime?
+  status     TableStatus @default(AVAILABLE)
+  isActive   Boolean     @default(true)
+  sortOrder  Int         @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  carts        Cart[]
+  orders       Order[]
+  reservations Reservation[]
+
+  @@unique([businessId, code])
+  @@index([businessId, status])
+  @@index([businessId, seats]) // "mesas de al menos N lugares" al reservar
+}
+
+// ============================================================================
+//  CARRITO
+// ============================================================================
+
+/// Carrito persistido. Se separa de Order (y NO es un Order en estado DRAFT)
+/// por tres razones:
+///   1. Un carrito puede existir sin usuario logueado (sessionToken anónimo).
+///   2. Un carrito caduca y se limpia; un pedido nunca se borra.
+///   3. Order tiene invariantes fuertes (totales cerrados, folio, pago). Un
+///      carrito medio armado violaría todas ellas y ensuciaría los reportes.
+model Cart {
+  id           String  @id @default(cuid())
+  businessId   String
+  userId       String? // null = invitado
+  sessionToken String? @unique // cookie del invitado
+  tableId      String? // si escaneó el QR de una mesa
+  orderType    OrderType @default(TAKEAWAY)
+  notes        String?
+
+  expiresAt DateTime? // limpieza por cron
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  table    RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  items    CartItem[]
+
+  @@index([businessId, userId])
+  @@index([expiresAt])
+}
+
+model CartItem {
+  id         String @id @default(cuid())
+  cartId     String
+  menuItemId String
+  quantity   Int    @default(1)
+  notes      String? // "sin cebolla"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart      Cart               @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  menuItem  MenuItem           @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  modifiers CartItemModifier[]
+
+  @@index([cartId])
+}
+
+/// En el carrito SÍ se referencia el precio vivo (no hay snapshot): si el
+/// negocio sube el precio mientras el carrito está abierto, el cliente debe
+/// ver el precio nuevo. El congelamiento ocurre al convertir a Order.
+model CartItemModifier {
+  id               String @id @default(cuid())
+  cartItemId       String
+  modifierOptionId String
+
+  cartItem CartItem       @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+  option   ModifierOption @relation(fields: [modifierOptionId], references: [id], onDelete: Cascade)
+
+  @@unique([cartItemId, modifierOptionId])
+}
+
+// ============================================================================
+//  PEDIDOS
+// ============================================================================
+
+model Order {
+  id         String @id @default(cuid())
+  businessId String
+
+  /// Folio corto y legible que se le dice al cliente ("A-0142").
+  /// Es por negocio, no global, por eso el unique compuesto.
+  orderNumber String
+
+  type   OrderType   @default(TAKEAWAY)
+  status OrderStatus @default(PENDING)
+
+  customerId String? // null si ordenó como invitado
+  tableId    String? // requerido lógicamente cuando type = DINE_IN
+  staffId    String? // mesero que atiende / capturó el pedido
+
+  // Datos de contacto del invitado. Se copian aquí (y no sólo se leen del
+  // User) porque el pedido debe seguir siendo contactable aunque el usuario
+  // cambie su teléfono o borre su cuenta.
+  guestName  String?
+  guestEmail String?
+  guestPhone String?
+
+  notes         String? @db.Text
+  scheduledFor  DateTime? // preorder: "lo recojo a las 8pm"
+  guestCount    Int?      // comensales en mesa
+
+  /// Totales congelados. Se guardan calculados y no se recalculan al vuelo
+  /// porque impuestos, promociones y precios cambian; un ticket de hace un
+  /// año debe seguir cuadrando exactamente como se cobró.
+  subtotal      Decimal @default(0) @db.Decimal(10, 2)
+  discountTotal Decimal @default(0) @db.Decimal(10, 2)
+  taxTotal      Decimal @default(0) @db.Decimal(10, 2)
+  tipTotal      Decimal @default(0) @db.Decimal(10, 2)
+  total         Decimal @default(0) @db.Decimal(10, 2)
+  currency      String  @default("MXN") @db.VarChar(3)
+
+  placedAt           DateTime  @default(now())
+  readyAt            DateTime?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // Sin deletedAt a propósito: un pedido se CANCELA, no se borra.
+
+  business      Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer      User?              @relation("OrderCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+  staff         User?              @relation("OrderStaff", fields: [staffId], references: [id], onDelete: SetNull)
+  table         RestaurantTable?   @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  items         OrderItem[]
+  statusEvents  OrderStatusEvent[]
+  payments      Payment[]
+  promotions    OrderPromotion[]
+  testimonials  Testimonial[]
+  notifications NotificationJob[]
+
+  @@unique([businessId, orderNumber])
+  @@index([businessId, status, placedAt]) // tablero de cocina
+  @@index([tableId, status]) // "qué se está preparando para la mesa 4"
+  @@index([customerId, placedAt]) // "mis pedidos"
+  @@index([businessId, placedAt]) // reportes por rango de fechas
+  @@index([scheduledFor])
+}
+
+/// Línea del pedido. Tabla aparte de Order porque un pedido tiene N platillos
+/// y cada línea necesita SUS PROPIOS datos: cantidad, precio congelado, notas
+/// y sus modificadores. Ver la explicación para Eloquent en la documentación.
+model OrderItem {
+  id         String  @id @default(cuid())
+  orderId    String
+  menuItemId String? // SetNull: si algún día se purga el catálogo, la línea sobrevive
+
+  /// SNAPSHOT — el corazón del requisito. Nombre y precio se copian al
+  /// momento de ordenar. Si mañana la langosta sube de $42 a $55, este ticket
+  /// sigue diciendo $42 y el reporte de ventas no se corrompe.
+  nameSnapshot     String
+  unitPrice        Decimal @db.Decimal(10, 2) // base + modificadores, ya resuelto
+  quantity         Int     @default(1)
+  lineTotal        Decimal @db.Decimal(10, 2) // unitPrice * quantity - descuento de línea
+  lineDiscount     Decimal @default(0) @db.Decimal(10, 2)
+  notes            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order     Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem  MenuItem?           @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  modifiers OrderItemModifier[]
+
+  @@index([orderId])
+  @@index([menuItemId]) // "cuántas langostas vendimos este mes"
+}
+
+/// Modificadores elegidos, también congelados en nombre y precio.
+model OrderItemModifier {
+  id               String  @id @default(cuid())
+  orderItemId      String
+  modifierOptionId String?
+
+  nameSnapshot String
+  priceDelta   Decimal @db.Decimal(10, 2)
+
+  orderItem OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  option    ModifierOption? @relation(fields: [modifierOptionId], references: [id], onDelete: SetNull)
+
+  @@index([orderItemId])
+}
+
+/// Bitácora de estados. Order.status es el último valor; esta tabla es el
+/// historial completo con timestamp y autor. Se separa porque:
+///   - permite medir tiempos reales (¿cuánto tarda PENDING → READY?),
+///   - da trazabilidad de quién canceló,
+///   - alimenta el feed en tiempo real (Supabase Realtime escucha INSERTs
+///     aquí, que son inmutables, en vez de UPDATEs sobre Order).
+model OrderStatusEvent {
+  id          String       @id @default(cuid())
+  orderId     String
+  fromStatus  OrderStatus?  // null en el evento inicial
+  toStatus    OrderStatus
+  changedById String?
+  note        String?
+  createdAt   DateTime     @default(now())
+
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedBy User? @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+  @@index([toStatus, createdAt])
+}
+
+// ============================================================================
+//  PAGOS
+// ============================================================================
+
+/// Un pedido puede tener VARIOS pagos: un intento que falló y otro que
+/// funcionó, o una cuenta dividida entre dos tarjetas, o anticipo + resto.
+/// Por eso Payment es 1-a-muchos desde Order y no columnas en Order.
+model Payment {
+  id         String @id @default(cuid())
+  businessId String
+  orderId    String
+
+  provider PaymentProvider @default(STRIPE)
+  status   PaymentStatus   @default(PENDING)
+  amount   Decimal         @db.Decimal(10, 2)
+  currency String          @default("MXN") @db.VarChar(3)
+
+  // Identificadores de Stripe. Únicos porque son la llave de idempotencia
+  // natural cuando llega el webhook.
+  stripePaymentIntentId String? @unique
+  stripeChargeId        String? @unique
+  stripeCustomerId      String?
+  paymentMethodBrand    String? // "visa"
+  paymentMethodLast4    String? @db.VarChar(4)
+  receiptUrl            String?
+
+  failureCode    String?
+  failureMessage String?
+
+  /// Quién cobró en caja (para cortes de turno) cuando provider = CASH_REGISTER.
+  collectedByUserId String?
+
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refunds  Refund[]
+
+  @@index([orderId])
+  @@index([businessId, status, createdAt])
+}
+
+/// Reembolsos separados de Payment: pueden ser parciales y múltiples sobre
+/// un mismo cobro, y cada uno tiene su propio ciclo de vida en Stripe.
+model Refund {
+  id        String       @id @default(cuid())
+  paymentId String
+  amount    Decimal      @db.Decimal(10, 2)
+  currency  String       @default("MXN") @db.VarChar(3)
+  status    RefundStatus @default(PENDING)
+  reason    String?
+
+  stripeRefundId String? @unique
+  createdById    String? // staff que autorizó el reembolso
+
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([paymentId])
+}
+
+/// Bitácora de webhooks de Stripe. Stripe reenvía el mismo evento varias
+/// veces; sin esta tabla acabas cobrando o reembolsando dos veces.
+/// Regla: inserta (eventId) dentro de la MISMA transacción que aplica el
+/// efecto; si el insert choca con el unique, ya lo procesaste, ignóralo.
+model StripeWebhookEvent {
+  id          String    @id @default(cuid())
+  eventId     String    @unique // evt_...
+  type        String // "payment_intent.succeeded"
+  payload     Json
+  processedAt DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+
+  @@index([type, createdAt])
+}
+
+// ============================================================================
+//  RESERVACIONES
+// ============================================================================
+
+model Reservation {
+  id         String @id @default(cuid())
+  businessId String
+  customerId String? // null si reservó sin cuenta
+  tableId    String? // se asigna al confirmar, puede quedar null mientras tanto
+
+  // Contacto congelado, igual que en Order y por la misma razón.
+  guestName  String
+  guestEmail String?
+  guestPhone String?
+
+  partySize Int
+
+  /// Inicio de la reservación.
+  reservedFor DateTime
+  durationMinutes Int @default(90)
+  /// Fin calculado (reservedFor + durationMinutes). Se GUARDA en vez de
+  /// calcularse porque la consulta clave —"¿esta mesa está libre entre A y B?"—
+  /// es un solapamiento de rangos, y sólo es indexable si ambos extremos son
+  /// columnas reales:  WHERE tableId = ? AND reservedFor < B AND endsAt > A
+  endsAt DateTime
+
+  status ReservationStatus @default(PENDING)
+  notes  String? @db.Text // "alergias, ocasión especial, preferencia de mesa"
+
+  /// Código que se le manda al cliente para consultar o cancelar sin cuenta.
+  confirmationCode String @unique @default(cuid())
+
+  confirmedAt DateTime?
+  seatedAt    DateTime?
+  cancelledAt DateTime?
+  cancellationReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business      Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer      User?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  table         RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  notifications NotificationJob[]
+
+  // Disponibilidad de una mesa en un rango: este es EL índice del módulo.
+  @@index([tableId, reservedFor, endsAt])
+  // Agenda del día en el panel de staff.
+  @@index([businessId, reservedFor])
+  @@index([businessId, status, reservedFor])
+  @@index([customerId, reservedFor])
+
+  // NOTA: para impedir de verdad dos reservaciones solapadas sobre la misma
+  // mesa hace falta una EXCLUDE constraint de Postgres, que Prisma no genera.
+  // Agrégala a mano en la migración:
+  //   CREATE EXTENSION IF NOT EXISTS btree_gist;
+  //   ALTER TABLE "Reservation" ADD CONSTRAINT reservation_no_overlap
+  //     EXCLUDE USING gist (
+  //       "tableId" WITH =,
+  //       tsrange("reservedFor", "endsAt") WITH &&
+  //     ) WHERE (status IN ('PENDING','CONFIRMED','SEATED'));
+}
+
+// ============================================================================
+//  PROMOCIONES
+// ============================================================================
+
+/// Reemplaza el bloque `offers` hardcodeado en content.ts.
+/// Cubre los cuatro casos que ya existen en el landing:
+///   - "Champagne & Oysters Set  $39"        → BUNDLE_PRICE
+///   - "Lobster Night  50% OFF, jueves"      → PERCENTAGE + daysOfWeek [4]
+///   - "Seafood Lovers' Platter $59 (2)"     → BUNDLE_PRICE
+///   - "Sushi Weekend 20% OFF, vie–dom"      → PERCENTAGE + daysOfWeek [5,6,0]
+model Promotion {
+  id         String        @id @default(cuid())
+  businessId String
+  slug       String
+  type       PromotionType
+
+  /// Cupón que el cliente teclea. Null = promoción automática / de vitrina.
+  code String?
+
+  /// Significado según `type`: porcentaje, monto fijo, o precio final del combo.
+  value Decimal @db.Decimal(10, 2)
+
+  minOrderTotal Decimal? @db.Decimal(10, 2)
+  maxDiscount   Decimal? @db.Decimal(10, 2) // tope para los porcentajes
+
+  // Vigencia
+  startsAt DateTime?
+  endsAt   DateTime?
+  /// Días de la semana en que aplica (0=domingo … 6=sábado). Vacío = todos.
+  /// Array de enteros en vez de siete booleanos: se lee y se filtra igual de
+  /// fácil y no obliga a migrar si mañana quieres "días del mes".
+  daysOfWeek Int[] @default([])
+  /// Ventana horaria dentro del día, en minutos desde medianoche (happy hour).
+  startMinute Int?
+  endMinute   Int?
+
+  // Límites de uso
+  usageLimit   Int? // total global
+  usageCount   Int  @default(0)
+  perUserLimit Int?
+
+  /// Sólo aplica a los pedidos de este tipo (ej. promo exclusiva de mesa).
+  appliesToOrderType OrderType?
+
+  imageUrl  String?
+  isActive  Boolean @default(true)
+  isFeatured Boolean @default(false) // se muestra en la sección de ofertas
+  sortOrder Int     @default(0) // el "left/right" del landing es presentación, no dato
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  business     Business               @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  translations PromotionTranslation[]
+  menuItems    PromotionMenuItem[]
+  orders       OrderPromotion[]
+
+  @@unique([businessId, slug])
+  @@unique([businessId, code])
+  @@index([businessId, isActive, startsAt, endsAt])
+}
+
+model PromotionTranslation {
+  id          String  @id @default(cuid())
+  promotionId String
+  locale      String  @db.VarChar(10)
+  title       String
+  description String? @db.Text
+  /// La etiqueta visible ("50% OFF" / "50% DESC.", "$59 (for 2)"). Es texto
+  /// de mercadotecnia y por eso vive en la traducción, separado de `value`,
+  /// que es el número con el que se calcula el descuento.
+  badgeLabel String?
+
+  promotion Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+
+  @@unique([promotionId, locale])
+}
+
+/// A qué platillos aplica la promoción. Vacío = a todo el pedido.
+model PromotionMenuItem {
+  promotionId String
+  menuItemId  String
+
+  promotion Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  menuItem  MenuItem  @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@id([promotionId, menuItemId])
+  @@index([menuItemId])
+}
+
+/// Promociones efectivamente aplicadas a un pedido, con el descuento
+/// congelado. Sin esto no puedes auditar por qué un ticket viejo cobró menos.
+model OrderPromotion {
+  id             String  @id @default(cuid())
+  orderId        String
+  promotionId    String?
+  codeSnapshot   String?
+  titleSnapshot  String
+  discountAmount Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  promotion Promotion? @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+
+  @@unique([orderId, promotionId])
+  @@index([promotionId])
+}
+
+// ============================================================================
+//  TESTIMONIOS
+// ============================================================================
+
+/// Reseñas del landing, hoy hardcodeadas en `tmls.items`.
+model Testimonial {
+  id         String @id @default(cuid())
+  businessId String
+
+  authorId   String? // si la dejó un usuario registrado
+  authorName String // congelado: la reseña se firma con el nombre de entonces
+  authorTitle String?
+  avatarUrl  String?
+  rating     Int? // 1–5, opcional
+
+  orderId String? // reseña verificada: vino de un pedido real
+
+  /// Idioma en el que la escribió el cliente. Las traducciones a otros
+  /// idiomas son opcionales y normalmente sólo existen para los testimonios
+  /// "de catálogo" que redacta el negocio.
+  sourceLocale String @default("es") @db.VarChar(10)
+
+  status     ReviewStatus @default(PENDING)
+  isFeatured Boolean      @default(false)
+  sortOrder  Int          @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  business     Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  author       User?                    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  order        Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  translations TestimonialTranslation[]
+
+  @@index([businessId, status, isFeatured, sortOrder])
+}
+
+model TestimonialTranslation {
+  id            String @id @default(cuid())
+  testimonialId String
+  locale        String @db.VarChar(10)
+  quote         String @db.Text
+
+  testimonial Testimonial @relation(fields: [testimonialId], references: [id], onDelete: Cascade)
+
+  @@unique([testimonialId, locale])
+}
+
+// ============================================================================
+//  NOTIFICACIONES (cola de tareas)
+// ============================================================================
+
+/// Cola de trabajos en Postgres. No hace falta Redis para este volumen: el
+/// worker toma trabajo con
+///   SELECT ... FROM "NotificationJob"
+///   WHERE status='QUEUED' AND "runAfter" <= now()
+///   ORDER BY "runAfter" LIMIT 20
+///   FOR UPDATE SKIP LOCKED;
+/// que es exactamente lo que sirve el índice [status, runAfter].
+///
+/// Se encola SIEMPRE dentro de la misma transacción que cambia el estado del
+/// pedido/reservación (patrón outbox): si la transacción falla, no se manda
+/// un correo de algo que nunca pasó.
+model NotificationJob {
+  id         String @id @default(cuid())
+  businessId String
+
+  channel NotificationChannel @default(EMAIL)
+  /// Clave de plantilla ("order.ready", "reservation.confirmed"). String y no
+  /// enum a propósito: agregar una plantilla nueva no debería ser migración.
+  templateKey String
+
+  recipientUserId String?
+  recipientEmail  String?
+  recipientPhone  String?
+  locale          String @default("es") @db.VarChar(10)
+
+  /// Variables de la plantilla ya resueltas al momento de encolar.
+  payload Json @default("{}")
+
+  status      JobStatus @default(QUEUED)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  /// Cuándo puede ejecutarse (backoff exponencial al reintentar).
+  runAfter    DateTime  @default(now())
+  /// Lease del worker: si lockedAt es viejo, otro worker puede robar el job.
+  lockedAt    DateTime?
+  lockedBy    String?
+  lastError   String?   @db.Text
+  sentAt      DateTime?
+
+  /// Idempotencia: "order:<id>:READY" evita mandar dos veces el mismo aviso
+  /// si el estado se toca dos veces por un doble clic.
+  dedupeKey String? @unique
+
+  relatedOrderId       String?
+  relatedReservationId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  recipient   User?        @relation(fields: [recipientUserId], references: [id], onDelete: SetNull)
+  order       Order?       @relation(fields: [relatedOrderId], references: [id], onDelete: Cascade)
+  reservation Reservation? @relation(fields: [relatedReservationId], references: [id], onDelete: Cascade)
+
+  @@index([status, runAfter]) // el índice que usa el poller del worker
+  @@index([businessId, createdAt])
+  @@index([relatedOrderId])
+  @@index([relatedReservationId])
+}
+
+/// Suscriptores del footer ("Let's connect with us").
+model NewsletterSubscriber {
+  id           String    @id @default(cuid())
+  businessId   String
+  email        String
+  locale       String    @default("es") @db.VarChar(10)
+  confirmedAt  DateTime?
+  unsubscribedAt DateTime?
+  createdAt    DateTime  @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, email])
+}
+
+// ============================================================================
+//  FUTURO — asistente con IA (v2, NO habilitado)
+// ============================================================================
+//
+//  Respuesta corta a la pregunta: SÍ hacen falta tablas, tres.
+//  Se dejan comentadas para no ensuciar la primera migración; descoméntalas
+//  cuando de verdad vayas a construir el asistente.
+//
+//  1) AiConversation / AiMessage — hilo de chat por usuario o por sesión
+//     anónima. Sirve para dar contexto entre turnos, para moderar, y para
+//     medir qué le pregunta la gente al negocio (que es información de
+//     producto valiosísima: "¿tienen opciones sin gluten?" repetido 200 veces
+//     es una señal para el menú).
+//
+//  2) AiKnowledgeChunk — fragmentos del menú, horarios y políticas ya
+//     embebidos, para RAG. Requiere la extensión pgvector de Supabase:
+//        CREATE EXTENSION IF NOT EXISTS vector;
+//     Prisma no tiene tipo `vector` nativo, así que la columna se declara con
+//     Unsupported("vector(1536)") y se consulta con $queryRaw.
+//
+// model AiConversation {
+//   id           String   @id @default(cuid())
+//   businessId   String
+//   userId       String?
+//   sessionToken String?
+//   locale       String   @default("es") @db.VarChar(10)
+//   createdAt    DateTime @default(now())
+//   updatedAt    DateTime @updatedAt
+//   business Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+//   user     User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+//   messages AiMessage[]
+//   @@index([businessId, createdAt])
+// }
+//
+// model AiMessage {
+//   id             String   @id @default(cuid())
+//   conversationId String
+//   role           String   // "user" | "assistant" | "system" | "tool"
+//   content        String   @db.Text
+//   toolCalls      Json?
+//   promptTokens     Int?   // control de costo
+//   completionTokens Int?
+//   latencyMs        Int?
+//   createdAt      DateTime @default(now())
+//   conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+//   @@index([conversationId, createdAt])
+// }
+//
+// model AiKnowledgeChunk {
+//   id         String @id @default(cuid())
+//   businessId String
+//   sourceType String // "menu_item" | "faq" | "hours" | "policy"
+//   sourceId   String?
+//   locale     String @db.VarChar(10)
+//   content    String @db.Text
+//   embedding  Unsupported("vector(1536)")?
+//   createdAt  DateTime @default(now())
+//   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+//   @@index([businessId, sourceType, locale])
+// }

@@ -10,8 +10,12 @@ next-env.d.ts
 dist
 build
 
+# generated Prisma client (regenerated via `npm run db:generate`)
+lib/generated/
+
 # misc
 *.log
+.env
 .env*.local
 .DS_Store
 *.tsbuildinfo
