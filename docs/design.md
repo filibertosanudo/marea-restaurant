@@ -6,16 +6,17 @@ colors:
   surface: "#FFFFFF"
   surface-subtle: "#F8F9FA"
   surface-ocean: "#ECF5F8"
-  surface-ocean-border: "#D6E9EF"
+  surface-ocean-border: "#418FA7"
   on-surface: "#232C3B"
   on-surface-muted: "#57646C"
-  border: "#E2E5E8"
+  border: "#828F9C"
   primary: "#1B367B"
   primary-hover: "#16295F"
   on-primary: "#FFFFFF"
   accent-warm: "#F0E7D5"
-  accent-warm-border: "#D8CCB4"
+  accent-warm-border: "#927B4C"
   on-accent-warm: "#6F6A5C"
+  surface-raised: "#ECEFF2"
   success: "#1F8A5F"
   warning: "#C77D19"
   error: "#C0392B"
@@ -34,6 +35,7 @@ darkColors:
   accent-warm: "#3A3322"
   accent-warm-border: "#93815A"
   on-accent-warm: "#D6C9B0"
+  surface-raised: "#203057"
   success: "#34B27A"
   warning: "#E0A542"
   error: "#E87C6E"
@@ -75,6 +77,12 @@ typography:
     fontFamily: "'Poppins', sans-serif"
     fontSize: "13px"
     fontWeight: 400
+    lineHeight: 1.4
+    letterSpacing: "0.01em"
+  label:
+    fontFamily: "'Poppins', sans-serif"
+    fontSize: "13px"
+    fontWeight: 500
     lineHeight: 1.4
     letterSpacing: "0.01em"
   button-label:
@@ -165,6 +173,147 @@ components:
     typography: "{typography.body}"
     rounded: "{rounded.full}"
     padding: "12px 24px"
+
+  # ---- Admin panel (variante densa — ver sección "Admin Panel" bajo Components) ----
+  admin-sidebar:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.on-surface-muted}"
+    typography: "{typography.body}"
+    rounded: "0px"
+    padding: "16px 12px"
+  admin-sidebar-item-active:
+    backgroundColor: "{colors.surface-ocean}"
+    textColor: "{colors.primary}"
+    typography: "{typography.body}"
+    rounded: "{rounded.sm}"
+    padding: "10px 12px"
+  admin-sidebar-item-disabled:
+    backgroundColor: "transparent"
+    textColor: "{colors.on-surface-muted}/50"
+    typography: "{typography.body}"
+    rounded: "{rounded.sm}"
+    padding: "10px 12px"
+  admin-topbar:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.on-surface}"
+    typography: "{typography.body}"
+    rounded: "0px"
+    padding: "12px 20px"
+  button-primary-admin:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.button-label}"
+    rounded: "{rounded.sm}"
+    padding: "8px 14px"
+  input-admin:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.on-surface}"
+    typography: "{typography.body}"
+    rounded: "{rounded.sm}"
+    padding: "8px 12px"
+  data-table:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.on-surface}"
+    typography: "{typography.body}"
+    rounded: "{rounded.md}"
+    padding: "0px"
+  data-table-header:
+    backgroundColor: "{colors.surface-subtle}"
+    textColor: "{colors.on-surface-muted}"
+    typography: "{typography.caption}"
+    rounded: "0px"
+    padding: "10px 12px"
+  data-table-row:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.on-surface}"
+    typography: "{typography.body}"
+    rounded: "0px"
+    padding: "10px 12px"
+  data-table-row-alt:
+    backgroundColor: "{colors.surface-raised}"
+    textColor: "{colors.on-surface}"
+    typography: "{typography.body}"
+    rounded: "0px"
+    padding: "10px 12px"
+  empty-state:
+    backgroundColor: "{colors.surface-subtle}"
+    textColor: "{colors.on-surface-muted}"
+    typography: "{typography.body}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.3xl}"
+  status-badge-neutral:
+    backgroundColor: "{colors.border}/16"
+    textColor: "{colors.on-surface-muted}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.sm}"
+    padding: "3px 10px"
+  status-badge-success:
+    backgroundColor: "{colors.success}/12"
+    textColor: "{colors.success}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.sm}"
+    padding: "3px 10px"
+  status-badge-warning:
+    backgroundColor: "{colors.warning}/12"
+    textColor: "{colors.warning}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.sm}"
+    padding: "3px 10px"
+  status-badge-error:
+    backgroundColor: "{colors.error}/12"
+    textColor: "{colors.error}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.sm}"
+    padding: "3px 10px"
+  status-badge-info:
+    backgroundColor: "{colors.info}/12"
+    textColor: "{colors.info}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.sm}"
+    padding: "3px 10px"
+  form-field-label:
+    textColor: "{colors.on-surface}"
+    typography: "{typography.label}"
+    padding: "0px 0px 4px 0px"
+  form-field-hint:
+    textColor: "{colors.on-surface-muted}"
+    typography: "{typography.caption}"
+    padding: "4px 0px 0px 0px"
+  form-field-error:
+    textColor: "{colors.error}"
+    typography: "{typography.caption}"
+    padding: "4px 0px 0px 0px"
+  drawer:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.on-surface}"
+    typography: "{typography.body}"
+    rounded: "20px 0px 0px 20px"
+    padding: "{spacing.lg}"
+    width: "480px"
+  confirm-dialog:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.on-surface}"
+    typography: "{typography.body}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.lg}"
+  skeleton:
+    backgroundColor: "{colors.surface-subtle}"
+    textColor: "transparent"
+    typography: "{typography.body}"
+    rounded: "{rounded.sm}"
+    padding: "0px"
+  image-dropzone:
+    backgroundColor: "{colors.surface-subtle}"
+    textColor: "{colors.on-surface-muted}"
+    typography: "{typography.body}"
+    rounded: "{rounded.md}"
+    padding: "{spacing.2xl}"
+  image-dropzone-active:
+    backgroundColor: "{colors.surface-ocean}"
+    textColor: "{colors.primary}"
+    typography: "{typography.body}"
+    rounded: "{rounded.md}"
+    padding: "{spacing.2xl}"
 ---
 
 # Marea Design System
@@ -175,7 +324,7 @@ Marea es el sistema de diseño del proyecto insignia "Grupo 1 — Comida y Bebid
 
 ## Colors
 
-`primary` (#1B367B) es exactamente el navy del portafolio (`navy.DEFAULT` en su `tailwind.config.ts`) en lugar del `1C3F6C`/`003093` de la referencia original — es la decisión de coherencia más importante del sistema: cuando este proyecto aparezca como card de preview dentro del portafolio, ambos deben leerse como el mismo azul de marca. `surface-ocean` (#ECF5F8) viene directo de la referencia y se usa como superficie alterna fresca (secciones About/Testimonials) evocando agua clara, con `surface-ocean-border` como borde sutil derivado. `accent-warm` reutiliza el trío cream/cream-border/cream-muted que el portafolio ya tiene definido — así el acento cálido para badges de "Ofertas exclusivas" también es compartido entre ambos proyectos, no inventado. Los semánticos (`success`/`warning`/`error`/`info`) están afinados dentro de la misma familia tonal para que nunca se sientan como colores "de sistema" pegados encima de la marca. Todos los pares texto/fondo cumplen AA: `on-surface` sobre `surface-ocean`, `on-primary` blanco sobre `primary`, `on-accent-warm` sobre `accent-warm`.
+`primary` (#1B367B) es exactamente el navy del portafolio (`navy.DEFAULT` en su `tailwind.config.ts`) en lugar del `1C3F6C`/`003093` de la referencia original — es la decisión de coherencia más importante del sistema: cuando este proyecto aparezca como card de preview dentro del portafolio, ambos deben leerse como el mismo azul de marca. `surface-ocean` (#ECF5F8) viene directo de la referencia y se usa como superficie alterna fresca (secciones About/Testimonials) evocando agua clara, con `surface-ocean-border` como borde sutil derivado. `accent-warm` reutiliza el trío cream/cream-border/cream-muted que el portafolio ya tiene definido — así el acento cálido para badges de "Ofertas exclusivas" también es compartido entre ambos proyectos, no inventado. Los semánticos (`success`/`warning`/`error`/`info`) están afinados dentro de la misma familia tonal para que nunca se sientan como colores "de sistema" pegados encima de la marca. Todos los pares texto/fondo cumplen AA: `on-surface` sobre `surface-ocean`, `on-primary` blanco sobre `primary`, `on-accent-warm` sobre `accent-warm`. `surface-raised` es el único token agregado para el panel de administración: una superficie neutra (no un tinte de `primary` ni de `surface-ocean`, para no leerse como "seleccionado" o "tematizado") ligeramente distinta de `surface`, pensada para la fila alterna de `DataTable` — en claro es un gris casi imperceptible (#ECEFF2), en oscuro se aclara en vez de oscurecerse (#203057, más claro que `surface` #16213D) porque en modo oscuro "elevado" se lee subiendo la luminosidad, no bajándola.
 
 ## Dark Mode
 
@@ -193,6 +342,7 @@ Marea es el sistema de diseño del proyecto insignia "Grupo 1 — Comida y Bebid
 | `border` sobre `surface` | borde de inputs/cards | 3.3:1 | AA (UI) |
 | `surface-ocean-border` sobre `surface-ocean` | borde de testimonios | 3.25:1 | AA (UI) |
 | `accent-warm-border` sobre `accent-warm` | borde de badges | 3.3:1 | AA (UI) |
+| `surface-raised` sobre `surface` | fila alterna de tabla (zebra) | 1.15:1 | decorativo — no es límite de componente, ver nota abajo |
 | `success` sobre `surface` | estado positivo | 5.9:1 | AA |
 | `warning` sobre `surface` | estado de alerta | 7.3:1 | AAA |
 | `error` sobre `surface` | estado de error | 5.7:1 | AA |
@@ -200,7 +350,7 @@ Marea es el sistema de diseño del proyecto insignia "Grupo 1 — Comida y Bebid
 
 Los tres tokens de borde (`border`, `surface-ocean-border`, `accent-warm-border`) se ajustaron específicamente para esta verificación: los valores iniciales que se habían propuesto para dark mode (tomados de la referencia de Claude Design) daban entre 1.6:1 y 1.7:1 — invisibles como límite de componente. Se aclararon hasta cruzar el mínimo de 3:1 sin perder la identidad de marca (siguen siendo tonos derivados de `primary`/`accent-warm`, solo más claros).
 
-**Nota sobre el modo claro:** al hacer esta verificación se detectó que `border` (#E2E5E8 sobre `surface` blanco) y `surface-ocean-border`/`accent-warm-border` en modo claro también caen por debajo de 3:1 (~1.1–1.3:1) — es un problema preexistente, no introducido por el dark mode. No se corrigió en este pase porque cambia la apariencia de algo ya revisado visualmente; queda como pendiente explícito a decidir (ver Do's and Don'ts).
+**Nota sobre el modo claro (resuelto):** esta verificación había detectado que `border` (antes #E2E5E8 sobre `surface` blanco) y `surface-ocean-border`/`accent-warm-border` en modo claro caían por debajo de 3:1 (~1.1–1.3:1) — un problema preexistente, no introducido por el dark mode, que quedó pendiente en el primer pase para no tocar una apariencia ya aprobada del landing sin decisión explícita. Al construir el panel de administración (denso, lleno de tablas y formularios donde un borde invisible es un defecto real, no un detalle) se decidió cerrarlo: los tres tokens se oscurecieron manteniendo el mismo matiz (`border` → #828F9C, `surface-ocean-border` → #418FA7, `accent-warm-border` → #927B4C), los tres ahora en 3.3:1–3.33:1. Se verificó visualmente que el landing conserva su lectura de bordes sutiles — el cambio es perceptible de cerca pero no introduce una línea dura donde antes había una casi invisible.
 
 ## Typography
 
@@ -222,6 +372,30 @@ El lenguaje de forma es suave-redondeado en toda la jerarquía: botones completa
 
 `button-primary` es el CTA principal (Reservar mesa, Agregar al carrito) en navy sólido; `button-secondary` es su contraparte de baja énfasis en superficie blanca con texto navy, para acciones secundarias (Ver menú completo). Los inputs (`input`/`input-focus`) alimentan el formulario de reservación — el foco se marca con borde en `primary` más un halo suave, nunca solo un cambio de color de fondo, por accesibilidad de teclado. `card-menu` es la unidad repetible de la sección Our Menu (foto, nombre, precio, botón); `card-testimonial` vive sobre `surface-ocean` para diferenciarse de las cards de menú sin introducir un color nuevo. `badge-offer` marca descuentos/ofertas reutilizando el acento cálido compartido con el portafolio. `stat-item` renderiza los números grandes de About Us (25+ años, 10K+ clientes) con tipografía `h2` en `primary` para destacar sin necesitar un color adicional. `nav` es la barra superior tipo píldora flotante que ya aparece en el mockup de referencia (logo + links + CTA), manteniendo `rounded.full` como firma de marca.
 
+### Admin Panel — variante densa, mismo sistema
+
+El panel de administración (`/admin`) no es un sistema de diseño nuevo: usa exactamente los mismos `colors` y `typography` que el landing, con un único ajuste deliberado — **densidad**. El landing es cómodo-generoso a propósito (mucho aire, `rounded.lg`/`xl`, todo en píldora) porque vende una experiencia de restaurante boutique que se consume una vez por visita. El panel se usa todo el día, muchas veces, por la misma persona mirando una tabla de 9+ filas — ahí el aire generoso deja de ser lujo y empieza a costar scroll y clics. La regla: **el color y la tipografía no cambian nunca; el radio baja de `rounded.lg`/`xl`/`full` a `rounded.md`/`sm`, y el padding baja un escalón en la escala de `spacing`** (de `lg`/`xl` a `sm`/`md`, y de `14px 28px` en botones a `8px 14px`/`8px 12px`, ver `button-primary-admin` e `input-admin`). Nunca se usa `rounded.full` dentro de una tabla o formulario admin — el pill queda reservado para las píldoras de marca del landing (`nav`, CTAs) y para controles que ya eran redondos por naturaleza (el switch de `isAvailable`, los avatares).
+
+**`AdminShell`** es `admin-sidebar` (columna fija, ítems en `admin-sidebar-item-active` cuando la ruta está activa — fondo `surface-ocean`, texto `primary`, el mismo par que ya usa el landing para estados "seleccionado" — y `admin-sidebar-item-disabled` para las secciones fuera de alcance de este encargo, visibles pero apagadas con candado) más `admin-topbar` (buscador, `LocaleTabs`, toggle de tema, menú de usuario). Ambos usan `rounded: 0px` porque son marcos estructurales de pantalla completa, no cards flotantes — el radio se reserva para el contenido que va *dentro* de ellos.
+
+**`DataTable`** extiende el `Table` existente (mismo `border`, mismo header en `surface-subtle` con texto `on-surface-muted` en mayúsculas) agregando: columna de selección, encabezados con affordance de orden (chevron, sin nuevo token — usa `on-surface-muted` / `on-surface` al hover), una barra de filtro/búsqueda arriba, paginación abajo, y la opción de fila alterna con `data-table-row-alt` (`surface-raised`) para tablas largas como la de platillos. El contenedor pasa de `rounded.lg` (Table del landing) a `rounded.md` — sigue siendo una card, solo menos generosa.
+
+**`StatusBadge`** (`status-badge-success/warning/error/info/neutral`) usa el color semántico como texto sólido sobre un tinte del 12–16% del mismo color (`bg-{color}/12` con las utilidades de opacidad que ya soporta `styles/tokens.css`) en vez de relleno sólido con texto blanco — así el mismo texto que ya está verificado a 5.4–7.3:1 contra `surface` en la tabla de arriba sigue pasando AA sin inventar un tono nuevo, y funciona igual en claro y oscuro sin lógica condicional de color de texto. `rounded.sm`, nunca píldora: es una etiqueta de estado en una fila de tabla, no un badge de oferta de marketing.
+
+**`FormField`** compone `form-field-label` (nuevo token tipográfico `label`: Poppins 13px/500, para diferenciar "esto es una etiqueta de campo" de `caption`, que es texto de apoyo) sobre `input`/`input-admin`, con `form-field-hint` (`on-surface-muted`) o `form-field-error` (`error`) debajo — nunca ambos a la vez. El estado inválido de `input-admin` cambia su borde a `error` con el mismo grosor, no añade un fondo rojo — el sistema ya reserva el color de fondo lleno para estados de marca (`primary`, `accent-warm`), no para errores.
+
+**`Drawer`/`SheetPanel`** es el editor de platillo: un panel lateral con `rounded: 20px 0 0 20px` (solo las esquinas interiores, porque el borde derecho pega con el viewport) y `shadow-hero` para separarse claramente de la lista que queda visible detrás. Es la pieza que hace posible editar 9 platillos seguidos sin perder contexto de la tabla.
+
+**`ConfirmDialog`** reutiliza `Modal` casi sin cambios (mismo `rounded.lg`, `shadow-hero`) — la única diferencia es que su acción primaria usa `bg-error` en vez de `bg-primary` cuando la acción es destructiva (borrar/desactivar), siguiendo el mismo patrón de `button-primary` pero con el color semántico de error.
+
+**`LocaleTabs`** no es un componente nuevo: es el `Tabs` del landing (`rounded.full`, track en `surface-subtle`, pestaña activa en `bg-primary`) usado con exactamente dos ítems fijos, EN/ES, colocado junto a cada campo de `FormField` que tiene traducción. Se mantiene en píldora a propósito — es un control pequeño y frecuente, no una tabla, y reusar el componente tal cual (en vez de inventar una variante admin) es más consistente que inventar una diferencia donde no hace falta.
+
+**`Skeleton`** es un bloque `surface-subtle` con `rounded.sm` y una animación de brillo (`surface` deslizándose sobre `surface-subtle`) — sin texto, solo la forma del contenido que va a aparecer (fila de tabla, línea de texto, foto de platillo).
+
+**`EmptyState`** es deliberadamente la pieza *menos* densa del panel: `surface-subtle`, `rounded.lg` y `padding.3xl` — mismo aire generoso que el landing — porque un estado vacío ya se siente como un error de uso si además se ve apretado; aquí sí vale la pena el respiro.
+
+**`ImageDropzone`** es `surface-subtle` con borde punteado en el token `border` (ahora visible a 3.3:1, antes hubiera sido un punteado invisible) y `rounded.md`; al arrastrar un archivo sobre la zona pasa a `image-dropzone-active` (`surface-ocean` + texto `primary`), el mismo par que usa el landing para "esto está activo/seleccionado" en vez de inventar un color de "drag over" nuevo.
+
 ## Do's and Don'ts
 
 ✓ Usar `primary` (#1B367B) como único azul de marca en todo el sitio — es el punto de anclaje visual con el portafolio.
@@ -229,10 +403,14 @@ El lenguaje de forma es suave-redondeado en toda la jerarquía: botones completa
 ✓ Mantener el radio píldora en todos los CTAs para que la marca se reconozca de un vistazo, incluso en thumbnail.
 ✓ Dejar que la fotografía real de comida/mariscos sea la protagonista visual; el sistema de color es deliberadamente comedido para no competir con ella.
 ✓ Cumplir AA en todos los pares texto/fondo, sobre todo con `body-lg` en Poppins Light.
+✓ En el panel de administración, usar `rounded.md`/`sm` y el padding corto (`button-primary-admin`, `input-admin`) en vez del padding y radio del landing — la densidad es la única variante permitida.
+✓ Construir `StatusBadge` y demás estados con tinte de opacidad (`bg-{semantic}/12`) sobre los colores semánticos existentes, nunca con un hex nuevo.
 
 ✗ No introducir un segundo azul (p. ej. el `1C3F6C`/`003093` literal de la referencia) — rompe el ancla compartida con el portafolio.
 ✗ No usar Poppins Light por debajo de 18px para texto de lectura — cae el contraste de trazo y la legibilidad.
 ✗ No aplanar las sombras a "flat design" total — el sistema depende de la sensación de profundidad tipo agua/vidrio para su carácter.
 ✗ No mezclar esquinas rectas de golpe en un componente puntual (p. ej. un botón cuadrado) — rompe el lenguaje de forma suave.
+✗ No usar `rounded.full` dentro de tablas o formularios del panel (excepto controles ya redondos por naturaleza, como el switch de disponibilidad) — el pill es firma del landing, no del panel.
+✗ No crear un sistema de diseño "admin" aparte. Todo componente nuevo de `components/admin/` referencia los mismos tokens de `colors`/`typography` de este documento; solo cambian `rounded` y `padding`.
 
-**Pendiente conocido:** los tokens de borde en modo claro (`border`, `surface-ocean-border`, `accent-warm-border`) no cumplen el mínimo WCAG de 3:1 para límites de componentes de UI (ver sección Dark Mode). Se decidió no tocarlos en este pase para no alterar una apariencia ya aprobada — requiere una decisión explícita antes de cerrarse.
+**Resuelto:** los tokens de borde en modo claro (`border`, `surface-ocean-border`, `accent-warm-border`) ya cumplen el mínimo WCAG de 3:1 para límites de componentes de UI (ver sección Dark Mode) — se oscurecieron conservando el matiz de cada uno.

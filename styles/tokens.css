@@ -11,15 +11,16 @@
   --color-surface: 255 255 255;
   --color-surface-subtle: 248 249 250;
   --color-surface-ocean: 236 245 248;
-  --color-surface-ocean-border: 214 233 239;
+  --color-surface-ocean-border: 65 143 167; /* 3.33:1 vs surface-ocean */
+  --color-surface-raised: 236 239 242; /* zebra row fill, admin DataTable */
   --color-on-surface: 35 44 59;
   --color-on-surface-muted: 87 100 108;
-  --color-border: 226 229 232;
+  --color-border: 130 143 156; /* 3.31:1 vs surface */
   --color-primary: 27 54 123;
   --color-primary-hover: 22 41 95;
   --color-on-primary: 255 255 255;
   --color-accent-warm: 240 231 213;
-  --color-accent-warm-border: 216 204 180;
+  --color-accent-warm-border: 146 123 76; /* 3.31:1 vs accent-warm */
   --color-on-accent-warm: 111 106 92;
   --color-success: 31 138 95;
   --color-warning: 199 125 25;
@@ -36,6 +37,7 @@
   --color-surface-subtle: 14 24 48;
   --color-surface-ocean: 26 42 77;
   --color-surface-ocean-border: 93 120 181; /* 3.25:1 vs surface-ocean */
+  --color-surface-raised: 32 48 87; /* lighter than surface — "raised" flips direction in dark mode */
   --color-on-surface: 238 242 250; /* 14.2:1 vs surface (AAA) */
   --color-on-surface-muted: 185 196 218; /* 9.1:1 vs surface (AAA) */
   --color-border: 91 112 168; /* 3.28:1 vs surface */
