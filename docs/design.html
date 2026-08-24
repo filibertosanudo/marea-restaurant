@@ -13,15 +13,16 @@
     --color-surface: #FFFFFF;
     --color-surface-subtle: #F8F9FA;
     --color-surface-ocean: #ECF5F8;
-    --color-surface-ocean-border: #D6E9EF;
+    --color-surface-ocean-border: #418FA7;
+    --color-surface-raised: #ECEFF2;
     --color-on-surface: #232C3B;
     --color-on-surface-muted: #57646C;
-    --color-border: #E2E5E8;
+    --color-border: #828F9C;
     --color-primary: #1B367B;
     --color-primary-hover: #16295F;
     --color-on-primary: #FFFFFF;
     --color-accent-warm: #F0E7D5;
-    --color-accent-warm-border: #D8CCB4;
+    --color-accent-warm-border: #927B4C;
     --color-on-accent-warm: #6F6A5C;
     --color-success: #1F8A5F;
     --color-warning: #C77D19;
@@ -69,6 +70,11 @@
     --type-button-lh: 1;
     --type-button-ls: 0.01em;
 
+    --type-label-size: 13px;
+    --type-label-weight: 500;
+    --type-label-lh: 1.4;
+    --type-label-ls: 0.01em;
+
     /* rounded */
     --rounded-sm: 8px;
     --rounded-md: 12px;
@@ -98,6 +104,7 @@
     --color-surface-subtle: #0E1830;
     --color-surface-ocean: #1A2A4D;
     --color-surface-ocean-border: #5D78B5;
+    --color-surface-raised: #203057;
     --color-on-surface: #EEF2FA;
     --color-on-surface-muted: #B9C4DA;
     --color-border: #5B70A8;
@@ -378,6 +385,100 @@
   }
   .dd-col.dont li { border-left-color: var(--color-error); }
 
+  /* Admin panel — densidad, mismos tokens */
+  .admin-frame {
+    display: flex;
+    border: 1px solid var(--color-border);
+    border-radius: var(--rounded-md);
+    overflow: hidden;
+    background: var(--color-surface);
+  }
+  .admin-sidebar {
+    width: 168px;
+    flex-shrink: 0;
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    padding: var(--space-md) var(--space-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .admin-navitem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    border-radius: var(--rounded-sm);
+    padding: 8px 10px;
+    color: var(--color-on-surface-muted);
+  }
+  .admin-navitem.active { background: var(--color-surface-ocean); color: var(--color-primary); font-weight: 500; }
+  .admin-navitem.disabled { opacity: 0.55; }
+  .admin-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .admin-topbar {
+    height: 44px;
+    flex-shrink: 0;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+    padding: 0 var(--space-md);
+  }
+  .admin-pill-toggle { display: flex; gap: 3px; background: var(--color-surface-subtle); border-radius: var(--rounded-full); padding: 3px; font-size: 11px; }
+  .admin-pill-toggle span { border-radius: var(--rounded-full); padding: 3px 9px; color: var(--color-on-surface-muted); }
+  .admin-pill-toggle span.active { background: var(--color-primary); color: var(--color-on-primary); }
+  .admin-content { padding: var(--space-md); }
+
+  .btn-admin {
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: var(--type-button-weight);
+    border-radius: var(--rounded-sm);
+    padding: 8px 14px;
+    border: none; cursor: pointer;
+    background: var(--color-primary); color: var(--color-on-primary);
+  }
+  .input-admin {
+    font-family: var(--font-body);
+    font-size: 14px;
+    padding: 8px 12px;
+    border-radius: var(--rounded-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-on-surface);
+    width: 200px;
+  }
+
+  .data-table { width: 100%; border-collapse: collapse; border: 1px solid var(--color-border); border-radius: var(--rounded-md); overflow: hidden; font-size: 13px; }
+  .data-table th { text-align: left; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-on-surface-muted); background: var(--color-surface-subtle); padding: 8px 12px; border-bottom: 1px solid var(--color-border); }
+  .data-table td { padding: 8px 12px; border-bottom: 1px solid var(--color-border); color: var(--color-on-surface); }
+  .data-table tr.alt td { background: var(--color-surface-raised); }
+  .data-table tr:last-child td { border-bottom: none; }
+
+  .status-badge { display: inline-flex; align-items: center; font-size: 11px; font-weight: 500; border-radius: var(--rounded-sm); padding: 3px 10px; }
+  .status-badge.success { background: rgba(31,138,95,0.12); color: var(--color-success); }
+  .status-badge.warning { background: rgba(199,125,25,0.12); color: var(--color-warning); }
+  .status-badge.error { background: rgba(192,57,43,0.12); color: var(--color-error); }
+  .status-badge.info { background: rgba(44,111,187,0.12); color: var(--color-info); }
+  .status-badge.neutral { background: rgba(130,143,156,0.16); color: var(--color-on-surface-muted); }
+
+  .form-field-label { font-family: var(--font-body); font-size: var(--type-label-size); font-weight: var(--type-label-weight); color: var(--color-on-surface); display: block; margin-bottom: 4px; }
+  .form-field-hint { font-size: 12px; color: var(--color-on-surface-muted); margin-top: 4px; }
+  .form-field-error { font-size: 12px; color: var(--color-error); margin-top: 4px; }
+  .input-invalid { border-color: var(--color-error) !important; }
+
+  .drawer-demo { width: 260px; background: var(--color-surface); border-radius: 20px 0 0 20px; box-shadow: var(--shadow-hero); padding: var(--space-md); }
+
+  .empty-state-demo { background: var(--color-surface-subtle); border: 1px dashed var(--color-border); border-radius: var(--rounded-lg); padding: var(--space-2xl); text-align: center; width: 280px; }
+
+  .skeleton-line { background: var(--color-surface-subtle); border-radius: var(--rounded-sm); height: 14px; }
+
+  .dropzone { border: 1.5px dashed var(--color-border); border-radius: var(--rounded-md); background: var(--color-surface-subtle); padding: var(--space-lg); text-align: center; width: 220px; color: var(--color-on-surface-muted); font-size: 12px; }
+  .dropzone.active { background: var(--color-surface-ocean); border-color: var(--color-primary); color: var(--color-primary); }
+
   @media (max-width: 640px) {
     .dd-grid { grid-template-columns: 1fr; }
     .type-row { flex-direction: column; align-items: flex-start; gap: var(--space-sm); }
@@ -411,14 +512,15 @@
       <div class="swatch"><div class="block" style="background:var(--color-surface); color:var(--color-on-surface); border-bottom:1px solid var(--color-border)">surface</div><div class="meta"><div class="name">surface</div><div class="hex">#FFFFFF</div></div></div>
       <div class="swatch"><div class="block" style="background:var(--color-surface-subtle); color:var(--color-on-surface)">surface-subtle</div><div class="meta"><div class="name">surface-subtle</div><div class="hex">#F8F9FA</div></div></div>
       <div class="swatch"><div class="block" style="background:var(--color-surface-ocean); color:var(--color-on-surface)">surface-ocean</div><div class="meta"><div class="name">surface-ocean</div><div class="hex">#ECF5F8</div></div></div>
-      <div class="swatch"><div class="block" style="background:var(--color-surface-ocean-border); color:var(--color-on-surface)">surface-ocean-border</div><div class="meta"><div class="name">surface-ocean-border</div><div class="hex">#D6E9EF</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-surface-ocean-border); color:#fff">surface-ocean-border</div><div class="meta"><div class="name">surface-ocean-border</div><div class="hex">#418FA7</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-surface-raised); color:var(--color-on-surface); border-bottom:1px solid var(--color-border)">surface-raised</div><div class="meta"><div class="name">surface-raised</div><div class="hex">#ECEFF2 · fila alterna de DataTable</div></div></div>
 
       <div class="swatch"><div class="block" style="background:var(--color-on-surface); color:#fff">on-surface</div><div class="meta"><div class="name">on-surface</div><div class="hex">#232C3B</div></div></div>
       <div class="swatch"><div class="block" style="background:var(--color-on-surface-muted); color:#fff">on-surface-muted</div><div class="meta"><div class="name">on-surface-muted</div><div class="hex">#57646C</div></div></div>
-      <div class="swatch"><div class="block" style="background:var(--color-border); color:var(--color-on-surface)">border</div><div class="meta"><div class="name">border</div><div class="hex">#E2E5E8</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-border); color:#fff">border</div><div class="meta"><div class="name">border</div><div class="hex">#828F9C · 3.31:1</div></div></div>
 
       <div class="swatch"><div class="block" style="background:var(--color-accent-warm); color:var(--color-on-accent-warm)">accent-warm</div><div class="meta"><div class="name">accent-warm</div><div class="hex">#F0E7D5</div></div></div>
-      <div class="swatch"><div class="block" style="background:var(--color-accent-warm-border); color:var(--color-on-accent-warm)">accent-warm-border</div><div class="meta"><div class="name">accent-warm-border</div><div class="hex">#D8CCB4</div></div></div>
+      <div class="swatch"><div class="block" style="background:var(--color-accent-warm-border); color:#fff">accent-warm-border</div><div class="meta"><div class="name">accent-warm-border</div><div class="hex">#927B4C · 3.31:1</div></div></div>
       <div class="swatch"><div class="block" style="background:var(--color-on-accent-warm); color:#fff">on-accent-warm</div><div class="meta"><div class="name">on-accent-warm</div><div class="hex">#6F6A5C</div></div></div>
 
       <div class="swatch"><div class="block" style="background:var(--color-success); color:#fff">success</div><div class="meta"><div class="name">success</div><div class="hex">#1F8A5F</div></div></div>
@@ -464,6 +566,10 @@
     <div class="type-row">
       <div class="sample" style="font-family:var(--font-body); font-size:var(--type-button-size); font-weight:var(--type-button-weight); letter-spacing:var(--type-button-ls)">Book a Table</div>
       <div class="spec"><span class="token">button-label</span><br>Poppins Medium · 500<br>15px</div>
+    </div>
+    <div class="type-row">
+      <div class="sample" style="font-family:var(--font-body); font-size:var(--type-label-size); font-weight:var(--type-label-weight); letter-spacing:var(--type-label-ls)">Nombre (EN)</div>
+      <div class="spec"><span class="token">label</span> (nuevo · admin)<br>Poppins Medium · 500<br>13px — etiqueta de FormField, distinta de <code>caption</code> (400)</div>
     </div>
   </section>
 
@@ -573,6 +679,125 @@
     </div>
   </section>
 
+  <section id="admin-panel">
+    <h2 class="section-title">Admin Panel — variante densa</h2>
+    <p class="section-desc">Mismos <code>colors</code> y <code>typography</code> que el resto del sistema. La única variable es la densidad: <code>rounded.lg/xl/full</code> baja a <code>rounded.md/sm</code>, y el padding generoso del landing baja un escalón. Nunca un token de color nuevo.</p>
+
+    <div class="comp-block">
+      <h3>AdminShell (sidebar + topbar)</h3>
+      <div class="admin-frame" style="height:220px;">
+        <div class="admin-sidebar">
+          <div class="admin-navitem active">Menú</div>
+          <div class="admin-navitem disabled"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8"/></svg> Pedidos</div>
+          <div class="admin-navitem disabled"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8"/></svg> Reservaciones</div>
+          <div class="admin-navitem disabled"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8"/></svg> Promociones</div>
+        </div>
+        <div class="admin-main">
+          <div class="admin-topbar">
+            <div class="admin-pill-toggle"><span class="active">EN</span><span>ES</span></div>
+          </div>
+          <div class="admin-content">
+            <span style="font-size:12px; color:var(--color-on-surface-muted);">rounded: 0 — marco de pantalla completa, no una card</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="comp-block">
+      <h3>Button / Input — admin density</h3>
+      <div class="comp-row">
+        <button class="btn-admin">Guardar</button>
+        <input class="input-admin" placeholder="Buscar platillo…" readonly>
+      </div>
+      <p class="form-field-hint" style="margin-top:8px;">vs. landing: <code>padding 14px 28px</code> + <code>rounded.full</code> → aquí <code>padding 8px 12–14px</code> + <code>rounded.sm</code>.</p>
+    </div>
+
+    <div class="comp-block">
+      <h3>DataTable</h3>
+      <table class="data-table" style="max-width:520px;">
+        <thead><tr><th>Platillo</th><th>Categoría</th><th>Precio</th></tr></thead>
+        <tbody>
+          <tr><td>Oyster Sampler</td><td>Starters</td><td>$16.00</td></tr>
+          <tr class="alt"><td>Lobster Bisque</td><td>Soups</td><td>$14.00</td></tr>
+          <tr><td>Lobster Thermidor</td><td>Main Dishes</td><td>$42.00</td></tr>
+        </tbody>
+      </table>
+      <p class="form-field-hint" style="margin-top:8px;">Fila alterna en <code>surface-raised</code> (nuevo token). Contenedor en <code>rounded.md</code>, no <code>rounded.lg</code> como el <code>Table</code> del landing.</p>
+    </div>
+
+    <div class="comp-block">
+      <h3>StatusBadge</h3>
+      <div class="comp-row">
+        <span class="status-badge success">Disponible</span>
+        <span class="status-badge warning">falta EN</span>
+        <span class="status-badge error">Agotado</span>
+        <span class="status-badge info">Nuevo</span>
+        <span class="status-badge neutral">Borrador</span>
+      </div>
+      <p class="form-field-hint" style="margin-top:8px;">Tinte de opacidad (<code>bg-{color}/12</code>) sobre el color semántico existente + texto sólido del mismo color — nunca relleno sólido con texto blanco (falla AA en <code>warning</code>).</p>
+    </div>
+
+    <div class="comp-block">
+      <h3>FormField (label + hint / error)</h3>
+      <div class="comp-row" style="align-items:flex-start;">
+        <div style="width:200px;">
+          <span class="form-field-label">Nombre (EN)</span>
+          <input class="input-admin" style="width:100%;" readonly>
+          <div class="form-field-hint">Se muestra en el menú público</div>
+        </div>
+        <div style="width:200px;">
+          <span class="form-field-label">Precio</span>
+          <input class="input-admin input-invalid" style="width:100%;" readonly>
+          <div class="form-field-error">Requerido</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="comp-block">
+      <h3>Drawer / SheetPanel</h3>
+      <div class="comp-row">
+        <div class="drawer-demo">
+          <div style="font-family:var(--font-display); font-weight:600; font-size:15px; margin-bottom:6px;">Editar platillo</div>
+          <div style="font-size:12px; color:var(--color-on-surface-muted);">rounded: 20px 0 0 20px · shadow-hero</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="comp-block">
+      <h3>EmptyState</h3>
+      <div class="comp-row">
+        <div class="empty-state-demo">
+          <div style="font-size:13px; color:var(--color-on-surface-muted);">Todavía no hay platillos en esta categoría</div>
+        </div>
+      </div>
+      <p class="form-field-hint" style="margin-top:8px;">La única pieza del panel que conserva el aire generoso del landing (<code>rounded.lg</code> + <code>padding.3xl</code>) — un estado vacío no debe sentirse apretado.</p>
+    </div>
+
+    <div class="comp-block">
+      <h3>Skeleton</h3>
+      <div class="comp-row" style="flex-direction:column; align-items:stretch; width:220px; gap:8px;">
+        <div class="skeleton-line" style="width:100%;"></div>
+        <div class="skeleton-line" style="width:70%;"></div>
+      </div>
+    </div>
+
+    <div class="comp-block">
+      <h3>ImageDropzone</h3>
+      <div class="comp-row">
+        <div class="dropzone">Arrastra una foto<br>o haz clic</div>
+        <div class="dropzone active">Suelta aquí</div>
+      </div>
+    </div>
+
+    <div class="comp-block">
+      <h3>LocaleTabs</h3>
+      <div class="comp-row">
+        <div class="admin-pill-toggle" style="font-size:12px;"><span class="active">EN</span><span>ES</span></div>
+      </div>
+      <p class="form-field-hint" style="margin-top:8px;">No es un componente nuevo: es <code>Tabs</code> del landing (<code>rounded.full</code>) con exactamente dos ítems. Se mantiene en píldora a propósito.</p>
+    </div>
+  </section>
+
   <section id="dos-donts">
     <h2 class="section-title">Do's and Don'ts</h2>
     <div class="dd-grid">
@@ -584,6 +809,8 @@
           <li>Mantener el radio píldora en todos los CTAs, incluso en thumbnail.</li>
           <li>Dejar que la fotografía real de comida sea la protagonista visual.</li>
           <li>Cumplir AA en todos los pares texto/fondo, sobre todo con <code>body-lg</code>.</li>
+          <li>En el panel admin, usar <code>rounded.md/sm</code> y el padding corto en vez del padding/radio del landing.</li>
+          <li>Construir <code>StatusBadge</code> y estados con tinte de opacidad sobre colores semánticos existentes, nunca un hex nuevo.</li>
         </ul>
       </div>
       <div class="dd-col dont">
@@ -593,6 +820,8 @@
           <li>Usar Poppins Light por debajo de 18px en texto de lectura.</li>
           <li>Aplanar las sombras a "flat design" total — se pierde la sensación de agua/vidrio.</li>
           <li>Mezclar esquinas rectas de golpe en un componente puntual.</li>
+          <li>Usar <code>rounded.full</code> dentro de tablas o formularios del panel (excepto controles ya redondos y <code>LocaleTabs</code>).</li>
+          <li>Crear un sistema de diseño "admin" aparte — todo componente nuevo referencia los mismos tokens de color/tipografía.</li>
         </ul>
       </div>
     </div>

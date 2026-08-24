@@ -219,6 +219,12 @@ model Business {
   acceptsOnlinePayment      Boolean @default(true)
   acceptsPayAtCounter       Boolean @default(true)
 
+  /// Contador del folio de pedidos. Se incrementa con un UPDATE atómico
+  /// (`{ increment: 1 }`) DENTRO de la transacción que crea el pedido — es la
+  /// única forma de que dos cajas simultáneas no generen el mismo A-0042.
+  /// Nunca calcules el folio con un COUNT(*): eso es una condición de carrera.
+  orderSequence Int @default(0)
+
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -388,6 +394,22 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+/// Rate limit de login en Postgres (no en memoria): sobrevive al deploy y
+/// funciona con varias instancias. Una fila por intento, con email E IP, para
+/// que el chequeo pueda limitar por los dos ejes por separado — así una
+/// rociada de contraseñas contra miles de correos desde una sola IP sí topa
+/// contra el límite por IP, aunque nunca repita el mismo correo.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  ipAddress String
+  succeeded Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([ipAddress, createdAt])
 }
 
 /// La costura del multi-tenant: un usuario puede ser mesero en un negocio y
@@ -762,7 +784,22 @@ model Order {
 
   /// Folio corto y legible que se le dice al cliente ("A-0142").
   /// Es por negocio, no global, por eso el unique compuesto.
+  /// Se genera con Business.orderSequence, nunca con un COUNT.
   orderNumber String
+
+  /// Token impredecible para la pantalla pública de seguimiento
+  /// (/o/<publicToken>). NO uses `id` ni `orderNumber` en esa URL: el folio es
+  /// adivinable y expondría los pedidos de otros clientes a cualquiera que
+  /// cuente hacia arriba. Es el mismo patrón que Reservation.confirmationCode.
+  ///
+  /// cuid(2) y no cuid() a propósito: el cuid() por defecto de Prisma es
+  /// CUID v1, un id ESTRUCTURADO (timestamp + contador + huella del proceso
+  /// + poco random) — bueno como PK ordenable, malo como capability token
+  /// público sin auth, porque acota mucho el espacio de búsqueda de alguien
+  /// que ya tiene un token propio y quiere adivinar el de otro pedido hecho
+  /// casi al mismo tiempo. cuid(2) es el mismo formato de string, drop-in,
+  /// pero diseñado para no ser adivinable.
+  publicToken String @unique @default(cuid(2))
 
   type   OrderType   @default(TAKEAWAY)
   status OrderStatus @default(PENDING)

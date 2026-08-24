@@ -13,6 +13,7 @@ const config: Config = {
         "surface-ocean": "rgb(var(--color-surface-ocean) / <alpha-value>)",
         "surface-ocean-border":
           "rgb(var(--color-surface-ocean-border) / <alpha-value>)",
+        "surface-raised": "rgb(var(--color-surface-raised) / <alpha-value>)",
         "on-surface": "rgb(var(--color-on-surface) / <alpha-value>)",
         "on-surface-muted":
           "rgb(var(--color-on-surface-muted) / <alpha-value>)",
