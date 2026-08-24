@@ -35,8 +35,23 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
   if (!token) throw new CheckoutError("empty_cart");
 
   const order = await prisma.$transaction(async (tx) => {
-    const cart = await tx.cart.findFirst({
-      where: { sessionToken: token, businessId },
+    // Lock the Cart row before reading anything else it owns. Without this,
+    // two overlapping checkout submissions (a double-tap before the button's
+    // disabled state lands, two open tabs) each read the same CartItems,
+    // each pass availability, and each commit a full duplicate order —
+    // nothing here would throw, since the cart isn't actually consumed
+    // until cartItem.deleteMany at the very end. FOR UPDATE makes the
+    // second transaction block until the first commits, so it re-reads a
+    // cart the first one already emptied and takes the empty_cart path
+    // below instead of creating a second order for the same items.
+    const lockedCart = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Cart" WHERE "sessionToken" = ${token} AND "businessId" = ${businessId} FOR UPDATE
+    `;
+    const cartId = lockedCart[0]?.id;
+    if (!cartId) throw new CheckoutError("empty_cart");
+
+    const cart = await tx.cart.findUniqueOrThrow({
+      where: { id: cartId },
       include: {
         items: {
           include: {
@@ -51,7 +66,7 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
       },
     });
 
-    if (!cart || cart.items.length === 0) {
+    if (cart.items.length === 0) {
       throw new CheckoutError("empty_cart");
     }
 
