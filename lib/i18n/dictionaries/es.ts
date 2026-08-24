@@ -70,6 +70,8 @@ export const es = {
       image: "Foto",
       imageAlt: "Texto alternativo de la imagen",
       imageDropHint: "Arrastra una foto aquí o haz clic para elegir",
+      imageStorageUnconfigured:
+        "Sube tu foto a un host de imágenes y pega la URL abajo — la subida directa no está configurada en este entorno.",
       imageUrlAlt: "…o pega una URL de imagen",
       imageTooLarge: "La imagen es demasiado grande (máx. 4 MB).",
       imageInvalidType: "Solo se permiten imágenes JPG, PNG o WebP.",
@@ -111,8 +113,13 @@ export const es = {
       newOption: "Nueva opción",
       optionName: "Nombre de la opción",
       priceDelta: "Delta de precio",
+      isDefault: "Opción por defecto",
       appliedTo: "Aplicado a",
       appliedToCount: "{count} platillos",
+      noGroupsYet: "Todavía no hay grupos de modificadores.",
+      deleteGroupBlocked: "Este grupo está aplicado a platillos — quítalo de ellos primero.",
+      deleteGroupConfirmBody: "Este grupo de modificadores se eliminará — esto no se puede deshacer.",
+      deleteOptionConfirmBody: "Esta opción se eliminará — esto no se puede deshacer.",
     },
     team: {
       title: "Equipo",
@@ -132,6 +139,7 @@ export const es = {
     common: {
       save: "Guardar",
       cancel: "Cancelar",
+      edit: "Editar",
       delete: "Eliminar",
       confirm: "Confirmar",
       search: "Buscar",

@@ -69,6 +69,8 @@ export const en = {
       image: "Photo",
       imageAlt: "Image alt text",
       imageDropHint: "Drag a photo here or click to choose",
+      imageStorageUnconfigured:
+        "Upload a photo to an image host and paste the URL below — direct upload isn't configured in this environment.",
       imageUrlAlt: "…or paste an image URL",
       imageTooLarge: "Image is too large (max 4 MB).",
       imageInvalidType: "Only JPG, PNG or WebP images are allowed.",
@@ -109,8 +111,13 @@ export const en = {
       newOption: "New option",
       optionName: "Option name",
       priceDelta: "Price delta",
+      isDefault: "Default option",
       appliedTo: "Applied to",
       appliedToCount: "{count} dishes",
+      noGroupsYet: "No modifier groups yet.",
+      deleteGroupBlocked: "This group is applied to dishes — remove it from them first.",
+      deleteGroupConfirmBody: "This modifier group will be removed — this can't be undone.",
+      deleteOptionConfirmBody: "This option will be removed — this can't be undone.",
     },
     team: {
       title: "Team",
@@ -130,6 +137,7 @@ export const en = {
     common: {
       save: "Save",
       cancel: "Cancel",
+      edit: "Edit",
       delete: "Delete",
       confirm: "Confirm",
       search: "Search",

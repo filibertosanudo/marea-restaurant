@@ -97,6 +97,11 @@ type MenuItemWithRelations = MenuItem & {
   modifierGroups: { groupId: string }[];
 };
 
+// One DTO serves both the table row (name/categoryName/tags at the current
+// admin locale) and the edit drawer (full per-locale translations, tagIds,
+// modifierGroupIds) — the raw query already joins everything either needs,
+// and embedding both means opening the editor never costs a second round
+// trip (see the same choice for categories, toCategoryListDTO).
 export type MenuItemListDTO = {
   id: string;
   slug: string;
@@ -104,10 +109,15 @@ export type MenuItemListDTO = {
   categoryId: string;
   categoryName: string;
   basePrice: string;
+  compareAtPrice: string | null;
   imageUrl: string | null;
   isAvailable: boolean;
+  isFeatured: boolean;
   tags: TagDTO[];
+  tagIds: string[];
+  modifierGroupIds: string[];
   missingLocales: Lang[];
+  translations: Record<Lang, { name: string; description: string; imageAlt: string }>;
 };
 
 export function toMenuItemListDTO(item: MenuItemWithRelations, lang: Lang): MenuItemListDTO {
@@ -120,38 +130,14 @@ export function toMenuItemListDTO(item: MenuItemWithRelations, lang: Lang): Menu
     categoryId: item.categoryId,
     categoryName: categoryMap[lang]?.name ?? categoryMap.en?.name ?? item.category.slug,
     basePrice: decimalToString(item.basePrice) ?? "0.00",
-    imageUrl: item.imageUrl,
-    isAvailable: item.isAvailable,
-    tags: item.tags.map((t) => toTagDTO(t.tag, lang)),
-    missingLocales: missingLocales(item.translations),
-  };
-}
-
-export type MenuItemEditDTO = {
-  id: string;
-  slug: string;
-  categoryId: string;
-  basePrice: string;
-  compareAtPrice: string | null;
-  imageUrl: string | null;
-  isAvailable: boolean;
-  isFeatured: boolean;
-  translations: Record<Lang, { name: string; description: string; imageAlt: string }>;
-  tagIds: string[];
-  modifierGroupIds: string[];
-};
-
-export function toMenuItemEditDTO(item: MenuItemWithRelations): MenuItemEditDTO {
-  const map = translationMap(item.translations);
-  return {
-    id: item.id,
-    slug: item.slug,
-    categoryId: item.categoryId,
-    basePrice: decimalToString(item.basePrice) ?? "0.00",
     compareAtPrice: decimalToString(item.compareAtPrice),
     imageUrl: item.imageUrl,
     isAvailable: item.isAvailable,
     isFeatured: item.isFeatured,
+    tags: item.tags.map((t) => toTagDTO(t.tag, lang)),
+    tagIds: item.tags.map((t) => t.tag.id),
+    modifierGroupIds: item.modifierGroups.map((g) => g.groupId),
+    missingLocales: missingLocales(item.translations),
     translations: {
       en: {
         name: map.en?.name ?? "",
@@ -164,8 +150,6 @@ export function toMenuItemEditDTO(item: MenuItemWithRelations): MenuItemEditDTO 
         imageAlt: map.es?.imageAlt ?? "",
       },
     },
-    tagIds: item.tags.map((t) => t.tag.id),
-    modifierGroupIds: item.modifierGroups.map((g) => g.groupId),
   };
 }
 
@@ -176,10 +160,13 @@ export function toMenuItemEditDTO(item: MenuItemWithRelations): MenuItemEditDTO 
 export type ModifierOptionDTO = {
   id: string;
   slug: string;
+  groupId: string;
   name: string;
   priceDelta: string;
   isAvailable: boolean;
   isDefault: boolean;
+  missingLocales: Lang[];
+  translations: Record<Lang, { name: string }>;
 };
 
 export function toModifierOptionDTO(
@@ -190,10 +177,16 @@ export function toModifierOptionDTO(
   return {
     id: option.id,
     slug: option.slug,
+    groupId: option.groupId,
     name: map[lang]?.name ?? map.en?.name ?? option.slug,
     priceDelta: decimalToString(option.priceDelta) ?? "0.00",
     isAvailable: option.isAvailable,
     isDefault: option.isDefault,
+    missingLocales: missingLocales(option.translations),
+    translations: {
+      en: { name: map.en?.name ?? "" },
+      es: { name: map.es?.name ?? "" },
+    },
   };
 }
 
@@ -201,12 +194,15 @@ export type ModifierGroupDTO = {
   id: string;
   slug: string;
   name: string;
+  helpText: string;
   selectionType: "SINGLE" | "MULTIPLE";
   isRequired: boolean;
   minSelections: number;
   maxSelections: number | null;
   options: ModifierOptionDTO[];
   appliedToCount: number;
+  missingLocales: Lang[];
+  translations: Record<Lang, { name: string }>;
 };
 
 export function toModifierGroupDTO(
@@ -222,11 +218,17 @@ export function toModifierGroupDTO(
     id: group.id,
     slug: group.slug,
     name: map[lang]?.name ?? map.en?.name ?? group.slug,
+    helpText: map[lang]?.helpText ?? map.en?.helpText ?? "",
     selectionType: group.selectionType,
     isRequired: group.isRequired,
     minSelections: group.minSelections,
     maxSelections: group.maxSelections,
     options: group.options.map((o) => toModifierOptionDTO(o, lang)),
     appliedToCount: group._count.menuItems,
+    missingLocales: missingLocales(group.translations),
+    translations: {
+      en: { name: map.en?.name ?? "" },
+      es: { name: map.es?.name ?? "" },
+    },
   };
 }
