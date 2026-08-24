@@ -39,6 +39,32 @@ docs/           → design system spec
 styles/         → shared stylesheet for the component library build
 ```
 
+## Database
+
+Prisma 7 + Postgres. See [`docs/DATABASE.md`](docs/DATABASE.md) for the schema rationale.
+
+```bash
+npm run db:migrate    # apply migrations
+npm run db:seed       # seed dev data (menu, business, users, orders...)
+npm run db:studio     # visual inspector
+```
+
+Needs `DATABASE_URL` and `DIRECT_URL` in `.env` (see `.env.example`). For local dev without Supabase, any Postgres works — point both vars at the same instance.
+
+## Admin panel
+
+`/admin` — staff-only, no public signup. Auth.js (NextAuth v5) with a Credentials provider, argon2id password hashing, JWT sessions.
+
+Dev accounts (seeded, password hash regenerated on every `npm run db:seed`):
+
+| Email | Password | Role |
+|---|---|---|
+| `super@marea.test` | `MareaSuper123!` | SUPER_ADMIN |
+| `admin@marea.test` | `MareaAdmin123!` | BUSINESS_ADMIN |
+| `mesero@marea.test` | `MareaTemp123!` | STAFF — forces a password change on first login |
+
+Never reuse these outside a local/dev environment.
+
 ## Design system
 
 Colors, typography, spacing, and component tokens are documented in [`docs/design.md`](docs/design.md). Open [`docs/design.html`](docs/design.html) directly in a browser for a live, visual style guide of every token and component.
