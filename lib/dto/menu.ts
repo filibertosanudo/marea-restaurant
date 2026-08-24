@@ -42,6 +42,9 @@ export type CategoryListDTO = {
   sortOrder: number;
   itemCount: number;
   missingLocales: Lang[];
+  // Full per-locale text, included so the edit modal can populate instantly
+  // from the already-fetched list instead of a second round-trip.
+  translations: Record<Lang, { name: string; description: string }>;
 };
 
 export function toCategoryListDTO(
@@ -60,24 +63,6 @@ export function toCategoryListDTO(
     sortOrder: category.sortOrder,
     itemCount: category._count.items,
     missingLocales: missingLocales(category.translations),
-  };
-}
-
-export type CategoryEditDTO = {
-  id: string;
-  slug: string;
-  isActive: boolean;
-  translations: Record<Lang, { name: string; description: string }>;
-};
-
-export function toCategoryEditDTO(
-  category: MenuCategory & { translations: MenuCategoryTranslation[] }
-): CategoryEditDTO {
-  const map = translationMap(category.translations);
-  return {
-    id: category.id,
-    slug: category.slug,
-    isActive: category.isActive,
     translations: {
       en: { name: map.en?.name ?? "", description: map.en?.description ?? "" },
       es: { name: map.es?.name ?? "", description: map.es?.description ?? "" },
