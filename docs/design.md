@@ -20,6 +20,24 @@ colors:
   warning: "#C77D19"
   error: "#C0392B"
   info: "#2C6FBB"
+darkColors:
+  surface: "#16213D"
+  surface-subtle: "#0E1830"
+  surface-ocean: "#1A2A4D"
+  surface-ocean-border: "#5D78B5"
+  on-surface: "#EEF2FA"
+  on-surface-muted: "#B9C4DA"
+  border: "#5B70A8"
+  primary: "#9EB3F2"
+  primary-hover: "#B7C7F5"
+  on-primary: "#0B1226"
+  accent-warm: "#3A3322"
+  accent-warm-border: "#93815A"
+  on-accent-warm: "#D6C9B0"
+  success: "#34B27A"
+  warning: "#E0A542"
+  error: "#E87C6E"
+  info: "#5E9AE0"
 typography:
   display:
     fontFamily: "'Montserrat Alternates', sans-serif"
@@ -159,6 +177,31 @@ Marea es el sistema de diseño del proyecto insignia "Grupo 1 — Comida y Bebid
 
 `primary` (#1B367B) es exactamente el navy del portafolio (`navy.DEFAULT` en su `tailwind.config.ts`) en lugar del `1C3F6C`/`003093` de la referencia original — es la decisión de coherencia más importante del sistema: cuando este proyecto aparezca como card de preview dentro del portafolio, ambos deben leerse como el mismo azul de marca. `surface-ocean` (#ECF5F8) viene directo de la referencia y se usa como superficie alterna fresca (secciones About/Testimonials) evocando agua clara, con `surface-ocean-border` como borde sutil derivado. `accent-warm` reutiliza el trío cream/cream-border/cream-muted que el portafolio ya tiene definido — así el acento cálido para badges de "Ofertas exclusivas" también es compartido entre ambos proyectos, no inventado. Los semánticos (`success`/`warning`/`error`/`info`) están afinados dentro de la misma familia tonal para que nunca se sientan como colores "de sistema" pegados encima de la marca. Todos los pares texto/fondo cumplen AA: `on-surface` sobre `surface-ocean`, `on-primary` blanco sobre `primary`, `on-accent-warm` sobre `accent-warm`.
 
+## Dark Mode
+
+`darkColors` sigue exactamente los mismos roles semánticos que `colors` — no es una paleta distinta, es la misma marca reexpresada para fondo oscuro. Las superficies se oscurecen (`surface` #16213D, `surface-subtle` #0E1830, `surface-ocean` #1A2A4D) y el texto se aclara (`on-surface` #EEF2FA, `on-surface-muted` #B9C4DA), siguiendo el patrón estándar de dark mode. La única inversión real es `primary`: en vez del navy sólido (#1B367B), en oscuro se usa un azul-lavanda claro (#9EB3F2) con `on-primary` casi negro (#0B1226) — un navy saturado pierde casi todo su contraste sobre un fondo ya oscuro, mientras que aclararlo (y voltear el texto que lo acompaña) es el mismo patrón que usan sistemas como los de GitHub o Linear para su color de marca en modo oscuro. Como todos los componentes usan los nombres semánticos (`bg-primary`, `text-on-surface`, etc.) y nunca hex directo, este cambio se propaga automáticamente a los 12 componentes del sistema con cero cambios de código — ese es el punto de haberlos construido así desde el principio. El tema activo se controla con el atributo `data-theme="dark"` en `<html>`, y las sombras (`shadow-1`/`shadow-2`/`shadow-hero`) cambian de un tinte navy sutil a negro puro, ya que un tinte de color sobre fondo oscuro se pierde — en su lugar, la definición de las cards se apoya más en `border` que en la sombra.
+
+**Verificación WCAG 2.1** (ratio calculado con la fórmula de luminancia relativa del estándar; mínimos: texto normal 4.5:1 / AAA 7:1, texto grande o componentes de UI 3:1):
+
+| Par | Uso | Ratio | Nivel |
+|---|---|---|---|
+| `on-surface` sobre `surface` | texto de cuerpo | 14.2:1 | AAA |
+| `on-surface-muted` sobre `surface` | texto secundario | 9.1:1 | AAA |
+| `primary` (texto) sobre `surface` | precios, acentos | 7.7:1 | AAA |
+| `on-primary` sobre `primary` (fill) | texto de botones | 9.0:1 | AAA |
+| `on-accent-warm` sobre `accent-warm` | badges de oferta | 7.7:1 | AAA |
+| `border` sobre `surface` | borde de inputs/cards | 3.3:1 | AA (UI) |
+| `surface-ocean-border` sobre `surface-ocean` | borde de testimonios | 3.25:1 | AA (UI) |
+| `accent-warm-border` sobre `accent-warm` | borde de badges | 3.3:1 | AA (UI) |
+| `success` sobre `surface` | estado positivo | 5.9:1 | AA |
+| `warning` sobre `surface` | estado de alerta | 7.3:1 | AAA |
+| `error` sobre `surface` | estado de error | 5.7:1 | AA |
+| `info` sobre `surface` | estado informativo | 5.4:1 | AA |
+
+Los tres tokens de borde (`border`, `surface-ocean-border`, `accent-warm-border`) se ajustaron específicamente para esta verificación: los valores iniciales que se habían propuesto para dark mode (tomados de la referencia de Claude Design) daban entre 1.6:1 y 1.7:1 — invisibles como límite de componente. Se aclararon hasta cruzar el mínimo de 3:1 sin perder la identidad de marca (siguen siendo tonos derivados de `primary`/`accent-warm`, solo más claros).
+
+**Nota sobre el modo claro:** al hacer esta verificación se detectó que `border` (#E2E5E8 sobre `surface` blanco) y `surface-ocean-border`/`accent-warm-border` en modo claro también caen por debajo de 3:1 (~1.1–1.3:1) — es un problema preexistente, no introducido por el dark mode. No se corrigió en este pase porque cambia la apariencia de algo ya revisado visualmente; queda como pendiente explícito a decidir (ver Do's and Don'ts).
+
 ## Typography
 
 La referencia especifica Montserrat Alternates SemiBold para headlines y Poppins Light para body — se conserva esa pareja porque le da a Marea una personalidad de restaurante boutique distinta a la Geist Sans del portafolio, y eso está bien: cada proyecto vertical del portafolio puede tener su propia voz tipográfica; lo que importa para la coherencia visual es el color, no la fuente (a nivel thumbnail/preview la fuente casi no se percibe, el color sí). El tamaño de 130px de la lámina de referencia es una medida de slide de presentación, no de web real — se reescala al token `display` (64px) pensado para el hero real en desktop, con `h1`/`h2`/`h3` bajando la escala para el resto de la jerarquía. Ajuste deliberado sobre la referencia: `body` pasa de Poppins Light 300 a Poppins Regular 400 a 16px — Light a ese tamaño cae por debajo de un contraste de trazo cómodo para lectura extendida (menús, testimonios), así que Light se reserva para `body-lg` (citas, subtítulos grandes) donde el tamaño mayor compensa el trazo fino. `button-label` usa Poppins Medium 500 para que los CTAs (reservar, agregar al carrito) se sientan firmes frente al resto del copy más ligero.
@@ -191,3 +234,5 @@ El lenguaje de forma es suave-redondeado en toda la jerarquía: botones completa
 ✗ No usar Poppins Light por debajo de 18px para texto de lectura — cae el contraste de trazo y la legibilidad.
 ✗ No aplanar las sombras a "flat design" total — el sistema depende de la sensación de profundidad tipo agua/vidrio para su carácter.
 ✗ No mezclar esquinas rectas de golpe en un componente puntual (p. ej. un botón cuadrado) — rompe el lenguaje de forma suave.
+
+**Pendiente conocido:** los tokens de borde en modo claro (`border`, `surface-ocean-border`, `accent-warm-border`) no cumplen el mínimo WCAG de 3:1 para límites de componentes de UI (ver sección Dark Mode). Se decidió no tocarlos en este pase para no alterar una apariencia ya aprobada — requiere una decisión explícita antes de cerrarse.

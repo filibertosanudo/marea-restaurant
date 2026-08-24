@@ -1,0 +1,53 @@
+/*
+  Marea design tokens as RGB triplets (so Tailwind's `rgb(var(--x) / <alpha-value>)`
+  pattern can apply opacity modifiers, e.g. bg-on-surface/40 in Modal).
+  Light values are canonical (docs/design.md). Dark values follow the same
+  semantic roles: surfaces darken, text/borders lighten, and `primary` flips
+  from a solid navy fill to a lighter tint (paired with dark on-primary text)
+  since a saturated navy loses contrast against a dark background.
+*/
+
+:root {
+  --color-surface: 255 255 255;
+  --color-surface-subtle: 248 249 250;
+  --color-surface-ocean: 236 245 248;
+  --color-surface-ocean-border: 214 233 239;
+  --color-on-surface: 35 44 59;
+  --color-on-surface-muted: 87 100 108;
+  --color-border: 226 229 232;
+  --color-primary: 27 54 123;
+  --color-primary-hover: 22 41 95;
+  --color-on-primary: 255 255 255;
+  --color-accent-warm: 240 231 213;
+  --color-accent-warm-border: 216 204 180;
+  --color-on-accent-warm: 111 106 92;
+  --color-success: 31 138 95;
+  --color-warning: 199 125 25;
+  --color-error: 192 57 43;
+  --color-info: 44 111 187;
+  --shadow-color: 27 54 123;
+}
+
+[data-theme="dark"] {
+  /* Every value below is checked against WCAG 2.1 contrast ratios (see
+     docs/design.md "Dark Mode" section for the full table): body text
+     >=4.5:1, large/display text >=3:1, UI component borders >=3:1. */
+  --color-surface: 22 33 61;
+  --color-surface-subtle: 14 24 48;
+  --color-surface-ocean: 26 42 77;
+  --color-surface-ocean-border: 93 120 181; /* 3.25:1 vs surface-ocean */
+  --color-on-surface: 238 242 250; /* 14.2:1 vs surface (AAA) */
+  --color-on-surface-muted: 185 196 218; /* 9.1:1 vs surface (AAA) */
+  --color-border: 91 112 168; /* 3.28:1 vs surface */
+  --color-primary: 158 179 242; /* 7.7:1 as text vs surface (AAA) */
+  --color-primary-hover: 183 199 245;
+  --color-on-primary: 11 18 38; /* 9.0:1 vs primary fill (AAA) */
+  --color-accent-warm: 58 51 34;
+  --color-accent-warm-border: 147 129 90; /* 3.30:1 vs accent-warm */
+  --color-on-accent-warm: 214 201 176; /* 7.7:1 vs accent-warm (AAA) */
+  --color-success: 52 178 122; /* 5.9:1 vs surface */
+  --color-warning: 224 165 66; /* 7.3:1 vs surface (AAA) */
+  --color-error: 232 124 110; /* 5.7:1 vs surface */
+  --color-info: 94 154 224; /* 5.4:1 vs surface */
+  --shadow-color: 0 0 0;
+}

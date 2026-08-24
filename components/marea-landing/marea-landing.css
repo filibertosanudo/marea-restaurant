@@ -1,0 +1,1050 @@
+/*
+  Layout CSS for the Marea landing page, ported from the Claude Design
+  generated "Marea Landing.html". Colors reference the shared design
+  tokens (styles/tokens.css) instead of local re-declarations, so dark
+  mode ([data-theme="dark"] on <html>) applies automatically with no
+  per-selector overrides needed here.
+*/
+
+html {
+  scroll-behavior: smooth;
+}
+
+.ml-wrap {
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.ml-disp {
+  font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.12;
+}
+
+.ml-eyebrow {
+  font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(var(--color-primary));
+}
+
+.ml-section {
+  scroll-margin-top: 110px;
+}
+
+/* Navbar */
+.ml-navbar {
+  position: fixed;
+  top: 18px;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.ml-navbar > * {
+  pointer-events: auto;
+}
+
+/* Controls: theme + language */
+.ml-controls {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 60;
+  display: flex;
+  gap: 10px;
+}
+.ml-seg {
+  display: inline-flex;
+  align-items: center;
+  background: rgb(var(--color-surface));
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 999px;
+  padding: 4px;
+  box-shadow: 0 10px 26px -14px rgb(var(--shadow-color) / 0.4);
+}
+.ml-seg button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-poppins, "Poppins", sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+  color: rgb(var(--color-on-surface-muted));
+  padding: 7px 13px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.ml-seg button:hover {
+  color: rgb(var(--color-on-surface));
+}
+.ml-seg button.active {
+  background: rgb(var(--color-primary));
+  color: rgb(var(--color-on-primary));
+}
+.ml-seg .icon-btn {
+  padding: 7px 11px;
+}
+.ml-seg svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Placeholder */
+.ml-placeholder {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgb(var(--color-primary) / 0.06) 0 12px,
+      rgb(var(--color-primary) / 0.02) 12px 24px
+    ),
+    rgb(var(--color-surface-ocean));
+}
+.ml-placeholder.navy {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgb(var(--color-on-primary) / 0.06) 0 12px,
+      rgb(var(--color-on-primary) / 0.02) 12px 24px
+    ),
+    linear-gradient(135deg, rgb(var(--color-primary)) 0%, rgb(var(--color-primary-hover)) 100%);
+}
+.ml-placeholder span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--color-on-surface-muted));
+  padding: 14px 16px;
+}
+.ml-placeholder.navy span {
+  color: rgb(var(--color-on-primary) / 0.72);
+}
+
+/* Hero — fills the viewport on load so About Us doesn't peek in below
+   the fold; the fixed nav pill floats over the top padding. */
+.ml-hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* flex-direction:column makes align-items the HORIZONTAL centering —
+     justify-content is what centers vertically here. Without it the
+     content just sits at the top of the 100dvh box. */
+  justify-content: center;
+  /* Bigger heading + more inter-element spacing (per feedback) often
+     makes the content taller than 100dvh, which leaves justify-content
+     nothing to distribute — so keep this pair close to each other
+     rather than relying on centering slack that may not exist. */
+  padding: 120px 0 100px;
+  background: linear-gradient(180deg, rgb(var(--color-surface)) 0%, rgb(var(--color-surface-ocean)) 100%);
+}
+/* The photo behaves like an atmospheric background layer bleeding off
+   the left edge, fading into the hero gradient, rather than a boxed
+   thumbnail — the text sits above it in normal flow. */
+.ml-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 60%;
+  z-index: 0;
+  -webkit-mask-image: linear-gradient(to right, black 55%, transparent 100%);
+  mask-image: linear-gradient(to right, black 55%, transparent 100%);
+}
+/* Not a .ml-wrap: the text is deliberately NOT capped by the shared
+   content container here — it pushes toward the true right edge of
+   the viewport (within edge padding) instead of stopping at the same
+   1320px box every other section uses, since the bled background on
+   the left already makes this section's layout asymmetric on purpose. */
+.ml-hero-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: 0 clamp(24px, 5vw, 96px);
+}
+.ml-hero-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  justify-content: center;
+  margin-left: auto;
+  max-width: 620px;
+}
+.ml-hero-right h1 {
+  font-size: clamp(42px, 5.8vw, 78px);
+  margin: 18px 0 36px;
+}
+.ml-highlight {
+  color: rgb(var(--color-primary));
+}
+.ml-hero-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.ml-hero-row p {
+  margin: 0;
+  color: rgb(var(--color-on-surface-muted));
+  font-weight: 300;
+  font-size: 17px;
+  max-width: 30ch;
+  text-align: right;
+}
+.ml-promo {
+  margin-top: 36px;
+  background: rgb(var(--color-surface));
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 18px;
+  padding: 24px 26px;
+  max-width: 420px;
+  text-align: left;
+  box-shadow: 0 20px 44px -26px rgb(var(--shadow-color) / 0.28);
+  position: relative;
+}
+.ml-promo h3 {
+  font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
+  font-weight: 600;
+  font-size: 18px;
+  margin: 0 0 10px;
+  color: rgb(var(--color-on-surface));
+  line-height: 1.3;
+}
+.ml-promo p {
+  margin: 0 0 16px;
+  color: rgb(var(--color-on-surface-muted));
+  font-size: 14px;
+}
+.ml-promo .promo-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  background: rgb(var(--color-primary));
+  color: rgb(var(--color-on-primary));
+  border: 0;
+  cursor: pointer;
+  font-family: var(--font-poppins, "Poppins", sans-serif);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 12px 10px 20px;
+  border-radius: 999px;
+  transition: background 0.2s;
+}
+.ml-promo .promo-cta:hover {
+  background: rgb(var(--color-primary-hover));
+  opacity: 1;
+}
+.ml-promo .promo-cta .pc-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgb(var(--color-on-primary) / 0.16);
+}
+.ml-promo .promo-cta svg {
+  width: 15px;
+  height: 15px;
+}
+.ml-arrow-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgb(var(--color-primary));
+  color: rgb(var(--color-on-primary));
+  border: 0;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background 0.2s;
+}
+.ml-arrow-btn:hover {
+  background: rgb(var(--color-primary-hover));
+}
+.ml-arrow-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Band */
+.ml-band {
+  padding: 96px 0;
+}
+.ml-band.subtle {
+  background: rgb(var(--color-surface-subtle));
+}
+.ml-band.ocean {
+  background: linear-gradient(
+    180deg,
+    rgb(var(--color-surface)) 0%,
+    rgb(var(--color-surface-ocean)) 60%,
+    rgb(var(--color-surface)) 100%
+  );
+}
+.ml-sec-head {
+  max-width: 620px;
+}
+.ml-sec-head.center {
+  margin: 0 auto;
+  text-align: center;
+}
+.ml-sec-head h2 {
+  font-size: clamp(30px, 3.4vw, 44px);
+  margin: 12px 0 0;
+  color: rgb(var(--color-on-surface));
+}
+.ml-lead {
+  font-size: 18px;
+  color: rgb(var(--color-on-surface-muted));
+  margin: 10px 0 0;
+}
+
+/* About */
+.ml-about-grid {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 56px;
+  align-items: center;
+}
+.ml-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
+}
+.ml-stat-grid > div {
+  width: 100% !important;
+  padding: 34px 22px !important;
+  border-radius: 18px !important;
+  box-shadow: 0 20px 44px -24px rgb(var(--shadow-color) / 0.28) !important;
+  border: 1px solid rgb(var(--color-border));
+}
+.ml-stat-grid > div > div:first-child {
+  font-size: 46px !important;
+  line-height: 1 !important;
+}
+.ml-stat-grid > div > div:last-child {
+  font-size: 14px !important;
+  margin-top: 10px !important;
+}
+
+/* Menu — shorter than the other bands on purpose: tall enough to
+   browse a category, short enough that the Offers heading is still
+   reachable without scrolling through a full section of dead air. */
+#menu.ml-band {
+  padding: 32px 0 28px;
+}
+.ml-menu-tabs {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+.ml-menu-tabs > div {
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
+}
+.ml-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 26px;
+  margin-top: 24px;
+}
+@keyframes ml-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The text card sits in NORMAL FLOW below the photo, not overlapping
+   it — only pulled up a few px via negative margin so its top padding
+   tucks against the photo's bottom edge. Normal document order makes
+   the text card paint over that small sliver automatically (no
+   position/z-index needed): everything below the tuck is plain page
+   flow, not covering the photo. */
+.ml-dish {
+  display: flex;
+  flex-direction: column;
+  animation: ml-card-in 0.4s ease both;
+}
+.ml-dish:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.ml-dish:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.ml-dish:nth-child(4) {
+  animation-delay: 0.18s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ml-dish {
+    animation: none;
+  }
+}
+.ml-dish-img {
+  width: 100%;
+  aspect-ratio: 1/0.72;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 18px 40px -26px rgb(var(--shadow-color) / 0.22);
+  /* Explicit stacking so the tuck below always paints in front,
+     regardless of DOM/flex paint-order edge cases. */
+  position: relative;
+  z-index: 0;
+}
+.ml-dish-body {
+  margin-top: -20px;
+  background: rgb(var(--color-surface));
+  border-radius: 14px;
+  padding: 14px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 10px 22px -16px rgb(var(--shadow-color) / 0.3);
+  position: relative;
+  z-index: 1;
+}
+.ml-dish h3 {
+  font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
+  font-weight: 600;
+  font-size: 16px;
+  margin: 0;
+  color: rgb(var(--color-on-surface));
+}
+.ml-dish p {
+  margin: 0;
+  font-size: 13px;
+  color: rgb(var(--color-on-surface-muted));
+  line-height: 1.5;
+  /* Fixed to exactly 3 lines' worth of space (not just capped at 3) —
+     a min-height so a short description still reserves the same room
+     a long one does, keeping every card in the row the same height. */
+  min-height: calc(1.5 * 3 * 13px);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ml-dish-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.ml-price {
+  /* Deliberately not the primary accent — only the Preorder button
+     should read as the accented element on this card. */
+  font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
+  font-weight: 600;
+  font-size: 18px;
+  color: rgb(var(--color-on-surface));
+}
+.ml-dish-foot button {
+  padding: 9px 20px !important;
+  font-size: 13px !important;
+}
+.ml-menu-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+/* Offers — four cards in two columns flanking the central dish photo.
+   Card/media sizes and positions are all percentages of the stage so
+   the gaps stay proportional at any width. Every card position is
+   horizontally clear of the media's band (0-26% and 73-99%, media
+   spans ~31.5-68.5%), so only card-vs-card vertical spacing matters
+   within each column — no dependency on the media's actual pixel
+   height the way a horizontally-overlapping position would need. */
+#offers.ml-band {
+  padding-top: 40px;
+}
+.ml-offer-stage {
+  position: relative;
+  margin-top: 64px;
+  min-height: 660px;
+}
+.ml-offer-media {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 37%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 30px 60px -22px rgb(var(--shadow-color) / 0.3);
+  z-index: 0;
+}
+.ml-offer-pos {
+  position: absolute;
+  width: 26%;
+  z-index: 1;
+}
+.ml-offer-pos-1 {
+  left: 0%;
+  top: 0%;
+}
+.ml-offer-pos-2 {
+  left: 73%;
+  top: 7%;
+}
+.ml-offer-pos-3 {
+  left: 0%;
+  top: 56%;
+}
+.ml-offer-pos-4 {
+  left: 73%;
+  top: 48%;
+}
+.ml-offer-card {
+  width: 100%;
+  background: rgb(var(--color-surface));
+  border: 1px solid rgb(var(--color-surface-ocean-border));
+  border-radius: 18px;
+  padding: 26px 28px;
+  box-shadow: 0 18px 40px -26px rgb(var(--shadow-color) / 0.25);
+  position: relative;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    background-color 0.25s ease;
+}
+.ml-offer-card:hover {
+  transform: scale(1.06);
+  background: rgb(var(--color-surface-ocean));
+  box-shadow: 0 26px 54px -22px rgb(var(--shadow-color) / 0.35);
+  z-index: 2;
+}
+.ml-oc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ml-offer-card h3 {
+  font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
+  font-weight: 600;
+  font-size: 18px;
+  margin: 0;
+  color: rgb(var(--color-on-surface));
+}
+.ml-oc-price {
+  font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
+  font-weight: 600;
+  font-size: 16px;
+  color: rgb(var(--color-primary));
+  white-space: nowrap;
+}
+.ml-offer-card p {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: rgb(var(--color-on-surface-muted));
+  line-height: 1.55;
+  max-width: 80%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ml-offer-card {
+    transition: none;
+  }
+  .ml-offer-card:hover {
+    transform: none;
+  }
+}
+.ml-offer-card .ml-arrow-btn {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+}
+
+/* Testimonials — a small circular accent, then an auto-scrolling
+   marquee so six+ quotes fit without stretching the section tall. The
+   track renders the list twice back to back; animating exactly -50%
+   loops seamlessly back to the start. */
+.ml-tmls-media {
+  width: 300px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  margin: 32px auto 0;
+  box-shadow: 0 24px 50px -24px rgb(var(--shadow-color) / 0.3);
+}
+.ml-tmls-track-wrap {
+  margin-top: 40px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
+}
+.ml-tmls-track {
+  display: flex;
+  gap: 24px;
+  width: max-content;
+  animation: ml-marquee 36s linear infinite;
+}
+.ml-tmls-track-wrap:hover .ml-tmls-track {
+  animation-play-state: paused;
+}
+@keyframes ml-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ml-tmls-track {
+    animation: none;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+  }
+  /* The track holds the item list twice for the loop — hide the
+     duplicate half (assumes 6 source testimonials) so a static wrap
+     doesn't show every quote twice. */
+  .ml-tmls-track > :nth-child(n + 7) {
+    display: none;
+  }
+  .ml-tmls-track-wrap {
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+}
+
+/* Reservation — same "photo as background" treatment as the hero:
+   bleeds off the left edge behind the form instead of a boxed thumb. */
+.ml-reserve-section {
+  position: relative;
+  overflow: hidden;
+}
+.ml-reserve-media {
+  position: absolute;
+  inset: 0;
+  width: 42%;
+  z-index: 0;
+  -webkit-mask-image: linear-gradient(to right, black 60%, transparent 100%);
+  mask-image: linear-gradient(to right, black 60%, transparent 100%);
+}
+/* Not .ml-wrap, same reasoning as .ml-hero-inner: pushes to the real
+   edge instead of stopping at the shared content container. */
+.ml-reserve-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: 0 clamp(24px, 5vw, 96px);
+}
+.ml-reserve-form-wrap {
+  margin-left: auto;
+  max-width: 620px;
+}
+.ml-form-card {
+  background: rgb(var(--color-surface));
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 20px;
+  padding: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow: 0 20px 44px -26px rgb(var(--shadow-color) / 0.28);
+}
+.ml-form-card .field input,
+.ml-form-card .field select {
+  width: 100%;
+}
+.ml-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Custom dropdown — mirrors Input styling so the open state matches the form */
+.ml-dd {
+  position: relative;
+}
+.ml-dd-label {
+  font-size: 13px;
+  color: rgb(var(--color-on-surface-muted));
+  margin-bottom: 6px;
+  display: block;
+}
+.ml-dd-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-poppins, "Poppins", sans-serif);
+  font-size: 16px;
+  color: rgb(var(--color-on-surface));
+  background: rgb(var(--color-surface));
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 6px;
+  padding: 12px 16px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.ml-dd-trigger:hover {
+  border-color: rgb(var(--color-on-surface-muted));
+}
+.ml-dd.open .ml-dd-trigger,
+.ml-dd-trigger:focus-visible {
+  border-color: rgb(var(--color-primary));
+  box-shadow: 0 0 0 3px rgb(var(--color-primary) / 0.15);
+  outline: none;
+}
+.ml-dd-trigger .ml-dd-chev {
+  width: 16px;
+  height: 16px;
+  color: rgb(var(--color-primary));
+  flex: 0 0 auto;
+  transition: transform 0.2s;
+  display: inline-flex;
+}
+.ml-dd.open .ml-dd-trigger .ml-dd-chev {
+  transform: rotate(180deg);
+}
+.ml-dd-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: rgb(var(--color-surface));
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 10px;
+  box-shadow: 0 22px 46px -18px rgb(var(--shadow-color) / 0.4);
+  padding: 6px;
+  max-height: 262px;
+  overflow: auto;
+}
+.ml-dd-opt {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-poppins, "Poppins", sans-serif);
+  font-size: 15px;
+  color: rgb(var(--color-on-surface));
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 11px 12px;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.ml-dd-opt:hover {
+  background: rgb(var(--color-surface-ocean));
+}
+.ml-dd-opt.sel {
+  background: rgb(var(--color-primary));
+  color: rgb(var(--color-on-primary));
+}
+
+/* Preorder modal */
+.ml-preorder-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ml-preorder-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+.ml-preorder-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.ml-preorder-price {
+  font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
+  font-weight: 600;
+  font-size: 22px;
+  color: rgb(var(--color-on-surface));
+}
+.ml-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 999px;
+  padding: 8px 16px;
+  flex: 0 0 auto;
+}
+.ml-qty button {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: rgb(var(--color-on-surface));
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ml-qty span {
+  min-width: 16px;
+  text-align: center;
+  font-weight: 600;
+  color: rgb(var(--color-on-surface));
+}
+
+.ml-ta-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ml-ta-field label {
+  font-size: 13px;
+  color: rgb(var(--color-on-surface-muted));
+}
+.ml-ta-field textarea {
+  font-family: var(--font-poppins, "Poppins", sans-serif);
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 6px;
+  background: rgb(var(--color-surface));
+  padding: 12px 16px;
+  font-size: 16px;
+  color: rgb(var(--color-on-surface));
+  outline: none;
+  resize: vertical;
+  min-height: 84px;
+  transition:
+    box-shadow 0.2s,
+    border-color 0.2s;
+}
+.ml-ta-field textarea:focus {
+  border-color: rgb(var(--color-primary));
+  box-shadow: 0 0 0 3px rgb(var(--color-primary) / 0.15);
+}
+
+/* Footer */
+.ml-footer {
+  background: linear-gradient(135deg, rgb(var(--color-primary)) 0%, rgb(var(--color-primary-hover)) 100%);
+  color: rgb(var(--color-on-primary) / 0.72);
+  padding: 64px 0 32px;
+}
+.ml-foot-top {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 32px;
+  align-items: center;
+  padding-bottom: 36px;
+  border-bottom: 1px solid rgb(var(--color-on-primary) / 0.14);
+}
+.ml-foot-top h3 {
+  font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
+  font-weight: 600;
+  font-size: clamp(24px, 2.6vw, 34px);
+  color: rgb(var(--color-on-primary));
+  margin: 0;
+}
+.ml-news {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+.ml-news .field {
+  min-width: 320px;
+}
+.ml-news .field input {
+  width: 100%;
+  padding: 14px 18px !important;
+  font-size: 15px !important;
+}
+.ml-foot-mid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 32px;
+  padding: 36px 0;
+  border-bottom: 1px solid rgb(var(--color-on-primary) / 0.14);
+}
+.ml-foot-mid h4 {
+  font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
+  font-weight: 600;
+  font-size: 15px;
+  color: rgb(var(--color-on-primary));
+  margin: 0 0 12px;
+  letter-spacing: 0.02em;
+}
+.ml-foot-mid p,
+.ml-foot-mid a {
+  color: rgb(var(--color-on-primary) / 0.72);
+  font-size: 14px;
+  margin: 4px 0;
+  display: block;
+}
+.ml-foot-mid a:hover {
+  color: rgb(var(--color-on-primary));
+  opacity: 1;
+}
+.ml-foot-mid .brand {
+  font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
+  font-weight: 600;
+  font-size: 22px;
+  color: rgb(var(--color-on-primary));
+  margin-bottom: 10px;
+}
+.ml-foot-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 24px;
+  font-size: 13px;
+}
+
+@media (max-width: 1000px) {
+  .ml-menu-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .ml-about-grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+  /* Below 900px the bled background doesn't have room to breathe next
+     to the text — fall back to a boxed image stacked above it. */
+  .ml-hero-bg {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 340px;
+    -webkit-mask-image: none;
+    mask-image: none;
+    border-radius: 24px;
+    margin-bottom: 24px;
+  }
+  .ml-hero-right {
+    margin-left: 0;
+    max-width: 100%;
+    align-items: center;
+    text-align: center;
+  }
+  .ml-hero-right h1,
+  .ml-hero-row p {
+    text-align: center;
+  }
+  .ml-hero-row {
+    justify-content: center;
+  }
+  .ml-promo {
+    max-width: 100%;
+  }
+  .ml-reserve-media {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 300px;
+    -webkit-mask-image: none;
+    mask-image: none;
+    border-radius: 22px;
+    margin-bottom: 24px;
+  }
+  .ml-reserve-form-wrap {
+    margin-left: 0;
+    max-width: 100%;
+  }
+  /* The scattered absolute layout only works with room to spread out —
+     below 900px it collapses back to a simple centered stack. */
+  .ml-offer-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    min-height: 0;
+  }
+  .ml-offer-media {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    order: -1;
+    width: 220px;
+  }
+  .ml-offer-pos,
+  .ml-offer-pos-1,
+  .ml-offer-pos-2,
+  .ml-offer-pos-3,
+  .ml-offer-pos-4 {
+    position: static;
+    width: 100%;
+    max-width: 420px;
+  }
+  .ml-foot-top,
+  .ml-foot-mid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .ml-band {
+    padding: 68px 0;
+  }
+  .ml-hero {
+    padding: 150px 0 60px;
+  }
+  .ml-controls {
+    /* Move below the navbar pill on narrow screens — at this width both
+       fixed-position clusters can't share the top row without overlapping. */
+    top: auto;
+    bottom: 14px;
+    right: 14px;
+    gap: 8px;
+  }
+  .ml-stat-grid,
+  .ml-menu-grid,
+  .ml-form-row {
+    grid-template-columns: 1fr;
+  }
+  .ml-news {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ml-news .field {
+    min-width: 0;
+  }
+}

@@ -25,13 +25,21 @@ export function Modal({ open, onClose, title, children, footer }: ModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/40 p-lg">
       <button
-        aria-label="Close"
+        aria-label="Close backdrop"
         onClick={onClose}
         className="absolute inset-0 h-full w-full cursor-default"
       />
-      <div className="relative w-full max-w-[420px] rounded-xl bg-surface p-lg shadow-hero">
+      <div className="relative w-full max-w-[460px] rounded-xl bg-surface p-lg shadow-hero">
+        <button
+          aria-label="Close"
+          onClick={onClose}
+          type="button"
+          className="absolute right-lg top-lg flex h-8 w-8 items-center justify-center rounded-full text-on-surface-muted transition-colors hover:bg-surface-subtle hover:text-on-surface"
+        >
+          ×
+        </button>
         {title && (
-          <h3 className="mb-md font-display text-[20px] font-semibold text-on-surface">
+          <h3 className="mb-md pr-xl font-display text-[20px] font-semibold text-on-surface">
             {title}
           </h3>
         )}
