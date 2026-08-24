@@ -13,6 +13,7 @@ import type {
   ModifierOptionTranslation,
 } from "@/lib/generated/prisma/client";
 import { decimalToString } from "@/lib/dto/money";
+import { pickTranslation } from "@/lib/i18n/translations";
 import type { Lang } from "@/lib/i18n/lang";
 
 const LOCALES: Lang[] = ["en", "es"];
@@ -74,7 +75,7 @@ type RawModifierGroup = ModifierGroup & {
 };
 
 export function toPublicModifierGroup(group: RawModifierGroup, locale: Lang): PublicModifierGroup {
-  const t = group.translations.find((tr) => tr.locale === locale) ?? group.translations[0];
+  const t = pickTranslation(group.translations, locale);
   return {
     id: group.id,
     name: t?.name ?? group.slug,
@@ -84,7 +85,7 @@ export function toPublicModifierGroup(group: RawModifierGroup, locale: Lang): Pu
     minSelections: group.minSelections,
     maxSelections: group.maxSelections,
     options: group.options.map((o) => {
-      const ot = o.translations.find((tr) => tr.locale === locale) ?? o.translations[0];
+      const ot = pickTranslation(o.translations, locale);
       return {
         id: o.id,
         name: ot?.name ?? o.slug,
@@ -112,13 +113,13 @@ export function toPublicMenuByLang(categories: RawCategory[]): PublicMenuByLang 
 
   for (const locale of LOCALES) {
     const publicCategories: PublicCategory[] = categories.map((c) => {
-      const t = c.translations.find((tr) => tr.locale === locale) ?? c.translations[0];
+      const t = pickTranslation(c.translations, locale);
       return { id: c.slug, label: t?.name ?? c.slug };
     });
 
     const dishes: PublicDish[] = categories.flatMap((c) =>
       c.items.map((item) => {
-        const t = item.translations.find((tr) => tr.locale === locale) ?? item.translations[0];
+        const t = pickTranslation(item.translations, locale);
         const name = t?.name ?? item.slug;
         return {
           id: item.id,
@@ -130,7 +131,7 @@ export function toPublicMenuByLang(categories: RawCategory[]): PublicMenuByLang 
           name,
           desc: t?.description ?? "",
           tags: item.tags.map(({ tag }) => {
-            const tt = tag.translations.find((tr) => tr.locale === locale) ?? tag.translations[0];
+            const tt = pickTranslation(tag.translations, locale);
             return { id: tag.id, slug: tag.slug, label: tt?.label ?? tag.slug, color: tag.color };
           }),
           modifierGroups: item.modifierGroups.map((mg) => toPublicModifierGroup(mg.group, locale)),

@@ -1,5 +1,6 @@
 import type { Lang } from "@/lib/i18n/lang";
 import { decimalToString } from "@/lib/dto/money";
+import { pickTranslation } from "@/lib/i18n/translations";
 import { Prisma } from "@/lib/generated/prisma/client";
 import type {
   Cart,
@@ -56,7 +57,7 @@ type RawCartItem = CartItem & {
 type RawCart = Cart & { table: RestaurantTable | null; items: RawCartItem[] };
 
 function pickName<T extends { locale: string }>(translations: T[], lang: Lang, key: keyof T): string {
-  const t = translations.find((tr) => tr.locale === lang) ?? translations[0];
+  const t = pickTranslation(translations, lang);
   return t ? String(t[key]) : "";
 }
 
