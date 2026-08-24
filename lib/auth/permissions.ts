@@ -1,24 +1,8 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { UserRole } from "@/lib/generated/prisma/client";
-import { auth } from "@/auth";
+import { getSession } from "@/lib/auth/session";
 import type { Session } from "next-auth";
-
-type MembershipLike = { role: UserRole; isActive: boolean };
-type UserLike = { role: UserRole; memberships: MembershipLike[] };
-
-/**
- * Resolves the single effective role for a user, in one place, per the
- * documented hierarchy: SUPER_ADMIN (a platform-level flag on User.role)
- * always wins; otherwise the role of their active BusinessMembership;
- * otherwise CUSTOMER. Called once at sign-in — the result is embedded in
- * the JWT so later requests never need to re-query the database for it.
- */
-export function getEffectiveRole(user: UserLike): UserRole {
-  if (user.role === UserRole.SUPER_ADMIN) return UserRole.SUPER_ADMIN;
-  const membership = user.memberships.find((m) => m.isActive);
-  return membership?.role ?? UserRole.CUSTOMER;
-}
 
 export class ForbiddenError extends Error {
   constructor(message = "Forbidden") {
@@ -36,9 +20,12 @@ export class ForbiddenError extends Error {
 export async function requireRole(
   ...roles: UserRole[]
 ): Promise<Session> {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) {
     throw new ForbiddenError("Not authenticated");
+  }
+  if (session.user.revoked) {
+    throw new ForbiddenError("Session no longer valid");
   }
   if (session.user.mustChangePassword) {
     throw new ForbiddenError("Password change required before continuing");
@@ -58,8 +45,13 @@ export async function requirePageRole(
   redirectTo: string,
   ...roles: UserRole[]
 ): Promise<Session> {
-  const session = await auth();
-  if (!session?.user || session.user.mustChangePassword || !roles.includes(session.user.role)) {
+  const session = await getSession();
+  if (
+    !session?.user ||
+    session.user.revoked ||
+    session.user.mustChangePassword ||
+    !roles.includes(session.user.role)
+  ) {
     redirect(redirectTo);
   }
   return session;

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { getSession } from "@/lib/auth/session";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { navItemsForRole } from "@/components/admin/nav-config";
@@ -14,8 +14,8 @@ export default async function AdminShellLayout({
   // covers the layout being rendered by anything that bypasses it (a
   // direct RSC fetch, a future route not yet matched, etc.) rather than
   // trusting the edge check alone.
-  const session = await auth();
-  if (!session?.user) {
+  const session = await getSession();
+  if (!session?.user || session.user.revoked) {
     redirect("/admin/login");
   }
 

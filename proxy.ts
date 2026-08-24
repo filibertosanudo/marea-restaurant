@@ -10,7 +10,7 @@ export default auth((req) => {
   if (!pathname.startsWith("/admin")) return;
 
   const session = req.auth;
-  const isLoggedIn = !!session?.user;
+  const isLoggedIn = !!session?.user && !session.user.revoked;
 
   if (pathname === LOGIN_PATH) {
     if (isLoggedIn) {
