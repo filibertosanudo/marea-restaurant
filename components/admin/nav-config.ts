@@ -26,7 +26,7 @@ const ADMIN_ONLY = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN];
 // built in this module; the rest are locked previews of later modules.
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: "menu", href: "/admin/menu", roles: STAFF_UP, enabled: true },
-  { key: "orders", href: "/admin/pedidos", roles: STAFF_UP, enabled: false },
+  { key: "orders", href: "/admin/pedidos", roles: STAFF_UP, enabled: true },
   { key: "reservations", href: "/admin/reservaciones", roles: STAFF_UP, enabled: false },
   { key: "promotions", href: "/admin/promociones", roles: ADMIN_ONLY, enabled: false },
   { key: "tables", href: "/admin/mesas", roles: ADMIN_ONLY, enabled: false },
