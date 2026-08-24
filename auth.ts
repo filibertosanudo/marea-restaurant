@@ -81,7 +81,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (await isRateLimited(email, ipAddress)) return null;
 
         const user = await prisma.user.findUnique({
-          where: { email },
+          where: { email, deletedAt: null },
           include: { memberships: { where: { isActive: true } } },
         });
 
