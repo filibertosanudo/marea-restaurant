@@ -173,7 +173,7 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
     }
     if (stockByMenuItem.size > 0) {
       await tx.menuItem.updateMany({
-        where: { id: { in: [...stockByMenuItem.keys()] }, stockQuantity: { lte: 0 } },
+        where: { id: { in: [...stockByMenuItem.keys()] }, businessId, stockQuantity: { lte: 0 } },
         data: { isAvailable: false },
       });
     }
