@@ -7,17 +7,12 @@ import { PaymentMethodChoice, type PaymentMethod } from "./PaymentMethodChoice";
 import { CardPaymentPanel } from "./CardPaymentPanel";
 import type { OrderDictionary } from "@/lib/i18n/dictionaries";
 import type { Lang } from "@/lib/i18n/lang";
+import type { TrackedOrderDTO } from "@/lib/orders/dto";
 
-export type TrackedPaymentStatus =
-  | "PENDING"
-  | "PROCESSING"
-  | "REQUIRES_ACTION"
-  | "SUCCEEDED"
-  | "FAILED"
-  | "CANCELLED"
-  | "REFUNDED"
-  | "PARTIALLY_REFUNDED"
-  | null;
+// Derived from the DTO's own field, not hand-rolled — a new PaymentStatus
+// enum value then shows up here automatically instead of silently falling
+// through every branch below to the generic "choose a method" screen.
+export type TrackedPaymentStatus = TrackedOrderDTO["paymentStatus"];
 
 /**
  * The payment block on the order-tracking page — the container that owns
@@ -62,6 +57,28 @@ export function PaymentSection({
     );
   }
 
+  // A guest whose order was refunded (or is mid-flight on a payment they
+  // already started) must never see the "choose how to pay" screen again —
+  // that reads as "you haven't paid" to someone who has, or invites a
+  // second card charge once Fase 4 makes the choice live.
+  if (paymentStatus === "REFUNDED" || paymentStatus === "PARTIALLY_REFUNDED") {
+    return (
+      <PaymentCard title={dict.paymentSectionTitle}>
+        <p className="text-[12.5px] text-on-surface-muted">{dict.paymentRefundedBody}</p>
+      </PaymentCard>
+    );
+  }
+
+  if (paymentStatus === "PROCESSING" || paymentStatus === "REQUIRES_ACTION") {
+    return (
+      <PaymentCard title={dict.paymentSectionTitle}>
+        <p className="text-[12.5px] text-on-surface-muted">
+          {paymentStatus === "PROCESSING" ? dict.cardProcessingBody : dict.cardRequiresActionBody}
+        </p>
+      </PaymentCard>
+    );
+  }
+
   if (!acceptsOnlinePayment) {
     return (
       <PaymentCard title={dict.paymentSectionTitle}>
@@ -72,6 +89,9 @@ export function PaymentSection({
 
   return (
     <PaymentCard title={dict.paymentSectionTitle}>
+      {paymentStatus === "FAILED" && (
+        <p className="mb-sm text-[12px] font-medium text-error">{dict.paymentPriorAttemptFailed}</p>
+      )}
       <PaymentMethodChoice
         value={method}
         onChange={setMethod}

@@ -289,6 +289,8 @@ export const en = {
     amountTotal: "Total",
     amountPaid: "Paid",
     paymentPaidBody: "Thanks — this order is paid in full.",
+    paymentRefundedBody: "This order was refunded. Reach out to the restaurant if you have questions.",
+    paymentPriorAttemptFailed: "Your last payment attempt didn't go through — try again or pay at the register.",
     payAtRegisterOnlyBody: "Pay at the register when your order is ready.",
     payCardTitle: "Pay now with card",
     payCardBody: "Fast, and your order is marked paid instantly.",

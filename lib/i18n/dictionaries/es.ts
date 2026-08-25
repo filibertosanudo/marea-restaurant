@@ -293,6 +293,8 @@ export const es = {
     amountTotal: "Total",
     amountPaid: "Pagado",
     paymentPaidBody: "Gracias — este pedido está pagado por completo.",
+    paymentRefundedBody: "Este pedido fue reembolsado. Contacta al restaurante si tienes dudas.",
+    paymentPriorAttemptFailed: "Tu último intento de pago no pasó — intenta de nuevo o paga en caja.",
     payAtRegisterOnlyBody: "Paga en caja cuando tu pedido esté listo.",
     payCardTitle: "Pagar ahora con tarjeta",
     payCardBody: "Rápido, y tu pedido queda marcado como pagado al instante.",
