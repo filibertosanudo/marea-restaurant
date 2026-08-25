@@ -168,26 +168,39 @@ export async function collectCashPaymentAction(orderId: string): Promise<BoardAc
   const session = await requireRole(...STAFF_ROLES);
   const business = await getCurrentBusiness();
 
-  const payment = await prisma.payment.findFirst({
-    where: {
-      orderId,
-      businessId: business.id,
-      provider: "CASH_REGISTER",
-      status: "PENDING",
-    },
-    include: { order: { select: { status: true } } },
-  });
-  if (!payment) return { error: "not_found" };
-  // Belt-and-suspenders alongside cancelOrderAction cancelling its own
-  // PENDING payments: a cancelled order must never be collectable, even if
-  // this is called directly (the Server Action is reachable regardless of
-  // which tab the UI happens to render).
-  if (payment.order.status === "CANCELLED") return { error: "order_cancelled" };
+  const result = await prisma.$transaction(async (tx) => {
+    // Lock the same Order row cancelOrderAction locks — not because this
+    // action writes to Order, but because it's the one resource that
+    // serializes the two. Without it, a collect and a concurrent cancel can
+    // both read a pre-transition state and each commit its own side: the
+    // collect marks the payment SUCCEEDED, the cancel marks it CANCELLED
+    // (or, if collect wins the ordering, the payment is already SUCCEEDED
+    // by the time cancel's updateMany runs and its `status: "PENDING"`
+    // filter no longer matches it) — either way a cancelled order ends up
+    // "paid". FOR UPDATE makes whichever call arrives second block until
+    // the first commits, then re-read a status that already moved on. Same
+    // double-tap protection as advanceOrderStatusAction gets for free.
+    const lockedOrder = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Order" WHERE id = ${orderId} AND "businessId" = ${business.id} FOR UPDATE
+    `;
+    if (!lockedOrder[0]) return { error: "not_found" } as const;
 
-  await prisma.payment.update({
-    where: { id: payment.id },
-    data: { status: "SUCCEEDED", paidAt: new Date(), collectedByUserId: session.user.id },
+    const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+    if (order.status === "CANCELLED") return { error: "order_cancelled" } as const;
+
+    const payment = await tx.payment.findFirst({
+      where: { orderId, businessId: business.id, provider: "CASH_REGISTER", status: "PENDING" },
+    });
+    if (!payment) return { error: "not_found" } as const;
+
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: { status: "SUCCEEDED", paidAt: new Date(), collectedByUserId: session.user.id },
+    });
+
+    return undefined;
   });
 
+  if (result?.error) return result;
   revalidatePath("/admin/pedidos");
 }
