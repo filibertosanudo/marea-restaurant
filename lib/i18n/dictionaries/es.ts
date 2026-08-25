@@ -308,7 +308,7 @@ export const es = {
     cardFieldLabel: "Datos de la tarjeta",
     cardFieldPlaceholder: "Número de tarjeta, vencimiento, CVC",
     payLabel: "Pagar {amount}",
-    cardPaymentComingSoon: "El pago con tarjeta llega en una actualización posterior — por ahora paga en caja.",
+    cardFieldLoading: "Cargando el formulario de la tarjeta…",
     cardIntentLoading: "Preparando tu pago…",
     cardIntentError: "No se pudo iniciar el pago con tarjeta. Paga en caja en su lugar.",
     cardProcessingTitle: "Procesando tu pago…",

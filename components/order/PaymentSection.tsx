@@ -47,6 +47,17 @@ export function PaymentSection({
   const [intentError, setIntentError] = useState<string | null>(null);
   const [loadingIntent, setLoadingIntent] = useState(false);
 
+  // Clearing on every method change (not just away from CARD) means
+  // switching CARD -> CASH_REGISTER -> CARD re-runs the fetch effect
+  // instead of reusing a secret that might now be stale for a reason
+  // unrelated to Stripe (the order itself getting cancelled, say) —
+  // createPaymentIntentAction re-validates all of that server-side anyway.
+  function handleMethodChange(next: PaymentMethod) {
+    setClientSecret(null);
+    setIntentError(null);
+    setMethod(next);
+  }
+
   useEffect(() => {
     if (method !== "CARD" || clientSecret || loadingIntent) return;
     let cancelled = false;
@@ -117,7 +128,7 @@ export function PaymentSection({
       )}
       <PaymentMethodChoice
         value={method}
-        onChange={setMethod}
+        onChange={handleMethodChange}
         groupLabel={dict.choosePaymentMethod}
         cardTitle={dict.payCardTitle}
         cardBody={dict.payCardBody}
@@ -136,7 +147,7 @@ export function PaymentSection({
               <p className="text-[12.5px] text-error">{intentError}</p>
               <button
                 type="button"
-                onClick={() => setMethod("CASH_REGISTER")}
+                onClick={() => handleMethodChange("CASH_REGISTER")}
                 className="rounded-full border border-border/40 py-[12px] text-[13.5px] font-semibold text-on-surface transition-colors hover:bg-surface-subtle"
               >
                 {dict.cardSwitchToCash}
@@ -148,12 +159,12 @@ export function PaymentSection({
             <CardPaymentPanel
               clientSecret={clientSecret}
               amountLabel={formatMoney(total, currency, lang)}
-              onSwitchToCash={() => setMethod("CASH_REGISTER")}
+              onSwitchToCash={() => handleMethodChange("CASH_REGISTER")}
               dict={{
                 cardFieldLabel: dict.cardFieldLabel,
                 cardFieldPlaceholder: dict.cardFieldPlaceholder,
                 payLabel: dict.payLabel,
-                disabledCaption: dict.cardPaymentComingSoon,
+                disabledCaption: dict.cardFieldLoading,
                 processingTitle: dict.cardProcessingTitle,
                 processingBody: dict.cardProcessingBody,
                 requiresActionTitle: dict.cardRequiresActionTitle,

@@ -304,7 +304,7 @@ export const en = {
     cardFieldLabel: "Card details",
     cardFieldPlaceholder: "Card number, expiry, CVC",
     payLabel: "Pay {amount}",
-    cardPaymentComingSoon: "Card payments are arriving in a later update — pay at the register for now.",
+    cardFieldLoading: "Loading the card form…",
     cardIntentLoading: "Preparing your payment…",
     cardIntentError: "Couldn't start the card payment. Pay at the register instead.",
     cardProcessingTitle: "Processing your payment…",
