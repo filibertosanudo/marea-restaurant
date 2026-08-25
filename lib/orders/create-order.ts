@@ -220,6 +220,10 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
         statusEvents: {
           create: { toStatus: "PENDING" },
         },
+        // Creates the first Payment row at PENDING — outside lib/payments/
+        // on purpose: that module owns *transitions* (an existing payment
+        // moving from one status to another), and a brand-new row has no
+        // prior state to validate against.
         payments: {
           create: {
             businessId,

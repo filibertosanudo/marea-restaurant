@@ -1,13 +1,13 @@
 import "server-only";
 import type { Prisma, PaymentStatus } from "@/lib/generated/prisma/client";
-import { assertPaymentTransition } from "./state-machine";
+import { assertPaymentTransition, CANCELLABLE_PAYMENT_STATUSES } from "./state-machine";
 
 type TxClient = Prisma.TransactionClient;
 
-/** Cancels every PENDING payment for an order — called inside cancelOrderAction's own transaction (finding 1.1). */
-export async function cancelPendingPayments(tx: TxClient, orderId: string): Promise<void> {
+/** Cancels every still-open payment for an order (PENDING, and anything mid-flight — PROCESSING, REQUIRES_ACTION), called when the order itself is cancelled. */
+export async function cancelOpenPayments(tx: TxClient, orderId: string): Promise<void> {
   await tx.payment.updateMany({
-    where: { orderId, status: "PENDING" },
+    where: { orderId, status: { in: CANCELLABLE_PAYMENT_STATUSES } },
     data: { status: "CANCELLED" },
   });
 }

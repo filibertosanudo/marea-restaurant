@@ -1,4 +1,4 @@
-import type { PaymentStatus } from "@/lib/generated/prisma/client";
+import { PaymentStatus } from "@/lib/generated/prisma/client";
 
 /**
  * The one graph of legal Payment transitions, mirroring
@@ -35,3 +35,12 @@ export function assertPaymentTransition(from: PaymentStatus, to: PaymentStatus):
     throw new IllegalPaymentTransitionError(from, to);
   }
 }
+
+/**
+ * Every status that can still legally become CANCELLED — derived from the
+ * graph above, not hand-listed, so a future edit to LEGAL_TRANSITIONS
+ * can't silently desync from what order cancellation actually cancels.
+ */
+export const CANCELLABLE_PAYMENT_STATUSES: PaymentStatus[] = Object.values(PaymentStatus).filter((status) =>
+  canTransitionPayment(status, "CANCELLED")
+);

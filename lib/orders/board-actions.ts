@@ -6,7 +6,8 @@ import { requireRole, ForbiddenError } from "@/lib/auth/permissions";
 import { STAFF_ROLES, ADMIN_ROLES } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
 import { getNextStatus, isCancellable } from "@/lib/orders/state-machine";
-import { cancelPendingPayments, markPaymentSucceeded } from "@/lib/payments/actions";
+import { cancelOpenPayments, markPaymentSucceeded } from "@/lib/payments/actions";
+import { IllegalPaymentTransitionError } from "@/lib/payments/state-machine";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
 export type BoardActionState = { error?: string } | undefined;
@@ -137,7 +138,7 @@ export async function cancelOrderAction(
     // collectCashPaymentAction still collect it, and would never let a shift
     // cash-out reconcile since it'd sit as outstanding for an order that no
     // longer exists in any real sense.
-    await cancelPendingPayments(tx, order.id);
+    await cancelOpenPayments(tx, order.id);
 
     // Give back whatever this order's checkout decremented (see
     // createOrderFromCart's stock check), for dishes that still track
@@ -208,26 +209,37 @@ export async function collectCashPaymentAction(orderId: string): Promise<BoardAc
   const session = await requireRole(...STAFF_ROLES);
   const business = await getCurrentBusiness();
 
-  const result = await prisma.$transaction(async (tx) => {
-    // Locking the same Order row cancelOrderAction locks — not because this
-    // action writes to Order, but because it's the one resource that
-    // serializes the two: without it, a collect and a concurrent cancel
-    // could both read a pre-transition state and each commit its own side,
-    // leaving a cancelled order "paid" (or vice versa).
-    if (!(await lockOrderForUpdate(tx, business.id, orderId))) return { error: "not_found" } as const;
+  let result;
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      // Locking the same Order row cancelOrderAction locks — not because
+      // this action writes to Order, but because it's the one resource
+      // that serializes the two: without it, a collect and a concurrent
+      // cancel could both read a pre-transition state and each commit
+      // their own side, leaving a cancelled order "paid" (or vice versa).
+      if (!(await lockOrderForUpdate(tx, business.id, orderId))) return { error: "not_found" } as const;
 
-    const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
-    if (order.status === "CANCELLED") return { error: "order_cancelled" } as const;
+      const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+      if (order.status === "CANCELLED") return { error: "order_cancelled" } as const;
 
-    const payment = await tx.payment.findFirst({
-      where: { orderId, businessId: business.id, provider: "CASH_REGISTER", status: "PENDING" },
+      const payment = await tx.payment.findFirst({
+        where: { orderId, businessId: business.id, provider: "CASH_REGISTER", status: "PENDING" },
+      });
+      if (!payment) return { error: "not_found" } as const;
+
+      await markPaymentSucceeded(tx, payment, session.user.id);
+
+      return undefined;
     });
-    if (!payment) return { error: "not_found" } as const;
-
-    await markPaymentSucceeded(tx, payment, session.user.id);
-
-    return undefined;
-  });
+  } catch (err) {
+    // markPaymentSucceeded's assertPaymentTransition can't fail from this
+    // call site today (the findFirst above only ever returns a PENDING
+    // payment), but it will once a second caller lands — a Stripe webhook
+    // racing this same collect. Fail as a normal board error, not a raw
+    // uncaught 500.
+    if (err instanceof IllegalPaymentTransitionError) return { error: "invalid_transition" };
+    throw err;
+  }
 
   if (result?.error) return result;
   revalidatePath("/admin/pedidos");
