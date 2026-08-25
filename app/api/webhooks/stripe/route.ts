@@ -1,7 +1,7 @@
 import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe/client";
-import { applyStripeEvent, resolveChargeDetails } from "@/lib/payments/webhook-handlers";
+import { applyStripeEvent, resolveChargeDetailsForEvent } from "@/lib/payments/webhook-handlers";
 import { isUniqueConstraintError } from "@/lib/payments/prisma-errors";
 import { Prisma } from "@/lib/generated/prisma/client";
 
@@ -30,10 +30,7 @@ export async function POST(request: Request) {
     return new Response("Invalid signature", { status: 400 });
   }
 
-  const chargeDetails =
-    event.type === "payment_intent.succeeded"
-      ? await resolveChargeDetails(event.data.object as Stripe.PaymentIntent)
-      : null;
+  const chargeDetails = await resolveChargeDetailsForEvent(event);
 
   try {
     await prisma.$transaction(async (tx) => {

@@ -20,7 +20,7 @@ export type ChargeDetails = {
  * external network round-trip. Webhook event payloads carry `latest_charge`
  * as a bare id, not the expanded charge, so this is a real extra request.
  */
-export async function resolveChargeDetails(intent: Stripe.PaymentIntent): Promise<ChargeDetails | null> {
+async function resolveChargeDetails(intent: Stripe.PaymentIntent): Promise<ChargeDetails | null> {
   const chargeId = typeof intent.latest_charge === "string" ? intent.latest_charge : intent.latest_charge?.id;
   if (!chargeId) return null;
 
@@ -31,6 +31,23 @@ export async function resolveChargeDetails(intent: Stripe.PaymentIntent): Promis
     last4: charge.payment_method_details?.card?.last4 ?? null,
     receiptUrl: charge.receipt_url ?? null,
   };
+}
+
+/**
+ * Which events need Stripe API enrichment before the DB transaction opens —
+ * a decision that belongs here (what each event needs to apply its effect),
+ * not in the webhook route, which stays a thin parse/verify/transaction shell.
+ */
+export async function resolveChargeDetailsForEvent(event: Stripe.Event): Promise<ChargeDetails | null> {
+  if (event.type === "payment_intent.succeeded") {
+    return resolveChargeDetails(event.data.object as Stripe.PaymentIntent);
+  }
+  return null;
+}
+
+/** A transition the graph rejects is worth a trace even though the handler still no-ops and responds 2xx — otherwise a real state mismatch (Stripe says paid, the DB disagrees) leaves zero record anywhere. */
+function logRejectedTransition(event: string, paymentId: string, from: PaymentStatus, to: PaymentStatus): void {
+  console.error(`[stripe webhook] ${event}: rejected ${from} -> ${to} for payment ${paymentId}`);
 }
 
 /**
@@ -65,7 +82,11 @@ async function handlePaymentIntentSucceeded(
   charge: ChargeDetails | null
 ): Promise<void> {
   const payment = await tx.payment.findUnique({ where: { stripePaymentIntentId: intent.id } });
-  if (!payment || !canTransitionPayment(payment.status, "SUCCEEDED")) return;
+  if (!payment) return;
+  if (!canTransitionPayment(payment.status, "SUCCEEDED")) {
+    logRejectedTransition("payment_intent.succeeded", payment.id, payment.status, "SUCCEEDED");
+    return;
+  }
 
   await tx.payment.update({
     where: { id: payment.id },
@@ -82,7 +103,11 @@ async function handlePaymentIntentSucceeded(
 
 async function handlePaymentIntentFailed(tx: TxClient, intent: Stripe.PaymentIntent): Promise<void> {
   const payment = await tx.payment.findUnique({ where: { stripePaymentIntentId: intent.id } });
-  if (!payment || !canTransitionPayment(payment.status, "FAILED")) return;
+  if (!payment) return;
+  if (!canTransitionPayment(payment.status, "FAILED")) {
+    logRejectedTransition("payment_intent.payment_failed", payment.id, payment.status, "FAILED");
+    return;
+  }
 
   await tx.payment.update({
     where: { id: payment.id },
@@ -96,7 +121,11 @@ async function handlePaymentIntentFailed(tx: TxClient, intent: Stripe.PaymentInt
 
 async function handlePaymentIntentCanceled(tx: TxClient, intent: Stripe.PaymentIntent): Promise<void> {
   const payment = await tx.payment.findUnique({ where: { stripePaymentIntentId: intent.id } });
-  if (!payment || !canTransitionPayment(payment.status, "CANCELLED")) return;
+  if (!payment) return;
+  if (!canTransitionPayment(payment.status, "CANCELLED")) {
+    logRejectedTransition("payment_intent.canceled", payment.id, payment.status, "CANCELLED");
+    return;
+  }
 
   await tx.payment.update({ where: { id: payment.id }, data: { status: "CANCELLED" } });
 }
@@ -115,10 +144,18 @@ async function handleChargeRefunded(tx: TxClient, charge: Stripe.Charge): Promis
   const payment = await tx.payment.findUnique({ where: { stripePaymentIntentId: paymentIntentId } });
   if (!payment) return;
 
+  // The status update and the refund-row reconciliation are independent
+  // facts — a blocked status transition (e.g. two refund events arrive
+  // out of order and the later, larger one is processed first) must never
+  // skip recording the refund itself. Money moved at Stripe regardless of
+  // what this app's local status field ends up saying.
   const targetStatus: PaymentStatus = charge.amount_refunded >= charge.amount ? "REFUNDED" : "PARTIALLY_REFUNDED";
   if (payment.status !== targetStatus) {
-    if (!canTransitionPayment(payment.status, targetStatus)) return;
-    await tx.payment.update({ where: { id: payment.id }, data: { status: targetStatus } });
+    if (canTransitionPayment(payment.status, targetStatus)) {
+      await tx.payment.update({ where: { id: payment.id }, data: { status: targetStatus } });
+    } else {
+      logRejectedTransition("charge.refunded", payment.id, payment.status, targetStatus);
+    }
   }
 
   for (const refund of charge.refunds?.data ?? []) {
