@@ -112,7 +112,13 @@ export function OrderCard({
 
   const nextStatus = getNextStatus(order.status);
   const isDelivered = order.status === "DELIVERED";
-  const paymentDue = order.paymentStatus === "PENDING";
+  // Anything short of SUCCEEDED reads as "not paid yet" — before Stripe,
+  // PENDING was the only non-paid status a cash order could hold, but a
+  // card attempt can also sit at PROCESSING/REQUIRES_ACTION/FAILED, and
+  // all three used to render this badge green ("Paid") since only PENDING
+  // was checked. REFUNDED/PARTIALLY_REFUNDED aren't reachable yet (Fase 5
+  // isn't wired), so they aren't given their own badge here.
+  const paymentDue = order.paymentStatus !== "SUCCEEDED";
 
   function advance() {
     startTransition(async () => {
