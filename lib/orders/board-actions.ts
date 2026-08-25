@@ -6,8 +6,30 @@ import { requireRole, ForbiddenError } from "@/lib/auth/permissions";
 import { STAFF_ROLES, ADMIN_ROLES } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
 import { getNextStatus, isCancellable } from "@/lib/orders/state-machine";
+import type { Prisma } from "@/lib/generated/prisma/client";
 
 export type BoardActionState = { error?: string } | undefined;
+
+/**
+ * Lock an Order row before reading its status, shared by every board action
+ * that needs to serialize with the others (advance, cancel, collect cash).
+ * Without this, two overlapping calls on the same order — a double-tap
+ * before the UI re-renders, two devices watching the same board, a collect
+ * racing a cancel — both read the same pre-transaction state and each
+ * commit their own side. FOR UPDATE makes whichever call arrives second
+ * block until the first commits, then re-read a status that's already
+ * moved on. Returns whether the row was found (and thus locked).
+ */
+async function lockOrderForUpdate(
+  tx: Prisma.TransactionClient,
+  businessId: string,
+  orderId: string
+): Promise<boolean> {
+  const locked = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id FROM "Order" WHERE id = ${orderId} AND "businessId" = ${businessId} FOR UPDATE
+  `;
+  return Boolean(locked[0]);
+}
 
 /**
  * The board's one-tap "advance" button. STAFF and up — per
@@ -22,17 +44,7 @@ export async function advanceOrderStatusAction(orderId: string): Promise<BoardAc
   const business = await getCurrentBusiness();
 
   const result = await prisma.$transaction(async (tx) => {
-    // Lock the Order row before reading its status. Without this, two
-    // overlapping taps on the one-tap advance button (a double-tap before
-    // the UI re-renders, or two devices watching the same board) both read
-    // the same pre-transaction status, both compute the same nextStatus,
-    // and both commit — producing two OrderStatusEvent rows for one real
-    // transition. FOR UPDATE makes the second call block until the first
-    // commits, then re-read a status that's already moved on.
-    const locked = await tx.$queryRaw<{ id: string }[]>`
-      SELECT id FROM "Order" WHERE id = ${orderId} AND "businessId" = ${business.id} FOR UPDATE
-    `;
-    if (!locked[0]) return { error: "not_found" } as const;
+    if (!(await lockOrderForUpdate(tx, business.id, orderId))) return { error: "not_found" } as const;
 
     const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
     const nextStatus = getNextStatus(order.status);
@@ -106,13 +118,7 @@ export async function cancelOrderAction(
   if (!trimmedReason) return { error: "reason_required" };
 
   const result = await prisma.$transaction(async (tx) => {
-    // Same lock-before-read reasoning as advanceOrderStatusAction — two
-    // concurrent cancellations of the same order (two admin tabs) must not
-    // both commit a CANCELLED transition with possibly different reasons.
-    const locked = await tx.$queryRaw<{ id: string }[]>`
-      SELECT id FROM "Order" WHERE id = ${orderId} AND "businessId" = ${business.id} FOR UPDATE
-    `;
-    if (!locked[0]) return { error: "not_found" } as const;
+    if (!(await lockOrderForUpdate(tx, business.id, orderId))) return { error: "not_found" } as const;
 
     const order = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
@@ -205,21 +211,12 @@ export async function collectCashPaymentAction(orderId: string): Promise<BoardAc
   const business = await getCurrentBusiness();
 
   const result = await prisma.$transaction(async (tx) => {
-    // Lock the same Order row cancelOrderAction locks — not because this
+    // Locking the same Order row cancelOrderAction locks — not because this
     // action writes to Order, but because it's the one resource that
-    // serializes the two. Without it, a collect and a concurrent cancel can
-    // both read a pre-transition state and each commit its own side: the
-    // collect marks the payment SUCCEEDED, the cancel marks it CANCELLED
-    // (or, if collect wins the ordering, the payment is already SUCCEEDED
-    // by the time cancel's updateMany runs and its `status: "PENDING"`
-    // filter no longer matches it) — either way a cancelled order ends up
-    // "paid". FOR UPDATE makes whichever call arrives second block until
-    // the first commits, then re-read a status that already moved on. Same
-    // double-tap protection as advanceOrderStatusAction gets for free.
-    const lockedOrder = await tx.$queryRaw<{ id: string }[]>`
-      SELECT id FROM "Order" WHERE id = ${orderId} AND "businessId" = ${business.id} FOR UPDATE
-    `;
-    if (!lockedOrder[0]) return { error: "not_found" } as const;
+    // serializes the two: without it, a collect and a concurrent cancel
+    // could both read a pre-transition state and each commit its own side,
+    // leaving a cancelled order "paid" (or vice versa).
+    if (!(await lockOrderForUpdate(tx, business.id, orderId))) return { error: "not_found" } as const;
 
     const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
     if (order.status === "CANCELLED") return { error: "order_cancelled" } as const;
