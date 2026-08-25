@@ -236,6 +236,7 @@ export const en = {
     errorEmptyCart: "Your cart is empty.",
     errorItemUnavailableNamed: "{dish} is no longer available — remove it from your cart to continue.",
     errorModifierUnavailableNamed: "An option chosen for {dish} is no longer available — check your cart.",
+    errorModifierInvalidNamed: "The options chosen for {dish} are no longer valid — check your cart.",
     requiredField: "This field is required.",
     yourOrder: "Your order",
     statusPending: "Received",

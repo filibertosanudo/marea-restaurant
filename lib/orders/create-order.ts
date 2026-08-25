@@ -4,9 +4,11 @@ import { Prisma } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
 import { getCartSessionToken } from "@/lib/cart/cookie";
 import { pickTranslation } from "@/lib/i18n/translations";
+import { toPublicModifierGroup } from "@/lib/menu/public-menu";
+import { validateModifierSelection } from "@/lib/cart/modifier-validation";
 
 export class CheckoutError extends Error {
-  code: "empty_cart" | "item_unavailable" | "modifier_unavailable";
+  code: "empty_cart" | "item_unavailable" | "modifier_unavailable" | "modifier_invalid";
   dishName?: string;
   constructor(code: CheckoutError["code"], dishName?: string) {
     super(code);
@@ -56,7 +58,28 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
         items: {
           include: {
             menuItem: {
-              include: { translations: true, category: true },
+              include: {
+                translations: true,
+                category: true,
+                // Needed to re-run validateModifierSelection below — the
+                // group's minSelections/maxSelections/isRequired can change
+                // after an item was already sitting in someone's cart.
+                modifierGroups: {
+                  orderBy: { sortOrder: "asc" },
+                  include: {
+                    group: {
+                      include: {
+                        translations: true,
+                        options: {
+                          where: { deletedAt: null },
+                          orderBy: { sortOrder: "asc" },
+                          include: { translations: true },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
             modifiers: {
               include: { option: { include: { translations: true } } },
@@ -86,6 +109,18 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
       const unavailableModifier = item.modifiers.find((m) => !m.option.isAvailable);
       if (unavailableModifier) {
         throw new CheckoutError("modifier_unavailable", dishName);
+      }
+
+      // Same rule addToCartAction enforces (minSelections/maxSelections/
+      // isRequired), re-run here because a group's requirements can change
+      // while the item is sitting in an open cart — without this, a cart
+      // built before a group became required checks out with the group
+      // simply missing.
+      const publicGroups = item.menuItem.modifierGroups.map((mg) => toPublicModifierGroup(mg.group, lang));
+      const selectedOptionIds = item.modifiers.map((m) => m.option.id);
+      const modifierValidation = validateModifierSelection(publicGroups, selectedOptionIds);
+      if (!modifierValidation.ok) {
+        throw new CheckoutError("modifier_invalid", dishName);
       }
 
       const unitPrice = item.modifiers

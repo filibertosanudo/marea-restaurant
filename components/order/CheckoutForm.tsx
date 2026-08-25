@@ -14,6 +14,8 @@ function errorMessage(state: CheckoutState, dict: OrderDictionary): string | nul
       return dict.errorItemUnavailableNamed.replace("{dish}", state.dishName ?? "");
     case "modifier_unavailable":
       return dict.errorModifierUnavailableNamed.replace("{dish}", state.dishName ?? "");
+    case "modifier_invalid":
+      return dict.errorModifierInvalidNamed.replace("{dish}", state.dishName ?? "");
     case "invalid_input":
       return dict.requiredField;
   }

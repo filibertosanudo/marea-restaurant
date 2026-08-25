@@ -239,6 +239,8 @@ export const es = {
     errorItemUnavailableNamed: "{dish} ya no está disponible — quítalo de tu carrito para continuar.",
     errorModifierUnavailableNamed:
       "Una opción elegida para {dish} ya no está disponible — revisa tu carrito.",
+    errorModifierInvalidNamed:
+      "Las opciones elegidas para {dish} ya no son válidas — revisa tu carrito.",
     requiredField: "Este campo es obligatorio.",
     yourOrder: "Tu pedido",
     statusPending: "Recibido",
