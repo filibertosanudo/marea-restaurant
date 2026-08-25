@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { formatMoney, toIntlLocale } from "@/lib/dto/money";
 import { getOrderPaymentDetailAction } from "@/lib/orders/payment-actions";
 import { createRefundAction, type CreateRefundResult } from "@/lib/payments/refund-actions";
@@ -76,8 +76,14 @@ export function OrderPaymentDrawer({
   const [loadError, setLoadError] = useState(false);
   const [refundError, setRefundError] = useState<string | null>(null);
   const [refundPending, startRefundTransition] = useTransition();
+  // Snapshot of which order this instance is currently showing — a refund
+  // submission captures it at click time and checks it again once the
+  // Server Action resolves, so a stale response for an order the drawer
+  // has since moved away from can't clobber whatever's on screen now.
+  const currentOrderIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    currentOrderIdRef.current = orderId;
     if (!open || !orderId) return;
     let cancelled = false;
     // Resetting for the order this drawer is now fetching — not
@@ -110,19 +116,21 @@ export function OrderPaymentDrawer({
 
   function handleRefundSubmit(refund: { mode: "FULL" | "PARTIAL"; amount: string; reason: string }) {
     if (!orderId) return;
+    const submittedForOrderId = orderId;
     setRefundError(null);
     startRefundTransition(async () => {
       const result = await createRefundAction(orderId, refund);
+      if (currentOrderIdRef.current !== submittedForOrderId) return;
       if (!result.ok) {
         setRefundError(dict[REFUND_ERROR_KEY[result.error]]);
         return;
       }
-      // Re-fetch so the new PENDING Refund and updated refundableTotal show
-      // up immediately — the webhook will later flip it to SUCCEEDED, at
+      // The action returns the refreshed detail directly — the new PENDING
+      // Refund and updated refundableTotal show up immediately without a
+      // second round-trip. The webhook later flips it to SUCCEEDED, at
       // which point closing and reopening (or the board's own revalidation)
       // picks that up the same way.
-      const refreshed = await getOrderPaymentDetailAction(orderId);
-      setDetail(refreshed);
+      setDetail(result.detail);
     });
   }
 
