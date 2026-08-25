@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/business";
+import { getOrderForPaymentIntentByPublicToken } from "@/lib/orders/queries";
 import { stripe } from "@/lib/stripe/client";
 import { toStripeAmount } from "./amount";
 import { computePaymentSummary } from "./summary";
@@ -9,9 +10,15 @@ import { isUniqueConstraintError } from "./prisma-errors";
 
 export type CreatePaymentIntentResult =
   | { ok: true; clientSecret: string }
-  | { ok: false; error: "not_found" | "order_cancelled" | "already_paid" | "try_again" };
+  | {
+      ok: false;
+      error: "not_found" | "order_cancelled" | "already_paid" | "online_payment_disabled" | "try_again";
+    };
 
 const OPEN_STRIPE_STATUSES = ["PENDING", "PROCESSING", "REQUIRES_ACTION"] as const;
+// Stripe's own intent status, not this app's PaymentStatus — the states a
+// PaymentIntent can still be confirmed from.
+const CONFIRMABLE_INTENT_STATUSES = ["requires_payment_method", "requires_confirmation", "requires_action"];
 
 /**
  * Called from the order-tracking page when a guest picks "pay with card".
@@ -22,19 +29,22 @@ const OPEN_STRIPE_STATUSES = ["PENDING", "PROCESSING", "REQUIRES_ACTION"] as con
  */
 export async function createPaymentIntentAction(publicToken: string): Promise<CreatePaymentIntentResult> {
   const business = await getCurrentBusiness();
+  if (!business.acceptsOnlinePayment) return { ok: false, error: "online_payment_disabled" };
 
-  const order = await prisma.order.findFirst({
-    where: { businessId: business.id, publicToken },
-    include: { payments: { orderBy: { createdAt: "desc" }, include: { refunds: true } } },
-  });
+  const order = await getOrderForPaymentIntentByPublicToken(business.id, publicToken);
   if (!order) return { ok: false, error: "not_found" };
   if (order.status === "CANCELLED") return { ok: false, error: "order_cancelled" };
+  if (order.total.lte(0)) return { ok: false, error: "try_again" };
 
   const summary = computePaymentSummary(order.payments, order.total);
   if (summary.isSettled) return { ok: false, error: "already_paid" };
 
   // Reuse an already-open Stripe payment on this order (page reload, a
-  // second render) instead of always round-tripping to Stripe.
+  // second render) instead of always round-tripping to Stripe — but only
+  // if Stripe itself still considers it confirmable. Otherwise a guest
+  // reload after the intent already succeeded (webhook not landed yet) or
+  // got cancelled out-of-band (Dashboard) would hand back a client_secret
+  // Stripe will reject on confirm.
   const openPayment = order.payments.find(
     (p) =>
       p.provider === "STRIPE" &&
@@ -42,8 +52,15 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
       (OPEN_STRIPE_STATUSES as readonly string[]).includes(p.status)
   );
   if (openPayment?.stripePaymentIntentId) {
-    const existing = await stripe.paymentIntents.retrieve(openPayment.stripePaymentIntentId);
-    if (existing.client_secret) return { ok: true, clientSecret: existing.client_secret };
+    const existing = await stripe.paymentIntents.retrieve(openPayment.stripePaymentIntentId).catch(() => null);
+    if (existing?.status === "succeeded") return { ok: false, error: "already_paid" };
+    if (existing && CONFIRMABLE_INTENT_STATUSES.includes(existing.status) && existing.client_secret) {
+      return { ok: true, clientSecret: existing.client_secret };
+    }
+    // Anything else (canceled, retrieve failed) falls through to create —
+    // Stripe's idempotency window means a truly dead intent under the
+    // same order-derived key won't mint a fresh one for 24h; accepted as
+    // a known, rare limitation rather than solved here.
   }
 
   let intent;
@@ -61,6 +78,16 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
     return { ok: false, error: "try_again" };
   }
   if (!intent.client_secret) return { ok: false, error: "try_again" };
+
+  // Re-checked right here, after the Stripe round-trip — closes most of
+  // the window between the read above and now. No row lock: cancelling
+  // the just-created intent at Stripe is enough to make this safe without
+  // holding a DB transaction open across an external API call.
+  const freshOrder = await prisma.order.findUnique({ where: { id: order.id }, select: { status: true } });
+  if (freshOrder?.status === "CANCELLED") {
+    await stripe.paymentIntents.cancel(intent.id).catch(() => {});
+    return { ok: false, error: "order_cancelled" };
+  }
 
   try {
     await prisma.payment.create({
