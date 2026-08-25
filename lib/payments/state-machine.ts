@@ -6,13 +6,20 @@ import { PaymentStatus } from "@/lib/generated/prisma/client";
  * covers cash-register collection (no Stripe intermediate step);
  * PENDING -> PROCESSING -> REQUIRES_ACTION -> SUCCEEDED covers a card.
  * REFUNDED/PARTIALLY_REFUNDED are terminal except the partial -> full case.
+ *
+ * FAILED is deliberately not terminal: a declined card doesn't kill the
+ * underlying Stripe PaymentIntent (it usually just goes back to
+ * "requires a payment method"), and this app's own Retry button confirms
+ * again against that same intent. Without SUCCEEDED/CANCELLED as legal
+ * exits from FAILED, a guest who fails once and then succeeds on retry
+ * would be genuinely charged while the webhook silently no-ops.
  */
 const LEGAL_TRANSITIONS: Record<PaymentStatus, PaymentStatus[]> = {
   PENDING: ["PROCESSING", "SUCCEEDED", "FAILED", "CANCELLED"],
   PROCESSING: ["REQUIRES_ACTION", "SUCCEEDED", "FAILED", "CANCELLED"],
   REQUIRES_ACTION: ["PROCESSING", "SUCCEEDED", "FAILED", "CANCELLED"],
+  FAILED: ["PROCESSING", "SUCCEEDED", "CANCELLED"],
   SUCCEEDED: ["REFUNDED", "PARTIALLY_REFUNDED"],
-  FAILED: [],
   CANCELLED: [],
   REFUNDED: [],
   PARTIALLY_REFUNDED: ["REFUNDED"],
