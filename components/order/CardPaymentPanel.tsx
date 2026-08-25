@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Stripe as StripeJS, StripeElements } from "@stripe/stripe-js";
+import type { Stripe as StripeJS, StripeElements, StripePaymentElement } from "@stripe/stripe-js";
 import { getStripe } from "@/lib/stripe/browser";
 
 export type CardPaymentStatus = "form" | "processing" | "requires_action" | "failed" | "succeeded";
@@ -60,6 +60,7 @@ export function CardPaymentPanel({
     cardFieldLabel: string;
     cardFieldPlaceholder: string;
     payLabel: string;
+    /** Shown under the submit button only while the Payment Element is still loading (button disabled). */
     disabledCaption: string;
     processingTitle: string;
     processingBody: string;
@@ -79,6 +80,7 @@ export function CardPaymentPanel({
   const mountNodeRef = useRef<HTMLDivElement | null>(null);
   const stripeRef = useRef<StripeJS | null>(null);
   const elementsRef = useRef<StripeElements | null>(null);
+  const paymentElementRef = useRef<StripePaymentElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,6 +108,7 @@ export function CardPaymentPanel({
       elementsRef.current = elements;
 
       const paymentElement = elements.create("payment");
+      paymentElementRef.current = paymentElement;
       paymentElement.mount(mountNodeRef.current);
       paymentElement.on("ready", () => {
         if (!cancelled) setElementReady(true);
@@ -114,6 +117,12 @@ export function CardPaymentPanel({
 
     return () => {
       cancelled = true;
+      // Unmounts the iframe before the next effect run (or this
+      // component's own unmount) creates a new one — without this, a
+      // clientSecret change while mounted would stack a second Payment
+      // Element into the same DOM node instead of replacing the first.
+      paymentElementRef.current?.unmount();
+      paymentElementRef.current = null;
       elementsRef.current = null;
       stripeRef.current = null;
     };
@@ -236,6 +245,7 @@ export function CardPaymentPanel({
       >
         {dict.payLabel.replace("{amount}", amountLabel)}
       </button>
+      {!elementReady && <p className="text-center text-[11.5px] text-on-surface-muted">{dict.disabledCaption}</p>}
     </div>
   );
 }
