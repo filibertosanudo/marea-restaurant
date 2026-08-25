@@ -1,9 +1,11 @@
 import { decimalToString } from "@/lib/dto/money";
+import { Prisma } from "@/lib/generated/prisma/client";
 import type {
   Order,
   OrderItem,
   OrderItemModifier,
   Payment,
+  Refund,
   RestaurantTable,
 } from "@/lib/generated/prisma/client";
 
@@ -98,6 +100,86 @@ export function toBoardOrderDTO(order: RawBoardOrder): BoardOrderDTO {
       quantity: item.quantity,
       notes: item.notes,
       modifiers: item.modifiers.map((m) => m.nameSnapshot),
+    })),
+  };
+}
+
+export type OrderPaymentDetailDTO = {
+  orderId: string;
+  orderNumber: string;
+  currency: string;
+  total: string;
+  /** Sum of SUCCEEDED payments — "what's been paid", never a single payment's status. */
+  paidTotal: string;
+  /** Sum of SUCCEEDED refunds. */
+  refundedTotal: string;
+  /** paidTotal - refundedTotal, floored at 0 — the most a new refund can be for. Computed here, not in the client, per the project's "no amount is calculated on the client" rule. */
+  refundableTotal: string;
+  payments: {
+    id: string;
+    provider: Payment["provider"];
+    status: Payment["status"];
+    amount: string;
+    paidAt: string | null;
+    createdAt: string;
+    paymentMethodBrand: string | null;
+    paymentMethodLast4: string | null;
+    receiptUrl: string | null;
+    refunds: {
+      id: string;
+      amount: string;
+      status: Refund["status"];
+      reason: string | null;
+      createdAt: string;
+    }[];
+  }[];
+};
+
+type RawPaymentDetailOrder = {
+  id: string;
+  orderNumber: string;
+  total: Prisma.Decimal;
+  currency: string;
+  payments: (Payment & { refunds: Refund[] })[];
+};
+
+export function toOrderPaymentDetailDTO(order: RawPaymentDetailOrder): OrderPaymentDetailDTO {
+  const paidTotal = order.payments
+    .filter((p) => p.status === "SUCCEEDED")
+    .reduce((sum, p) => sum.add(p.amount), new Prisma.Decimal(0));
+  const refundedTotal = order.payments
+    .flatMap((p) => p.refunds)
+    .filter((r) => r.status === "SUCCEEDED")
+    .reduce((sum, r) => sum.add(r.amount), new Prisma.Decimal(0));
+  const refundableTotal = refundedTotal.gte(paidTotal)
+    ? new Prisma.Decimal(0)
+    : paidTotal.sub(refundedTotal);
+
+  return {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    currency: order.currency,
+    total: decimalToString(order.total) ?? "0.00",
+    paidTotal: decimalToString(paidTotal) ?? "0.00",
+    refundedTotal: decimalToString(refundedTotal) ?? "0.00",
+    refundableTotal: decimalToString(refundableTotal) ?? "0.00",
+    payments: order.payments.map((p) => ({
+      id: p.id,
+      provider: p.provider,
+      status: p.status,
+      amount: decimalToString(p.amount) ?? "0.00",
+      paidAt: p.paidAt ? p.paidAt.toISOString() : null,
+      createdAt: p.createdAt.toISOString(),
+      paymentMethodBrand: p.paymentMethodBrand,
+      paymentMethodLast4: p.paymentMethodLast4,
+      receiptUrl: p.receiptUrl,
+      refunds: p.refunds.map((r) => ({
+        id: r.id,
+        amount: decimalToString(r.amount) ?? "0.00",
+        status: r.status,
+        reason: r.reason,
+        createdAt: r.createdAt.toISOString(),
+      })),
     })),
   };
 }

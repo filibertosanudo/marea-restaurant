@@ -63,6 +63,30 @@ export async function listActiveTablesRaw(businessId: string) {
 }
 
 /**
+ * Every payment attempt (and each one's refunds) for a single order — the
+ * board's own BOARD_INCLUDE deliberately takes only the latest payment
+ * (that's all a kanban card needs); this is the fuller read for the
+ * payment drawer, where "several attempts, one succeeded, one refunded
+ * partially" is exactly the case that needs to be visible, not
+ * simplified away.
+ */
+export async function getOrderPaymentDetailRaw(businessId: string, orderId: string) {
+  return prisma.order.findFirst({
+    where: { id: orderId, businessId },
+    select: {
+      id: true,
+      orderNumber: true,
+      total: true,
+      currency: true,
+      payments: {
+        orderBy: { createdAt: "desc" },
+        include: { refunds: { orderBy: { createdAt: "desc" } } },
+      },
+    },
+  });
+}
+
+/**
  * publicToken is the entire auth model for this page — an unauthenticated
  * guest reaches their order by knowing this token and nothing else (see
  * schema.prisma: cuid(2), not the guessable cuid() default). Never resolve
