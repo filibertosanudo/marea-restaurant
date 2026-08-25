@@ -5,6 +5,12 @@ import { getCurrentBusiness } from "@/lib/business";
 import { prisma } from "@/lib/prisma";
 
 const POLL_INTERVAL_MS = 2000;
+// A kitchen display left open for a shift would otherwise poll forever — 2
+// queries/2s for 12h is ~43k queries a day, and on Vercel it's one
+// continuously-billed invocation per open tab. Closing cleanly here costs
+// nothing: EventSource reconnects on its own, and useEventStream's backoff
+// treats this exactly like any other dropped connection.
+const MAX_LIFETIME_MS = 75_000;
 
 type Scope = { kind: "board"; businessId: string } | { kind: "order"; orderId: string };
 
@@ -94,7 +100,14 @@ export async function GET(request: NextRequest) {
         lastSignature = null;
       }
 
+      const deadline = Date.now() + MAX_LIFETIME_MS;
+
       while (!closed) {
+        if (Date.now() >= deadline) {
+          close();
+          break;
+        }
+
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
         if (closed) break;
 
