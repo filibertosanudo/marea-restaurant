@@ -90,6 +90,7 @@ export function OrderCard({
   lang,
   canCancel,
   onCancel,
+  onViewPayment,
   density,
 }: {
   order: BoardOrderDTO;
@@ -97,6 +98,7 @@ export function OrderCard({
   lang: "en" | "es";
   canCancel: boolean;
   onCancel: (order: BoardOrderDTO) => void;
+  onViewPayment: (order: BoardOrderDTO) => void;
   density: BoardDensity;
 }) {
   const [pending, startTransition] = useTransition();
@@ -172,13 +174,15 @@ export function OrderCard({
       )}
 
       <div className="mb-sm flex items-center justify-between">
-        <span
-          className={`rounded-sm font-semibold ${s.paymentBadge} ${
+        <button
+          type="button"
+          onClick={() => onViewPayment(order)}
+          className={`rounded-sm font-semibold underline-offset-2 hover:underline ${s.paymentBadge} ${
             paymentDue ? "bg-warning/12 text-warning" : "bg-success/12 text-success"
           }`}
         >
           {paymentDue ? dict.paymentPending : dict.paymentPaid}
-        </span>
+        </button>
         <span className={`font-semibold tabular-nums text-on-surface-muted ${s.price}`}>
           {formatMoney(order.total, order.currency, lang)}
         </span>

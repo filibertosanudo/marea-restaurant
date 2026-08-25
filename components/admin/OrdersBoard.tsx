@@ -9,6 +9,7 @@ import type { Lang } from "@/lib/i18n/lang";
 import { OrderCard } from "./OrderCard";
 import { KanbanColumn } from "./KanbanColumn";
 import { CancelOrderDialog } from "./CancelOrderDialog";
+import { OrderPaymentDrawer } from "./OrderPaymentDrawer";
 import { BOARD_COLUMNS } from "@/lib/orders/state-machine";
 import { SoundOnIcon, SoundOffIcon } from "./icons";
 import { useEventStream } from "@/lib/realtime/useEventStream";
@@ -36,21 +37,26 @@ export function OrdersBoard({
   cancelledOrders,
   tables,
   dict,
+  paymentsDict,
   lang,
   canCancel,
+  canRefund,
   tab,
 }: {
   boardOrders: BoardOrderDTO[];
   cancelledOrders: BoardOrderDTO[];
   tables: { id: string; code: string; zone: string | null }[];
   dict: AdminDictionary["orders"];
+  paymentsDict: AdminDictionary["payments"];
   lang: Lang;
   canCancel: boolean;
+  canRefund: boolean;
   tab: "board" | "cancelled";
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [cancelTarget, setCancelTarget] = useState<BoardOrderDTO | null>(null);
+  const [paymentTarget, setPaymentTarget] = useState<BoardOrderDTO | null>(null);
   // localStorage, not a cookie: this is a per-device preference (the kitchen
   // display and a waiter's phone shouldn't share it), same pattern as
   // marea-theme.
@@ -247,6 +253,7 @@ export function OrdersBoard({
                       lang={lang}
                       canCancel={canCancel}
                       onCancel={setCancelTarget}
+                      onViewPayment={setPaymentTarget}
                       density="kitchen"
                     />
                   ))}
@@ -262,11 +269,20 @@ export function OrdersBoard({
             lang={lang}
             canCancel={canCancel}
             onCancel={setCancelTarget}
+            onViewPayment={setPaymentTarget}
           />
         </>
       )}
 
       <CancelOrderDialog order={cancelTarget} dict={dict} onClose={() => setCancelTarget(null)} />
+      <OrderPaymentDrawer
+        orderId={paymentTarget?.id ?? null}
+        open={paymentTarget !== null}
+        onClose={() => setPaymentTarget(null)}
+        canRefund={canRefund}
+        lang={lang}
+        dict={paymentsDict}
+      />
     </div>
   );
 }
@@ -277,12 +293,14 @@ function MobileOrderList({
   lang,
   canCancel,
   onCancel,
+  onViewPayment,
 }: {
   orders: BoardOrderDTO[];
   dict: AdminDictionary["orders"];
   lang: Lang;
   canCancel: boolean;
   onCancel: (order: BoardOrderDTO) => void;
+  onViewPayment: (order: BoardOrderDTO) => void;
 }) {
   const [statusFilter, setStatusFilter] = useState<(typeof BOARD_COLUMNS)[number]["status"]>("PENDING");
   const filtered = orders.filter((o) => o.status === statusFilter);
@@ -321,6 +339,7 @@ function MobileOrderList({
                 lang={lang}
                 canCancel={canCancel}
                 onCancel={onCancel}
+                onViewPayment={onViewPayment}
                 density="waiter"
               />
             ))}

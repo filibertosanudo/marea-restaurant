@@ -30,6 +30,11 @@ export default async function OrdersBoardPage({
     UserRole.SUPER_ADMIN
   );
   const canCancel = session.user.role !== UserRole.STAFF;
+  // Same threshold as canCancel today (both are BUSINESS_ADMIN+ per the
+  // permission matrix) — kept as its own variable since they're two
+  // independently-named permissions ("Cancelar un pedido" and
+  // "Reembolsar") that happen to share a role, not the same rule.
+  const canRefund = session.user.role !== UserRole.STAFF;
 
   const params = await searchParams;
   const tab = params.tab === "cancelled" ? "cancelled" : "board";
@@ -50,8 +55,10 @@ export default async function OrdersBoardPage({
       cancelledOrders={cancelledOrders.map(toBoardOrderDTO)}
       tables={tables}
       dict={dict.orders}
+      paymentsDict={dict.payments}
       lang={lang}
       canCancel={canCancel}
+      canRefund={canRefund}
       tab={tab}
     />
   );
