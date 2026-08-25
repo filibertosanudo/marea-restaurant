@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatMoney } from "@/lib/dto/money";
 import { AmountBreakdown } from "@/components/admin/AmountBreakdown";
+import { createPaymentIntentAction } from "@/lib/payments/stripe-actions";
 import { PaymentMethodChoice, type PaymentMethod } from "./PaymentMethodChoice";
 import { CardPaymentPanel } from "./CardPaymentPanel";
 import type { OrderDictionary } from "@/lib/i18n/dictionaries";
@@ -16,16 +17,13 @@ export type TrackedPaymentStatus = TrackedOrderDTO["paymentStatus"];
 
 /**
  * The payment block on the order-tracking page — the container that owns
- * "which method did they pick" and "what state is the card flow in", built
- * from the presentational PaymentMethodChoice/CardPaymentPanel. Neither of
- * those knows about the other; this is the one place that does.
+ * "which method did they pick" and, once CARD is picked, fetching the
+ * PaymentIntent's clientSecret before CardPaymentPanel can mount anything.
+ * Neither PaymentMethodChoice nor CardPaymentPanel knows about the other;
+ * this is the one place that does.
  *
- * `acceptsOnlinePayment=false` (or a Stripe PaymentIntent action that
- * doesn't exist yet, in this phase) collapses straight to the pay-at-
- * register message — no dead-end choice screen for an option that isn't
- * live. Once Fase 4 wires a real onSubmit into CardPaymentPanel, choosing
- * "pay now" here starts driving `cardStatus` from Stripe's own callbacks
- * instead of staying parked on "form".
+ * `acceptsOnlinePayment=false` collapses straight to the pay-at-register
+ * message — no dead-end choice screen for an option that isn't live.
  */
 export function PaymentSection({
   paymentStatus,
@@ -33,6 +31,7 @@ export function PaymentSection({
   currency,
   lang,
   acceptsOnlinePayment,
+  publicToken,
   dict,
 }: {
   paymentStatus: TrackedPaymentStatus;
@@ -40,9 +39,33 @@ export function PaymentSection({
   currency: string;
   lang: Lang;
   acceptsOnlinePayment: boolean;
+  publicToken: string;
   dict: OrderDictionary;
 }) {
   const [method, setMethod] = useState<PaymentMethod | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [intentError, setIntentError] = useState<string | null>(null);
+  const [loadingIntent, setLoadingIntent] = useState(false);
+
+  useEffect(() => {
+    if (method !== "CARD" || clientSecret || loadingIntent) return;
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoadingIntent(true);
+    setIntentError(null);
+    createPaymentIntentAction(publicToken).then((result) => {
+      if (cancelled) return;
+      setLoadingIntent(false);
+      if (result.ok) {
+        setClientSecret(result.clientSecret);
+      } else {
+        setIntentError(dict.cardIntentError);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [method, clientSecret, loadingIntent, publicToken, dict.cardIntentError]);
 
   if (paymentStatus === "SUCCEEDED") {
     return (
@@ -60,7 +83,7 @@ export function PaymentSection({
   // A guest whose order was refunded (or is mid-flight on a payment they
   // already started) must never see the "choose how to pay" screen again —
   // that reads as "you haven't paid" to someone who has, or invites a
-  // second card charge once Fase 4 makes the choice live.
+  // second card charge.
   if (paymentStatus === "REFUNDED" || paymentStatus === "PARTIALLY_REFUNDED") {
     return (
       <PaymentCard title={dict.paymentSectionTitle}>
@@ -104,26 +127,46 @@ export function PaymentSection({
 
       {method === "CARD" && (
         <div className="mt-md">
-          <CardPaymentPanel
-            status="form"
-            amountLabel={formatMoney(total, currency, lang)}
-            dict={{
-              cardFieldLabel: dict.cardFieldLabel,
-              cardFieldPlaceholder: dict.cardFieldPlaceholder,
-              payLabel: dict.payLabel,
-              disabledCaption: dict.cardPaymentComingSoon,
-              processingTitle: dict.cardProcessingTitle,
-              processingBody: dict.cardProcessingBody,
-              requiresActionTitle: dict.cardRequiresActionTitle,
-              requiresActionBody: dict.cardRequiresActionBody,
-              failedTitle: dict.cardFailedTitle,
-              failedBodyFallback: dict.cardFailedBodyFallback,
-              retry: dict.cardRetry,
-              switchToCash: dict.cardSwitchToCash,
-              succeededTitle: dict.cardSucceededTitle,
-              succeededBody: dict.cardSucceededBody,
-            }}
-          />
+          {loadingIntent && (
+            <p className="text-center text-[12.5px] text-on-surface-muted">{dict.cardIntentLoading}</p>
+          )}
+
+          {intentError && !loadingIntent && (
+            <div className="flex flex-col gap-sm rounded-lg border border-error/30 bg-error/8 p-lg">
+              <p className="text-[12.5px] text-error">{intentError}</p>
+              <button
+                type="button"
+                onClick={() => setMethod("CASH_REGISTER")}
+                className="rounded-full border border-border/40 py-[12px] text-[13.5px] font-semibold text-on-surface transition-colors hover:bg-surface-subtle"
+              >
+                {dict.cardSwitchToCash}
+              </button>
+            </div>
+          )}
+
+          {clientSecret && !loadingIntent && (
+            <CardPaymentPanel
+              clientSecret={clientSecret}
+              amountLabel={formatMoney(total, currency, lang)}
+              onSwitchToCash={() => setMethod("CASH_REGISTER")}
+              dict={{
+                cardFieldLabel: dict.cardFieldLabel,
+                cardFieldPlaceholder: dict.cardFieldPlaceholder,
+                payLabel: dict.payLabel,
+                disabledCaption: dict.cardPaymentComingSoon,
+                processingTitle: dict.cardProcessingTitle,
+                processingBody: dict.cardProcessingBody,
+                requiresActionTitle: dict.cardRequiresActionTitle,
+                requiresActionBody: dict.cardRequiresActionBody,
+                failedTitle: dict.cardFailedTitle,
+                failedBodyFallback: dict.cardFailedBodyFallback,
+                retry: dict.cardRetry,
+                switchToCash: dict.cardSwitchToCash,
+                succeededTitle: dict.cardSucceededTitle,
+                succeededBody: dict.cardSucceededBody,
+              }}
+            />
+          )}
         </div>
       )}
 

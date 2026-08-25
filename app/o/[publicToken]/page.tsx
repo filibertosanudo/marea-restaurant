@@ -105,6 +105,7 @@ export default async function OrderTrackingPage({
             currency={order.currency}
             lang={lang}
             acceptsOnlinePayment={business.acceptsOnlinePayment}
+            publicToken={publicToken}
             dict={dict}
           />
         </div>
