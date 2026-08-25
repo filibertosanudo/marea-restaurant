@@ -165,6 +165,8 @@ export const en = {
       amountRefunded: "Refunded",
       historyTitle: "Payment history",
       historyEmpty: "No payment attempts yet.",
+      loadError: "Couldn't load this order's payment info. Try closing and reopening the drawer.",
+      notFound: "We couldn't find this order.",
       providerCash: "Cash register",
       providerCard: "Card",
       refundLabel: "Refund",

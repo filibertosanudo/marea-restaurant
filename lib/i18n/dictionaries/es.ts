@@ -167,6 +167,8 @@ export const es = {
       amountRefunded: "Reembolsado",
       historyTitle: "Historial de pagos",
       historyEmpty: "Todavía no hay intentos de pago.",
+      loadError: "No se pudo cargar la información de pago de este pedido. Cierra y vuelve a abrir el panel.",
+      notFound: "No encontramos este pedido.",
       providerCash: "Caja",
       providerCard: "Tarjeta",
       refundLabel: "Reembolso",
