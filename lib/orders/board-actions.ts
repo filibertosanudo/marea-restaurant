@@ -6,6 +6,7 @@ import { requireRole, ForbiddenError } from "@/lib/auth/permissions";
 import { STAFF_ROLES, ADMIN_ROLES } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
 import { getNextStatus, isCancellable } from "@/lib/orders/state-machine";
+import { cancelPendingPayments, markPaymentSucceeded } from "@/lib/payments/actions";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
 export type BoardActionState = { error?: string } | undefined;
@@ -136,10 +137,7 @@ export async function cancelOrderAction(
     // collectCashPaymentAction still collect it, and would never let a shift
     // cash-out reconcile since it'd sit as outstanding for an order that no
     // longer exists in any real sense.
-    await tx.payment.updateMany({
-      where: { orderId: order.id, status: "PENDING" },
-      data: { status: "CANCELLED" },
-    });
+    await cancelPendingPayments(tx, order.id);
 
     // Give back whatever this order's checkout decremented (see
     // createOrderFromCart's stock check), for dishes that still track
@@ -226,10 +224,7 @@ export async function collectCashPaymentAction(orderId: string): Promise<BoardAc
     });
     if (!payment) return { error: "not_found" } as const;
 
-    await tx.payment.update({
-      where: { id: payment.id },
-      data: { status: "SUCCEEDED", paidAt: new Date(), collectedByUserId: session.user.id },
-    });
+    await markPaymentSucceeded(tx, payment, session.user.id);
 
     return undefined;
   });
