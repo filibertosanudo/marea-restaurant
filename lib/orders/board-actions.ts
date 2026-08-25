@@ -122,6 +122,16 @@ export async function cancelOrderAction(
       data: { status: "CANCELLED", cancelledAt: new Date(), cancellationReason: trimmedReason },
     });
 
+    // A cancelled order must not stay "owed" forever — a PENDING payment
+    // (cash-register or otherwise) that survives the cancellation would let
+    // collectCashPaymentAction still collect it, and would never let a shift
+    // cash-out reconcile since it'd sit as outstanding for an order that no
+    // longer exists in any real sense.
+    await tx.payment.updateMany({
+      where: { orderId: order.id, status: "PENDING" },
+      data: { status: "CANCELLED" },
+    });
+
     await tx.orderStatusEvent.create({
       data: {
         orderId: order.id,
@@ -165,8 +175,14 @@ export async function collectCashPaymentAction(orderId: string): Promise<BoardAc
       provider: "CASH_REGISTER",
       status: "PENDING",
     },
+    include: { order: { select: { status: true } } },
   });
   if (!payment) return { error: "not_found" };
+  // Belt-and-suspenders alongside cancelOrderAction cancelling its own
+  // PENDING payments: a cancelled order must never be collectable, even if
+  // this is called directly (the Server Action is reachable regardless of
+  // which tab the UI happens to render).
+  if (payment.order.status === "CANCELLED") return { error: "order_cancelled" };
 
   await prisma.payment.update({
     where: { id: payment.id },
