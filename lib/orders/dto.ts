@@ -1,4 +1,5 @@
 import { decimalToString } from "@/lib/dto/money";
+import { computePaymentSummary } from "@/lib/payments/summary";
 import { Prisma } from "@/lib/generated/prisma/client";
 import type {
   Order,
@@ -115,6 +116,7 @@ export type OrderPaymentDetailDTO = {
   refundedTotal: string;
   /** paidTotal - refundedTotal, floored at 0 — the most a new refund can be for. Computed here, not in the client, per the project's "no amount is calculated on the client" rule. */
   refundableTotal: string;
+  isSettled: boolean;
   payments: {
     id: string;
     provider: Payment["provider"];
@@ -144,25 +146,17 @@ type RawPaymentDetailOrder = {
 };
 
 export function toOrderPaymentDetailDTO(order: RawPaymentDetailOrder): OrderPaymentDetailDTO {
-  const paidTotal = order.payments
-    .filter((p) => p.status === "SUCCEEDED")
-    .reduce((sum, p) => sum.add(p.amount), new Prisma.Decimal(0));
-  const refundedTotal = order.payments
-    .flatMap((p) => p.refunds)
-    .filter((r) => r.status === "SUCCEEDED")
-    .reduce((sum, r) => sum.add(r.amount), new Prisma.Decimal(0));
-  const refundableTotal = refundedTotal.gte(paidTotal)
-    ? new Prisma.Decimal(0)
-    : paidTotal.sub(refundedTotal);
+  const summary = computePaymentSummary(order.payments, order.total);
 
   return {
     orderId: order.id,
     orderNumber: order.orderNumber,
     currency: order.currency,
     total: decimalToString(order.total) ?? "0.00",
-    paidTotal: decimalToString(paidTotal) ?? "0.00",
-    refundedTotal: decimalToString(refundedTotal) ?? "0.00",
-    refundableTotal: decimalToString(refundableTotal) ?? "0.00",
+    paidTotal: decimalToString(summary.paidTotal) ?? "0.00",
+    refundedTotal: decimalToString(summary.refundedTotal) ?? "0.00",
+    refundableTotal: decimalToString(summary.refundableTotal) ?? "0.00",
+    isSettled: summary.isSettled,
     payments: order.payments.map((p) => ({
       id: p.id,
       provider: p.provider,
