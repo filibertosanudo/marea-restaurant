@@ -48,6 +48,14 @@ export async function recordLoginAttempt(
       where: { email: normalizeEmail(email), succeeded: false },
     });
   }
+  // Anything already outside the rate-limit window is dead weight — an
+  // email that never once succeeds (a typo'd address, a spray attack)
+  // otherwise only ever grows this table, since the block above only
+  // clears on a successful login. isRateLimited never reads past `since`
+  // anyway, so this is pure cleanup, not a behavior change.
+  await prisma.loginAttempt.deleteMany({
+    where: { createdAt: { lt: new Date(Date.now() - WINDOW_MS) } },
+  });
 }
 
 /**
