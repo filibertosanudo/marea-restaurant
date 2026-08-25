@@ -29,6 +29,23 @@ export type PaymentSummary = {
   isSettled: boolean;
 };
 
+/**
+ * One payment's own refundable balance — a refund always targets a single
+ * Stripe charge/PaymentIntent, never an abstract order total, so choosing
+ * which Payment to refund against needs this, not computePaymentSummary's
+ * order-wide number. Only SUCCEEDED/PARTIALLY_REFUNDED payments have
+ * anything left to give back.
+ */
+export function refundableForPayment(
+  payment: Pick<Payment, "status" | "amount"> & { refunds: Pick<Refund, "status" | "amount">[] }
+): Prisma.Decimal {
+  if (payment.status !== "SUCCEEDED" && payment.status !== "PARTIALLY_REFUNDED") {
+    return new Prisma.Decimal(0);
+  }
+  const net = payment.amount.sub(sumSucceededRefunds(payment.refunds));
+  return net.lte(0) ? new Prisma.Decimal(0) : net;
+}
+
 export function computePaymentSummary(
   payments: (Pick<Payment, "status" | "amount"> & { refunds: Pick<Refund, "status" | "amount">[] })[],
   orderTotal: Prisma.Decimal
