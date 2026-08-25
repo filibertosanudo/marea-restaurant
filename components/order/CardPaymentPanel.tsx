@@ -1,8 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Stripe as StripeJS, StripeElements, StripePaymentElement } from "@stripe/stripe-js";
 import { getStripe } from "@/lib/stripe/browser";
+
+// If the tracking page's SSE connection drops right after a successful
+// confirm (flaky mobile network, a proxy killing long-lived connections),
+// nothing ever nudges this component out of "processing" — the webhook
+// already updated the DB, there's just no push telling this tab. After
+// this long, offer a manual refresh instead of leaving the guest staring
+// at a spinner forever.
+const STUCK_PROCESSING_MS = 20_000;
 
 export type CardPaymentStatus = "form" | "processing" | "requires_action" | "failed" | "succeeded";
 
@@ -64,6 +73,7 @@ export function CardPaymentPanel({
     disabledCaption: string;
     processingTitle: string;
     processingBody: string;
+    stillWaitingRefresh: string;
     requiresActionTitle: string;
     requiresActionBody: string;
     failedTitle: string;
@@ -77,10 +87,22 @@ export function CardPaymentPanel({
   const [status, setStatus] = useState<CardPaymentStatus>("form");
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
   const [elementReady, setElementReady] = useState(false);
+  const [stuckProcessing, setStuckProcessing] = useState(false);
   const mountNodeRef = useRef<HTMLDivElement | null>(null);
   const stripeRef = useRef<StripeJS | null>(null);
   const elementsRef = useRef<StripeElements | null>(null);
   const paymentElementRef = useRef<StripePaymentElement | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status !== "processing") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStuckProcessing(false);
+      return;
+    }
+    const timer = setTimeout(() => setStuckProcessing(true), STUCK_PROCESSING_MS);
+    return () => clearTimeout(timer);
+  }, [status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -160,6 +182,15 @@ export function CardPaymentPanel({
         <Spinner />
         <p className="text-[14px] font-semibold text-on-surface">{dict.processingTitle}</p>
         <p className="text-[12.5px] text-on-surface-muted">{dict.processingBody}</p>
+        {stuckProcessing && (
+          <button
+            type="button"
+            onClick={() => router.refresh()}
+            className="mt-[4px] text-[12.5px] font-semibold text-primary underline underline-offset-2"
+          >
+            {dict.stillWaitingRefresh}
+          </button>
+        )}
       </div>
     );
   }

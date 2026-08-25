@@ -167,6 +167,7 @@ export function PaymentSection({
                 disabledCaption: dict.cardFieldLoading,
                 processingTitle: dict.cardProcessingTitle,
                 processingBody: dict.cardProcessingBody,
+                stillWaitingRefresh: dict.cardStillWaitingRefresh,
                 requiresActionTitle: dict.cardRequiresActionTitle,
                 requiresActionBody: dict.cardRequiresActionBody,
                 failedTitle: dict.cardFailedTitle,

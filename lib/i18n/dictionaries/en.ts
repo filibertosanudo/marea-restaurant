@@ -309,6 +309,7 @@ export const en = {
     cardIntentError: "Couldn't start the card payment. Pay at the register instead.",
     cardProcessingTitle: "Processing your payment…",
     cardProcessingBody: "Don't close this page.",
+    cardStillWaitingRefresh: "Still waiting? Tap to refresh.",
     cardRequiresActionTitle: "Confirm with your bank",
     cardRequiresActionBody: "Your bank needs a quick extra confirmation to finish this payment.",
     cardFailedTitle: "That card didn't go through",

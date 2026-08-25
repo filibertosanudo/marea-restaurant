@@ -313,6 +313,7 @@ export const es = {
     cardIntentError: "No se pudo iniciar el pago con tarjeta. Paga en caja en su lugar.",
     cardProcessingTitle: "Procesando tu pago…",
     cardProcessingBody: "No cierres esta página.",
+    cardStillWaitingRefresh: "¿Sigue esperando? Toca para actualizar.",
     cardRequiresActionTitle: "Confirma con tu banco",
     cardRequiresActionBody: "Tu banco necesita una confirmación extra rápida para terminar este pago.",
     cardFailedTitle: "Esa tarjeta no pasó",
