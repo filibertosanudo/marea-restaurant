@@ -237,6 +237,7 @@ export function OrdersBoard({
                   title={dict[COLUMN_LABEL_KEY[status]]}
                   count={columnOrders.length}
                   emptyLabel={dict.emptyColumn}
+                  density="kitchen"
                 >
                   {columnOrders.map((order) => (
                     <OrderCard
@@ -246,6 +247,7 @@ export function OrdersBoard({
                       lang={lang}
                       canCancel={canCancel}
                       onCancel={setCancelTarget}
+                      density="kitchen"
                     />
                   ))}
                 </KanbanColumn>
@@ -319,6 +321,7 @@ function MobileOrderList({
                 lang={lang}
                 canCancel={canCancel}
                 onCancel={onCancel}
+                density="waiter"
               />
             ))}
           </div>

@@ -16,7 +16,18 @@ function elapsedMinutes(placedAt: string): number {
  * text — color is never the only signal (H16), which matters doubly here
  * since this reads at three meters where color alone is easy to miss.
  */
-export function AgingIndicator({ placedAt, newLabel }: { placedAt: string; newLabel?: string }) {
+export function AgingIndicator({
+  placedAt,
+  newLabel,
+  sizeClassName = "gap-[5px] px-[9px] py-[4px] text-[12px]",
+  dotClassName = "h-[6px] w-[6px]",
+}: {
+  placedAt: string;
+  newLabel?: string;
+  /** Kitchen density needs this legible at three meters too — see BoardDensity in OrderCard.tsx. Defaults to the original (waiter) size. */
+  sizeClassName?: string;
+  dotClassName?: string;
+}) {
   const [minutes, setMinutes] = useState(() => elapsedMinutes(placedAt));
 
   useEffect(() => {
@@ -34,9 +45,9 @@ export function AgingIndicator({ placedAt, newLabel }: { placedAt: string; newLa
 
   return (
     <span
-      className={`inline-flex items-center gap-[5px] rounded-sm px-[9px] py-[4px] text-[12px] font-bold tabular-nums ${tierClasses}`}
+      className={`inline-flex items-center rounded-sm font-bold tabular-nums ${sizeClassName} ${tierClasses}`}
     >
-      <span className={`h-[6px] w-[6px] rounded-full ${dotClasses}`} />
+      <span className={`rounded-full ${dotClassName} ${dotClasses}`} />
       {minutes} min
       {newLabel && minutes < 1 && (
         <span className="ml-[4px] text-[10.5px] font-bold uppercase tracking-wide text-info">
