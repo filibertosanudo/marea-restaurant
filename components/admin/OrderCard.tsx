@@ -43,31 +43,32 @@ function isRecent(placedAt: string): boolean {
 const SCALE = {
   kitchen: {
     folio: "text-[52px] leading-none",
-    tableLabel: "text-[17px] tracking-wide",
-    aging: "text-[20px] gap-[8px] px-[14px] py-[8px]",
+    tableLabel: "text-[18px] tracking-wide",
+    aging: "text-[22px] gap-[8px] px-[14px] py-[8px]",
     agingDot: "h-[10px] w-[10px]",
-    itemGap: "gap-[10px]",
-    itemQty: "text-[26px]",
-    itemName: "text-[26px]",
-    itemModifiers: "ml-[38px] text-[19px]",
-    notes: "gap-[10px] px-md py-[12px] text-[19px]",
-    allergyIcon: "h-[22px] w-[22px]",
-    paymentBadge: "px-md py-[6px] text-[17px]",
-    price: "text-[19px]",
-    collectButton: "min-h-[76px] text-[20px]",
-    advanceButton: "min-h-[92px] gap-[12px] text-[26px]",
-    advanceIcon: 26,
-    completed: "gap-[12px] text-[22px]",
-    completedIcon: 26,
-    cancelLink: "min-h-[44px] text-[17px]",
+    itemGap: "gap-[12px]",
+    // The other half of "40-60px for the folio and the order lines" — the
+    // dish name/quantity is what a line cook actually reads line by line,
+    // arguably more than the folio itself.
+    itemName: "text-[44px] leading-tight",
+    itemModifiers: "ml-[44px] text-[24px]",
+    notes: "gap-[10px] px-md py-[14px] text-[22px]",
+    allergyIcon: "h-[24px] w-[24px]",
+    paymentBadge: "px-md py-[7px] text-[19px]",
+    price: "text-[22px]",
+    collectButton: "min-h-[84px] text-[22px]",
+    advanceButton: "min-h-[96px] gap-[12px] text-[28px]",
+    advanceIcon: 28,
+    completed: "gap-[12px] text-[24px]",
+    completedIcon: 28,
+    cancelLink: "min-h-[46px] text-[18px]",
   },
   waiter: {
     folio: "text-[20px]",
-    tableLabel: "text-[11.5px]",
+    tableLabel: "text-[11.5px] tracking-wide",
     aging: "gap-[5px] px-[9px] py-[4px] text-[12px]",
     agingDot: "h-[6px] w-[6px]",
     itemGap: "gap-[5px]",
-    itemQty: "text-[13.5px]",
     itemName: "text-[13.5px]",
     itemModifiers: "ml-[22px] text-[11.5px]",
     notes: "gap-[7px] px-sm py-[8px] text-[12px]",
@@ -239,7 +240,7 @@ export function OrderCard({
             <button
               type="button"
               onClick={() => onCancel(order)}
-              className={`text-error underline decoration-error/40 underline-offset-2 ${s.cancelLink}`}
+              className={`font-medium text-error underline decoration-error/40 underline-offset-2 ${s.cancelLink}`}
             >
               {dict.cancelOrder}
             </button>
