@@ -9,7 +9,7 @@ import type { Lang } from "@/lib/i18n/lang";
 import { Drawer } from "./Drawer";
 import { AmountBreakdown } from "./AmountBreakdown";
 import { PaymentStatusPill, type PaymentStatusValue } from "./PaymentStatusPill";
-import { RefundForm, type RefundMode } from "./RefundForm";
+import { RefundForm } from "./RefundForm";
 
 const STATUS_LABEL_KEY = {
   PENDING: "statusPending",
@@ -65,23 +65,19 @@ export function OrderPaymentDrawer({
   const [detail, setDetail] = useState<OrderPaymentDetailDTO | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [refundMode, setRefundMode] = useState<RefundMode>("FULL");
-  const [partialAmount, setPartialAmount] = useState("");
-  const [reason, setReason] = useState("");
 
   useEffect(() => {
     if (!open || !orderId) return;
     let cancelled = false;
     // Resetting for the order this drawer is now fetching — not
     // synchronizing with an external system on every render, just clearing
-    // stale state from whichever order the drawer showed last.
+    // stale state from whichever order the drawer showed last. RefundForm's
+    // own draft (mode/amount/reason) resets for free since it remounts
+    // along with this new `detail`, so there's nothing of its to reset here.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setLoadError(false);
     setDetail(null);
-    setRefundMode("FULL");
-    setPartialAmount("");
-    setReason("");
     getOrderPaymentDetailAction(orderId)
       .then((result) => {
         if (cancelled) return;
@@ -190,15 +186,10 @@ export function OrderPaymentDrawer({
 
           {canRefund && Number(detail.refundableTotal) > 0 && (
             <RefundForm
+              key={detail.orderId}
               currency={detail.currency}
               locale={lang}
               refundableAmount={detail.refundableTotal}
-              mode={refundMode}
-              onModeChange={setRefundMode}
-              partialAmount={partialAmount}
-              onPartialAmountChange={setPartialAmount}
-              reason={reason}
-              onReasonChange={setReason}
               dict={{
                 title: dict.refundTitle,
                 fullLabel: dict.refundFull,

@@ -38,34 +38,26 @@ function handleRadioKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, other: Re
  * phase ("a refund exceeding what was collected is rejected server-side"
  * per the brief, not by this form pretending to enforce it client-side).
  *
- * `onSubmit` is optional the same way CardPaymentPanel's is: undefined
- * today (Fase 5 wires the real Stripe refund + Refund-row transaction),
- * so the button stays disabled with `disabledCaption` instead of doing
- * nothing silently.
+ * The draft (mode/amount/reason) lives entirely inside this component —
+ * OrderPaymentDrawer remounts it fresh whenever the order it's showing
+ * changes, which already resets this state for free, so lifting it up
+ * would only add props with no caller that needs to read the draft mid-
+ * edit. `onSubmit` receives the final values instead: undefined today
+ * (Fase 5 wires the real Stripe refund + Refund-row transaction), so the
+ * button stays disabled with `disabledCaption` instead of doing nothing
+ * silently.
  */
 export function RefundForm({
   currency,
   locale,
   refundableAmount,
-  mode,
-  onModeChange,
-  partialAmount,
-  onPartialAmountChange,
-  reason,
-  onReasonChange,
   onSubmit,
   dict,
 }: {
   currency: string;
   locale: string;
   refundableAmount: string;
-  mode: RefundMode;
-  onModeChange: (mode: RefundMode) => void;
-  partialAmount: string;
-  onPartialAmountChange: (value: string) => void;
-  reason: string;
-  onReasonChange: (value: string) => void;
-  onSubmit?: () => void;
+  onSubmit?: (refund: { mode: RefundMode; amount: string; reason: string }) => void;
   dict: {
     title: string;
     fullLabel: string;
@@ -79,10 +71,17 @@ export function RefundForm({
     refundableLabel: string;
   };
 }) {
+  const [mode, setMode] = useState<RefundMode>("FULL");
+  const [partialAmount, setPartialAmount] = useState("");
+  const [reason, setReason] = useState("");
   const [reasonTouched, setReasonTouched] = useState(false);
   const reasonMissing = reason.trim().length === 0;
   const showReasonError = reasonTouched && reasonMissing;
   const canSubmit = Boolean(onSubmit) && !reasonMissing;
+
+  function handleSubmit() {
+    onSubmit?.({ mode, amount: mode === "FULL" ? refundableAmount : partialAmount, reason });
+  }
 
   return (
     <div className="flex flex-col gap-md rounded-lg border border-border/25 bg-surface p-md">
@@ -99,8 +98,8 @@ export function RefundForm({
           role="radio"
           aria-checked={mode === "FULL"}
           tabIndex={mode === "FULL" ? 0 : -1}
-          onClick={() => onModeChange("FULL")}
-          onKeyDown={(e) => handleRadioKeyDown(e, "PARTIAL", onModeChange)}
+          onClick={() => setMode("FULL")}
+          onKeyDown={(e) => handleRadioKeyDown(e, "PARTIAL", setMode)}
           className={`flex-1 rounded-sm border px-sm py-[8px] text-[12.5px] font-medium transition-colors ${
             mode === "FULL"
               ? "border-primary bg-surface-ocean text-primary"
@@ -114,8 +113,8 @@ export function RefundForm({
           role="radio"
           aria-checked={mode === "PARTIAL"}
           tabIndex={mode === "PARTIAL" ? 0 : -1}
-          onClick={() => onModeChange("PARTIAL")}
-          onKeyDown={(e) => handleRadioKeyDown(e, "FULL", onModeChange)}
+          onClick={() => setMode("PARTIAL")}
+          onKeyDown={(e) => handleRadioKeyDown(e, "FULL", setMode)}
           className={`flex-1 rounded-sm border px-sm py-[8px] text-[12.5px] font-medium transition-colors ${
             mode === "PARTIAL"
               ? "border-primary bg-surface-ocean text-primary"
@@ -138,7 +137,7 @@ export function RefundForm({
             min="0"
             inputMode="decimal"
             value={partialAmount}
-            onChange={(e) => onPartialAmountChange(e.target.value)}
+            onChange={(e) => setPartialAmount(e.target.value)}
             className="w-full rounded-sm border border-border/50 bg-surface px-sm py-[8px] text-[13px] text-on-surface outline-none focus:border-primary"
           />
         </div>
@@ -152,7 +151,7 @@ export function RefundForm({
           id="refund-reason"
           rows={2}
           value={reason}
-          onChange={(e) => onReasonChange(e.target.value)}
+          onChange={(e) => setReason(e.target.value)}
           onBlur={() => setReasonTouched(true)}
           placeholder={dict.reasonPlaceholder}
           aria-invalid={showReasonError}
@@ -168,7 +167,7 @@ export function RefundForm({
 
       <button
         type="button"
-        onClick={onSubmit}
+        onClick={handleSubmit}
         disabled={!canSubmit}
         className="rounded-full bg-error px-lg py-[11px] text-[13.5px] font-semibold text-on-primary transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
