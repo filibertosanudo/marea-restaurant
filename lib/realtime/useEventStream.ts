@@ -44,6 +44,19 @@ export function useEventStream(url: string, onUpdate: () => void): StreamStatus 
         onUpdateRef.current();
       });
 
+      // The server's scheduled lifetime handoff (see MAX_LIFETIME_MS in the
+      // route) — a planned close, not a failure. Closing it ourselves here
+      // means the browser never sees an "error" (that only fires when the
+      // connection drops out from under EventSource, not when this code
+      // calls .close() on it), so the status never flickers to "offline"
+      // for a healthy reconnect. Resets the backoff too, since this isn't
+      // the failure the backoff exists to slow down.
+      source.addEventListener("reconnect", () => {
+        source?.close();
+        retryDelay = BASE_RETRY_MS;
+        connect();
+      });
+
       source.addEventListener("error", () => {
         source?.close();
         setStatus("offline");

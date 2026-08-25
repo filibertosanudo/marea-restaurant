@@ -104,6 +104,15 @@ export async function GET(request: NextRequest) {
 
       while (!closed) {
         if (Date.now() >= deadline) {
+          // A plain close() here would look identical to a real drop to the
+          // client: EventSource fires the same "error" event for any
+          // server-initiated close, so useEventStream would flip to
+          // "offline" every ~75s on a healthy connection. Telling the
+          // client first lets it close and reconnect itself instead — a
+          // client-initiated close() never fires "error" — so the scheduled
+          // handoff never shows as an outage on a kitchen display that's
+          // read at a glance, not debugged.
+          controller.enqueue(encoder.encode(`event: reconnect\ndata: ${Date.now()}\n\n`));
           close();
           break;
         }
