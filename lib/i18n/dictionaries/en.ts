@@ -187,7 +187,11 @@ export const en = {
       refundReasonPlaceholder: "e.g. the guest was overcharged, an item was missing…",
       refundReasonRequired: "A reason is required.",
       refundSubmit: "Refund",
+      refundSubmitting: "Refunding…",
       refundDisabledCaption: "Refunds are arriving in a later update.",
+      refundErrorGeneric: "Couldn't process this refund. Try again.",
+      refundErrorNothingRefundable: "There's nothing left to refund on this order.",
+      refundErrorAmountExceeds: "That amount is more than what's refundable.",
       refundableLabel: "Refundable:",
     },
     team: {

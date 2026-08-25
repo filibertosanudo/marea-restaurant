@@ -34,30 +34,34 @@ function handleRadioKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, other: Re
  * minus what's already been refunded) comes from the server — see
  * OrderPaymentDetailDTO — and is only ever displayed here, never
  * recomputed; the partial-amount input is free text the server validates
- * against that same number when the real refund action lands in a later
- * phase ("a refund exceeding what was collected is rejected server-side"
- * per the brief, not by this form pretending to enforce it client-side).
+ * against that same number ("a refund exceeding what was collected is
+ * rejected server-side" per the brief, not by this form pretending to
+ * enforce it client-side).
  *
  * The draft (mode/amount/reason) lives entirely inside this component —
  * OrderPaymentDrawer remounts it fresh whenever the order it's showing
  * changes, which already resets this state for free, so lifting it up
  * would only add props with no caller that needs to read the draft mid-
- * edit. `onSubmit` receives the final values instead: undefined today
- * (Fase 5 wires the real Stripe refund + Refund-row transaction), so the
- * button stays disabled with `disabledCaption` instead of doing nothing
- * silently.
+ * edit. `onSubmit` receives the final values; `pending` disables the
+ * button and swaps the caption to a submitting message while the Server
+ * Action runs, the same role `disabledCaption` played before this form
+ * had a real action to call.
  */
 export function RefundForm({
   currency,
   locale,
   refundableAmount,
   onSubmit,
+  pending = false,
+  serverError,
   dict,
 }: {
   currency: string;
   locale: string;
   refundableAmount: string;
   onSubmit?: (refund: { mode: RefundMode; amount: string; reason: string }) => void;
+  pending?: boolean;
+  serverError?: string;
   dict: {
     title: string;
     fullLabel: string;
@@ -67,6 +71,7 @@ export function RefundForm({
     reasonPlaceholder: string;
     reasonRequired: string;
     submitLabel: string;
+    submittingLabel: string;
     disabledCaption: string;
     refundableLabel: string;
   };
@@ -77,7 +82,7 @@ export function RefundForm({
   const [reasonTouched, setReasonTouched] = useState(false);
   const reasonMissing = reason.trim().length === 0;
   const showReasonError = reasonTouched && reasonMissing;
-  const canSubmit = Boolean(onSubmit) && !reasonMissing;
+  const canSubmit = Boolean(onSubmit) && !reasonMissing && !pending;
 
   function handleSubmit() {
     onSubmit?.({ mode, amount: mode === "FULL" ? refundableAmount : partialAmount, reason });
@@ -165,13 +170,15 @@ export function RefundForm({
         )}
       </div>
 
+      {serverError && <p className="text-[12px] font-medium text-error">{serverError}</p>}
+
       <button
         type="button"
         onClick={handleSubmit}
         disabled={!canSubmit}
         className="rounded-full bg-error px-lg py-[11px] text-[13.5px] font-semibold text-on-primary transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {dict.submitLabel}
+        {pending ? dict.submittingLabel : dict.submitLabel}
       </button>
       {!onSubmit && <p className="text-[11.5px] text-on-surface-muted">{dict.disabledCaption}</p>}
     </div>

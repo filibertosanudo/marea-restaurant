@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { formatMoney, toIntlLocale } from "@/lib/dto/money";
 import { getOrderPaymentDetailAction } from "@/lib/orders/payment-actions";
+import { createRefundAction, type CreateRefundResult } from "@/lib/payments/refund-actions";
 import type { OrderPaymentDetailDTO } from "@/lib/orders/dto";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import type { Lang } from "@/lib/i18n/lang";
@@ -10,6 +11,14 @@ import { Drawer } from "./Drawer";
 import { AmountBreakdown } from "./AmountBreakdown";
 import { PaymentStatusPill, type PaymentStatusValue } from "./PaymentStatusPill";
 import { RefundForm } from "./RefundForm";
+
+const REFUND_ERROR_KEY = {
+  not_found: "refundErrorGeneric",
+  reason_required: "refundReasonRequired",
+  nothing_refundable: "refundErrorNothingRefundable",
+  amount_exceeds_refundable: "refundErrorAmountExceeds",
+  try_again: "refundErrorGeneric",
+} as const satisfies Record<Exclude<CreateRefundResult, { ok: true }>["error"], keyof AdminDictionary["payments"]>;
 
 const STATUS_LABEL_KEY = {
   PENDING: "statusPending",
@@ -65,6 +74,8 @@ export function OrderPaymentDrawer({
   const [detail, setDetail] = useState<OrderPaymentDetailDTO | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [refundError, setRefundError] = useState<string | null>(null);
+  const [refundPending, startRefundTransition] = useTransition();
 
   useEffect(() => {
     if (!open || !orderId) return;
@@ -77,6 +88,7 @@ export function OrderPaymentDrawer({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setLoadError(false);
+    setRefundError(null);
     setDetail(null);
     getOrderPaymentDetailAction(orderId)
       .then((result) => {
@@ -95,6 +107,24 @@ export function OrderPaymentDrawer({
       cancelled = true;
     };
   }, [open, orderId]);
+
+  function handleRefundSubmit(refund: { mode: "FULL" | "PARTIAL"; amount: string; reason: string }) {
+    if (!orderId) return;
+    setRefundError(null);
+    startRefundTransition(async () => {
+      const result = await createRefundAction(orderId, refund);
+      if (!result.ok) {
+        setRefundError(dict[REFUND_ERROR_KEY[result.error]]);
+        return;
+      }
+      // Re-fetch so the new PENDING Refund and updated refundableTotal show
+      // up immediately — the webhook will later flip it to SUCCEEDED, at
+      // which point closing and reopening (or the board's own revalidation)
+      // picks that up the same way.
+      const refreshed = await getOrderPaymentDetailAction(orderId);
+      setDetail(refreshed);
+    });
+  }
 
   return (
     <Drawer
@@ -190,6 +220,9 @@ export function OrderPaymentDrawer({
               currency={detail.currency}
               locale={lang}
               refundableAmount={detail.refundableTotal}
+              onSubmit={handleRefundSubmit}
+              pending={refundPending}
+              serverError={refundError ?? undefined}
               dict={{
                 title: dict.refundTitle,
                 fullLabel: dict.refundFull,
@@ -199,6 +232,7 @@ export function OrderPaymentDrawer({
                 reasonPlaceholder: dict.refundReasonPlaceholder,
                 reasonRequired: dict.refundReasonRequired,
                 submitLabel: dict.refundSubmit,
+                submittingLabel: dict.refundSubmitting,
                 disabledCaption: dict.refundDisabledCaption,
                 refundableLabel: dict.refundableLabel,
               }}

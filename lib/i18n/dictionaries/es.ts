@@ -189,7 +189,11 @@ export const es = {
       refundReasonPlaceholder: "Ej. se cobró de más, faltó un platillo…",
       refundReasonRequired: "El motivo es obligatorio.",
       refundSubmit: "Reembolsar",
+      refundSubmitting: "Reembolsando…",
       refundDisabledCaption: "Los reembolsos llegan en una actualización posterior.",
+      refundErrorGeneric: "No se pudo procesar el reembolso. Intenta de nuevo.",
+      refundErrorNothingRefundable: "Ya no queda nada por reembolsar en este pedido.",
+      refundErrorAmountExceeds: "Ese monto es mayor a lo reembolsable.",
       refundableLabel: "Reembolsable:",
     },
     team: {
