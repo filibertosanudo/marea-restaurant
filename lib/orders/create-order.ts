@@ -143,6 +143,41 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
       };
     });
 
+    // Stock check + decrement, only for dishes that track inventory
+    // (trackInventory false is the common case and ignores stockQuantity
+    // entirely, per the schema). Aggregated per menu item first — a cart
+    // can hold two lines for the same dish with different modifiers, and
+    // stock belongs to the dish, not the line.
+    const stockByMenuItem = new Map<string, { quantity: number; dishName: string }>();
+    for (const item of cart.items) {
+      if (!item.menuItem.trackInventory) continue;
+      const dishName = pickTranslation(item.menuItem.translations, lang)?.name ?? item.menuItem.slug;
+      const existing = stockByMenuItem.get(item.menuItem.id);
+      stockByMenuItem.set(item.menuItem.id, {
+        quantity: (existing?.quantity ?? 0) + item.quantity,
+        dishName,
+      });
+    }
+    for (const [menuItemId, { quantity, dishName }] of stockByMenuItem) {
+      // The `stockQuantity: { gte: quantity }` guard makes this an atomic
+      // check-and-decrement: if a concurrent checkout already ate the stock
+      // between our read of the cart and here, this simply matches zero
+      // rows instead of taking stock negative.
+      const decremented = await tx.menuItem.updateMany({
+        where: { id: menuItemId, businessId, stockQuantity: { gte: quantity } },
+        data: { stockQuantity: { decrement: quantity } },
+      });
+      if (decremented.count === 0) {
+        throw new CheckoutError("item_unavailable", dishName);
+      }
+    }
+    if (stockByMenuItem.size > 0) {
+      await tx.menuItem.updateMany({
+        where: { id: { in: [...stockByMenuItem.keys()] }, stockQuantity: { lte: 0 } },
+        data: { isAvailable: false },
+      });
+    }
+
     const subtotal = lineInputs
       .reduce((sum, l) => sum.add(l.lineTotal), new Prisma.Decimal(0))
       .toDecimalPlaces(2);
