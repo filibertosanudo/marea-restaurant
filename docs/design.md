@@ -396,6 +396,24 @@ El panel de administración (`/admin`) no es un sistema de diseño nuevo: usa ex
 
 **`ImageDropzone`** es `surface-subtle` con borde punteado en el token `border` (ahora visible a 3.3:1, antes hubiera sido un punteado invisible) y `rounded.md`; al arrastrar un archivo sobre la zona pasa a `image-dropzone-active` (`surface-ocean` + texto `primary`), el mismo par que usa el landing para "esto está activo/seleccionado" en vez de inventar un color de "drag over" nuevo.
 
+### Pagos — mismo sistema, cuatro patrones nuevos
+
+Los cuatro patrones del módulo de cobros (`components/order/PaymentMethodChoice.tsx`, `components/order/CardPaymentPanel.tsx`, `components/admin/PaymentStatusPill.tsx`, `components/admin/AmountBreakdown.tsx`, `components/admin/RefundForm.tsx`, más el nuevo `components/admin/Drawer.tsx` que los aloja en el panel) no necesitaron ni un token nuevo — la paleta semántica (`success`/`warning`/`error`/`info`/`neutral`) ya cubría los ocho estados de `PaymentStatus`, y `drawer` ya estaba definido en este documento desde antes de que ningún componente lo implementara.
+
+**`PaymentMethodChoice`** vive en la densidad del landing/pedido (card `rounded.lg`, no `rounded.sm` del panel) porque es una decisión que el cliente toma una vez, en su celular, recién hecho el pedido — el mismo razonamiento de densidad cómoda-generosa que ya aplica a `card-menu`. Cada opción es una "radio card" completa (título + descripción + indicador circular), no un `<select>` ni dos botones sueltos, porque a diferencia de un formulario de checkout esto es una bifurcación real de experiencia (tarjeta ahora vs. caja después) que merece leerse como tal.
+
+**`CardPaymentPanel`** cubre las cuatro fases del cobro con tarjeta (`form` / `processing` / `requires_action` / `failed` / `succeeded`) como ramas de un mismo componente, nunca pantallas separadas — así ninguna transición pierde el marco visual que la rodea. El estado `failed` es deliberadamente el más trabajado de los cinco: fondo `error/8` (más tenue que los tintes `/12`-`/16` que usa el resto del sistema, para no leerse como un error más alarmante de lo necesario) con icono, una sola línea de motivo, y dos acciones de igual peso (reintentar / pagar en caja) — nunca un solo botón de "cerrar", porque alguien con la comida ya pedida necesita un siguiente paso, no un callejón sin salida.
+
+**`PaymentStatusPill`** es el mismo patrón de `StatusBadge` (tinte `/12` sobre el color semántico, texto sólido) aplicado a los ocho valores de `PaymentStatus` en vez de a estados de pedido — se separan como componentes porque los vocabularios no coinciden (un pedido nunca está "requires_action") aunque la lógica de color sí. Acepta `className` para el tamaño, igual que la variante `density` de `OrderCard`/`AgingIndicator`, así cada superficie (tarjeta del tablero, drawer, tracking del cliente) controla su propia escala sin que el componente adivine.
+
+**`AmountBreakdown`** es deliberadamente "tonto": una lista de `{label, value}` que solo formatea con `formatMoney`, nunca suma ni resta. Todo importe que muestra (total, pagado, reembolsado, reembolsable) ya llegó calculado desde el servidor con `Prisma.Decimal` — la regla del proyecto de que "ningún importe se calcula en el cliente" se cumple por construcción, no por disciplina del que lo usa.
+
+**`RefundForm`** reutiliza el mismo patrón de "radio card" compacto (`rounded.sm`, no `rounded.lg` — vive en el panel, no en el pedido) para elegir total/parcial, y el botón de envío usa `bg-error` como `ConfirmDialog` ya hace para su acción destructiva primaria — reembolsar es exactamente ese tipo de acción.
+
+**`Drawer`** implementa el token `drawer` que este documento ya definía (`rounded: 20px 0 0 20px`, `width: 480px`, `shadow-hero`) por primera vez — nadie lo había construido todavía. Es el contenedor del historial de pagos + `RefundForm`, abierto desde el badge de pago de `OrderCard` en vez de una ruta propia, porque es información de un pedido que ya está en pantalla, no una sección nueva de navegación.
+
+**Nota de alcance:** en `CardPaymentPanel` y `RefundForm`, el botón de envío queda deshabilitado con una leyenda explicativa ("llega en una actualización posterior") en vez de simular un envío — el diseño de las cinco pantallas está terminado y es revisable hoy, pero conectarlas a Stripe real es una fase aparte del mismo encargo.
+
 ## Do's and Don'ts
 
 ✓ Usar `primary` (#1B367B) como único azul de marca en todo el sitio — es el punto de anclaje visual con el portafolio.
