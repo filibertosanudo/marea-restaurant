@@ -412,7 +412,7 @@ Los cuatro patrones del módulo de cobros (`components/order/PaymentMethodChoice
 
 **`Drawer`** implementa el token `drawer` que este documento ya definía (`rounded: 20px 0 0 20px`, `width: 480px`, `shadow-hero`) por primera vez — nadie lo había construido todavía. Es el contenedor del historial de pagos + `RefundForm`, abierto desde el badge de pago de `OrderCard` en vez de una ruta propia, porque es información de un pedido que ya está en pantalla, no una sección nueva de navegación.
 
-**Nota de alcance:** en `CardPaymentPanel` y `RefundForm`, el botón de envío queda deshabilitado con una leyenda explicativa ("llega en una actualización posterior") en vez de simular un envío — el diseño de las cinco pantallas está terminado y es revisable hoy, pero conectarlas a Stripe real es una fase aparte del mismo encargo.
+**Nota de alcance (actualizada en Fase 4):** `CardPaymentPanel` ya está conectado a Stripe real — monta un Payment Element de verdad y confirma contra un PaymentIntent creado en el servidor; su leyenda bajo el botón ahora explica que el formulario está cargando, no que el pago "llega después". `RefundForm` sigue en el patrón original (botón deshabilitado con leyenda "llega en una actualización posterior") hasta que la Fase 5 conecte el reembolso real.
 
 ## Do's and Don'ts
 
