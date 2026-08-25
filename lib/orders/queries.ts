@@ -87,6 +87,36 @@ export async function getOrderPaymentDetailRaw(businessId: string, orderId: stri
 }
 
 /**
+ * The order-plus-payments shape createPaymentIntentAction needs: is it
+ * settled already, is there an open Stripe payment to reuse, what's the
+ * live total to charge. A lighter select than getOrderPaymentDetailRaw's
+ * (that one feeds the admin drawer's full history UI) since this is a
+ * server-only check, not a render.
+ */
+export async function getOrderForPaymentIntentByPublicToken(businessId: string, publicToken: string) {
+  return prisma.order.findFirst({
+    where: { businessId, publicToken },
+    select: {
+      id: true,
+      orderNumber: true,
+      status: true,
+      total: true,
+      currency: true,
+      payments: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          status: true,
+          amount: true,
+          provider: true,
+          stripePaymentIntentId: true,
+          refunds: { select: { status: true, amount: true } },
+        },
+      },
+    },
+  });
+}
+
+/**
  * publicToken is the entire auth model for this page — an unauthenticated
  * guest reaches their order by knowing this token and nothing else (see
  * schema.prisma: cuid(2), not the guessable cuid() default). Never resolve
