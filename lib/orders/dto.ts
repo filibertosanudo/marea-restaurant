@@ -16,6 +16,7 @@ export type TrackedOrderDTO = {
   currency: string;
   placedAt: string;
   cancellationReason: string | null;
+  paymentStatus: Payment["status"] | null;
   items: {
     id: string;
     name: string;
@@ -27,6 +28,7 @@ export type TrackedOrderDTO = {
 type RawOrder = Order & {
   table: RestaurantTable | null;
   items: (OrderItem & { modifiers: OrderItemModifier[] })[];
+  payments: Payment[];
 };
 
 export function toTrackedOrderDTO(order: RawOrder): TrackedOrderDTO {
@@ -39,6 +41,7 @@ export function toTrackedOrderDTO(order: RawOrder): TrackedOrderDTO {
     currency: order.currency,
     placedAt: order.placedAt.toISOString(),
     cancellationReason: order.cancellationReason,
+    paymentStatus: order.payments[0]?.status ?? null,
     items: order.items.map((item) => ({
       id: item.id,
       name: item.nameSnapshot,

@@ -7,6 +7,7 @@ import { getOrderDictionary } from "@/lib/i18n/dictionaries";
 import { formatMoney } from "@/lib/dto/money";
 import { StatusStepper } from "@/components/order/StatusStepper";
 import { OrderStreamListener } from "@/components/order/OrderStreamListener";
+import { PaymentSection } from "@/components/order/PaymentSection";
 import type { OrderDictionary } from "@/lib/i18n/dictionaries";
 
 const MESSAGE_BY_STATUS: Record<string, { title: keyof OrderDictionary; sub: keyof OrderDictionary }> = {
@@ -95,6 +96,19 @@ export default async function OrderTrackingPage({
           ))}
         </ul>
       </div>
+
+      {!isCancelled && (
+        <div className="mt-md w-full max-w-[360px]">
+          <PaymentSection
+            paymentStatus={order.paymentStatus}
+            total={order.total}
+            currency={order.currency}
+            lang={lang}
+            acceptsOnlinePayment={business.acceptsOnlinePayment}
+            dict={dict}
+          />
+        </div>
+      )}
     </div>
   );
 }

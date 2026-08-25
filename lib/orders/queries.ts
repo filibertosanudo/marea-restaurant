@@ -74,6 +74,10 @@ export async function getOrderByPublicToken(businessId: string, publicToken: str
     include: {
       table: true,
       items: { include: { modifiers: true }, orderBy: { createdAt: "asc" } },
+      // Latest payment only, same simplification the board's BOARD_INCLUDE
+      // uses today — reading "paid" as the sum of SUCCEEDED payments across
+      // every attempt is Fase 3's job (lib/payments/), not this query's.
+      payments: { orderBy: { createdAt: "desc" }, take: 1 },
     },
   });
 }
