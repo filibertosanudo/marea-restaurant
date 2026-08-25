@@ -1,5 +1,9 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import type { Stripe as StripeJS, StripeElements } from "@stripe/stripe-js";
+import { getStripe } from "@/lib/stripe/browser";
+
 export type CardPaymentStatus = "form" | "processing" | "requires_action" | "failed" | "succeeded";
 
 function Spinner() {
@@ -16,34 +20,42 @@ function Spinner() {
   );
 }
 
+/** rgb(r g b) CSS custom properties, per styles/tokens.css — read from the resolved page (light/dark, whichever is active) since Stripe Elements mounts in an iframe and can't see the parent's CSS variables directly. */
+function readColorToken(name: string, fallback: string): string {
+  if (typeof window === "undefined") return fallback;
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return raw ? `rgb(${raw.replace(/\s+/g, ", ")})` : fallback;
+}
+
 /**
- * Everything after the customer picks "pay with card" — the card field,
- * and the four states that flow can land in. Stripe's PaymentIntent
- * creation and confirmation land in a later phase (`lib/payments/`, Fase
- * 4); this component is deliberately decoupled from that — it renders
- * whatever `status` it's given, so wiring the real Stripe.js callbacks in
- * later is a matter of driving this prop, not rebuilding the screens.
+ * Everything after the customer picks "pay with card": mounts a real
+ * Stripe Payment Element into the clientSecret Fase 4's
+ * createPaymentIntentAction hands back, and the four states that flow can
+ * land in.
  *
- * The "form" state's submit is disabled today (`disabledCaption`
- * explains why) rather than faked, since there's no PaymentIntent to
- * confirm yet — better an honest "not yet" than a submit button that
- * silently does nothing.
+ * confirmPayment resolving without an error does NOT mean the payment
+ * succeeded — the webhook is the only source of truth (see
+ * app/api/webhooks/stripe/route.ts), so this never sets its own status to
+ * "succeeded" from that resolution. It stays on "processing"; the tracking
+ * page's SSE listener (OrderStreamListener) refreshes once the webhook
+ * updates the order's real payment status, and PaymentSection's own
+ * top-level branch takes over from there.
+ *
+ * `requires_action`/`succeeded` stay as render branches for design
+ * completeness (a future manual-confirmation flow could drive them), but
+ * `redirect: "if_required"` has Stripe show its own 3D Secure challenge
+ * inline as part of confirmPayment's own UI — this component never gets a
+ * mid-flight callback to switch into `requires_action` itself.
  */
 export function CardPaymentPanel({
-  status,
+  clientSecret,
   amountLabel,
-  onSubmit,
-  onRetry,
   onSwitchToCash,
-  errorMessage,
   dict,
 }: {
-  status: CardPaymentStatus;
+  clientSecret: string;
   amountLabel: string;
-  onSubmit?: () => void;
-  onRetry?: () => void;
   onSwitchToCash?: () => void;
-  errorMessage?: string;
   dict: {
     cardFieldLabel: string;
     cardFieldPlaceholder: string;
@@ -61,6 +73,78 @@ export function CardPaymentPanel({
     succeededBody: string;
   };
 }) {
+  const [status, setStatus] = useState<CardPaymentStatus>("form");
+  const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
+  const [elementReady, setElementReady] = useState(false);
+  const mountNodeRef = useRef<HTMLDivElement | null>(null);
+  const stripeRef = useRef<StripeJS | null>(null);
+  const elementsRef = useRef<StripeElements | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setElementReady(false);
+
+    getStripe().then((stripeInstance) => {
+      if (cancelled || !stripeInstance || !mountNodeRef.current) return;
+      stripeRef.current = stripeInstance;
+
+      const elements = stripeInstance.elements({
+        clientSecret,
+        appearance: {
+          theme: "stripe",
+          variables: {
+            colorPrimary: readColorToken("--color-primary", "#1B367B"),
+            colorBackground: readColorToken("--color-surface", "#FFFFFF"),
+            colorText: readColorToken("--color-on-surface", "#232C3B"),
+            colorDanger: readColorToken("--color-error", "#C0392B"),
+            fontFamily: "Poppins, system-ui, sans-serif",
+            borderRadius: "12px",
+          },
+        },
+      });
+      elementsRef.current = elements;
+
+      const paymentElement = elements.create("payment");
+      paymentElement.mount(mountNodeRef.current);
+      paymentElement.on("ready", () => {
+        if (!cancelled) setElementReady(true);
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      elementsRef.current = null;
+      stripeRef.current = null;
+    };
+  }, [clientSecret]);
+
+  async function handleSubmit() {
+    const stripeInstance = stripeRef.current;
+    const elements = elementsRef.current;
+    if (!stripeInstance || !elements) return;
+
+    setErrorMessage(undefined);
+    setStatus("processing");
+
+    const { error } = await stripeInstance.confirmPayment({
+      elements,
+      confirmParams: { return_url: window.location.href },
+      redirect: "if_required",
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setStatus("failed");
+    }
+    // No error: stays on "processing" — see the doc comment above.
+  }
+
+  function handleRetry() {
+    setErrorMessage(undefined);
+    setStatus("form");
+  }
+
   if (status === "processing") {
     return (
       <div className="flex flex-col items-center gap-sm rounded-lg border border-border/25 bg-surface p-lg text-center">
@@ -105,7 +189,7 @@ export function CardPaymentPanel({
         <div className="flex gap-sm">
           <button
             type="button"
-            onClick={onRetry}
+            onClick={handleRetry}
             className="flex-1 rounded-full bg-primary py-[12px] text-[13.5px] font-semibold text-on-primary transition-colors hover:bg-primary-hover"
           >
             {dict.retry}
@@ -136,33 +220,22 @@ export function CardPaymentPanel({
     );
   }
 
-  // status === "form" — the slot a real Stripe PaymentElement mounts into
-  // once Fase 4 wires it; today it's a static placeholder that still
-  // communicates what's coming (card number/expiry/CVC layout) so the
-  // screen reads as finished, not broken.
   return (
     <div className="flex flex-col gap-sm">
       <div>
         <span className="mb-[6px] block text-[13px] font-medium text-on-surface">
           {dict.cardFieldLabel}
         </span>
-        <div className="flex items-center gap-sm rounded-md border border-border/50 bg-surface px-md py-[12px] text-[14px] text-on-surface-muted">
-          <svg width="20" height="14" viewBox="0 0 24 17" fill="none" aria-hidden>
-            <rect x="0.5" y="0.5" width="23" height="16" rx="2" stroke="currentColor" />
-            <rect x="0.5" y="4" width="23" height="3" fill="currentColor" />
-          </svg>
-          {dict.cardFieldPlaceholder}
-        </div>
+        <div ref={mountNodeRef} aria-label={dict.cardFieldPlaceholder} />
       </div>
       <button
         type="button"
-        onClick={onSubmit}
-        disabled={!onSubmit}
+        onClick={handleSubmit}
+        disabled={!elementReady}
         className="mt-[4px] w-full rounded-full bg-primary py-[15px] text-[14.5px] font-semibold text-on-primary transition-colors disabled:cursor-not-allowed disabled:opacity-50"
       >
         {dict.payLabel.replace("{amount}", amountLabel)}
       </button>
-      {!onSubmit && <p className="text-center text-[11.5px] text-on-surface-muted">{dict.disabledCaption}</p>}
     </div>
   );
 }
