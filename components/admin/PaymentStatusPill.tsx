@@ -44,13 +44,14 @@ const DOT_CLASSES: Record<Variant, string> = {
 };
 
 /**
- * The one place a PaymentStatus becomes a color + label — shared by the
- * kitchen board, the payment drawer, and the customer tracking page, so the
- * same status never reads as "paid" in one surface and "pending" in
- * another. `className` overrides size/padding only (never color), the same
- * pattern OrderCard's density variant and AgingIndicator already use, so
- * each surface's own density controls sizing instead of this component
- * guessing at it.
+ * The one place a PaymentStatus becomes a color + label, so the same
+ * status never reads as "paid" in one surface and "pending" in another —
+ * used today by the payment drawer's history list (both a payment's own
+ * status and, per refund row, its RefundStatus). `className` overrides
+ * size/padding only (never color), the same pattern OrderCard's density
+ * variant and AgingIndicator already use, for whichever future surface
+ * (the board card's own badge stays its own simpler due/paid distinction
+ * for now — see OrderCard.tsx) needs a different scale than the drawer's.
  */
 export function PaymentStatusPill({
   status,

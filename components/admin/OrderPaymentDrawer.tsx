@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatMoney } from "@/lib/dto/money";
+import { formatMoney, toIntlLocale } from "@/lib/dto/money";
 import { getOrderPaymentDetailAction } from "@/lib/orders/payment-actions";
 import type { OrderPaymentDetailDTO } from "@/lib/orders/dto";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
@@ -150,7 +150,7 @@ export function OrderPaymentDrawer({
                       />
                     </div>
                     <div className="mt-[4px] flex items-center justify-between text-[12px] text-on-surface-muted">
-                      <span>{new Date(payment.createdAt).toLocaleString(lang === "es" ? "es-MX" : "en-US")}</span>
+                      <span>{new Date(payment.createdAt).toLocaleString(toIntlLocale(lang))}</span>
                       <span className="tabular-nums">{formatMoney(payment.amount, detail.currency, lang)}</span>
                     </div>
                     {payment.refunds.map((refund) => (

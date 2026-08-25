@@ -6,9 +6,14 @@ export function decimalToString(value: Prisma.Decimal | null | undefined): strin
   return value.toFixed(2);
 }
 
+/** The only two locales this project has (see lib/i18n/lang.ts) mapped to their Intl locale — shared by every Intl.NumberFormat/DateTimeFormat call site instead of each one re-writing the same ternary. */
+export function toIntlLocale(locale: string): string {
+  return locale === "es" ? "es-MX" : "en-US";
+}
+
 export function formatMoney(value: string | number, currency: string, locale: string): string {
   const amount = typeof value === "string" ? Number(value) : value;
-  return new Intl.NumberFormat(locale === "es" ? "es-MX" : "en-US", {
+  return new Intl.NumberFormat(toIntlLocale(locale), {
     style: "currency",
     currency,
   }).format(amount);
