@@ -143,6 +143,7 @@ export const es = {
       takeaway: "Para llevar",
       paymentPending: "Pendiente de cobro",
       paymentPaid: "Pagado",
+      viewPayment: "Ver detalle de pago",
       advanceFromPending: "Comenzar preparación",
       advanceFromPreparing: "Marcar listo",
       advanceFromReady: "Entregar",

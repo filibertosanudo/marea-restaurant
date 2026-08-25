@@ -73,7 +73,7 @@ const SCALE = {
     itemModifiers: "ml-[22px] text-[11.5px]",
     notes: "gap-[7px] px-sm py-[8px] text-[12px]",
     allergyIcon: "",
-    paymentBadge: "px-sm py-[3px] text-[11px]",
+    paymentBadge: "min-h-[32px] px-sm py-[6px] text-[11px]",
     price: "text-[12px]",
     collectButton: "min-h-[48px] text-[13.5px]",
     advanceButton: "min-h-[52px] gap-[8px] text-[14.5px]",
@@ -177,7 +177,8 @@ export function OrderCard({
         <button
           type="button"
           onClick={() => onViewPayment(order)}
-          className={`rounded-sm font-semibold underline-offset-2 hover:underline ${s.paymentBadge} ${
+          aria-label={dict.viewPayment}
+          className={`rounded-sm font-semibold underline-offset-2 transition-[opacity,text-decoration] hover:underline active:opacity-60 ${s.paymentBadge} ${
             paymentDue ? "bg-warning/12 text-warning" : "bg-success/12 text-success"
           }`}
         >
