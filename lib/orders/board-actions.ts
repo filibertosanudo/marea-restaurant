@@ -114,7 +114,10 @@ export async function cancelOrderAction(
     `;
     if (!locked[0]) return { error: "not_found" } as const;
 
-    const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+    const order = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      include: { items: { select: { menuItemId: true, quantity: true } } },
+    });
     if (!isCancellable(order.status)) return { error: "not_cancellable" } as const;
 
     await tx.order.update({
@@ -131,6 +134,39 @@ export async function cancelOrderAction(
       where: { orderId: order.id, status: "PENDING" },
       data: { status: "CANCELLED" },
     });
+
+    // Give back whatever this order's checkout decremented (see
+    // createOrderFromCart's stock check), for dishes that still track
+    // inventory today. Without this, every cancellation of a tracked dish
+    // permanently shrinks real stock nobody actually used — and if the
+    // original decrement had crossed zero, the dish stays hidden from the
+    // menu forever with no path back short of a manual DB edit.
+    const quantityByMenuItem = new Map<string, number>();
+    for (const item of order.items) {
+      if (!item.menuItemId) continue;
+      quantityByMenuItem.set(
+        item.menuItemId,
+        (quantityByMenuItem.get(item.menuItemId) ?? 0) + item.quantity
+      );
+    }
+    for (const [menuItemId, quantity] of quantityByMenuItem) {
+      const restocked = await tx.menuItem.updateMany({
+        where: { id: menuItemId, businessId: business.id, trackInventory: true },
+        data: { stockQuantity: { increment: quantity } },
+      });
+      if (restocked.count > 0) {
+        // Symmetric with the decrement's auto-hide: stock crossing back
+        // above zero auto-restores visibility too. A manual re-disable an
+        // admin applied for an unrelated reason after the auto-hide is
+        // indistinguishable from the auto-hide itself once isAvailable is
+        // just a boolean, so this can't tell the two apart — same
+        // limitation the decrement path already has in the other direction.
+        await tx.menuItem.updateMany({
+          where: { id: menuItemId, businessId: business.id, stockQuantity: { gt: 0 } },
+          data: { isAvailable: true },
+        });
+      }
+    }
 
     await tx.orderStatusEvent.create({
       data: {
