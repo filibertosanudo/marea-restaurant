@@ -95,6 +95,7 @@ export function PaymentSection({
       <PaymentMethodChoice
         value={method}
         onChange={setMethod}
+        groupLabel={dict.choosePaymentMethod}
         cardTitle={dict.payCardTitle}
         cardBody={dict.payCardBody}
         cashTitle={dict.payCashTitle}

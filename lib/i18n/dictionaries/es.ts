@@ -298,6 +298,7 @@ export const es = {
     paymentRefundedBody: "Este pedido fue reembolsado. Contacta al restaurante si tienes dudas.",
     paymentPriorAttemptFailed: "Tu último intento de pago no pasó — intenta de nuevo o paga en caja.",
     payAtRegisterOnlyBody: "Paga en caja cuando tu pedido esté listo.",
+    choosePaymentMethod: "¿Cómo quieres pagar?",
     payCardTitle: "Pagar ahora con tarjeta",
     payCardBody: "Rápido, y tu pedido queda marcado como pagado al instante.",
     payCashTitle: "Pagar en caja",

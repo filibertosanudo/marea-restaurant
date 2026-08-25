@@ -1,8 +1,33 @@
 "use client";
 
+import { useState } from "react";
 import { formatMoney } from "@/lib/dto/money";
 
 export type RefundMode = "FULL" | "PARTIAL";
+
+const ARROW_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
+
+/**
+ * role="radio"/"radiogroup" implies arrow-key selection between the
+ * options (not just Tab+Enter) — without this, the ARIA role promises
+ * keyboard behavior neither button actually implements. Only two options
+ * here, so "any arrow key" just flips between them and moves focus with it.
+ */
+function handleRadioKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, other: RefundMode, select: (mode: RefundMode) => void) {
+  if (!ARROW_KEYS.has(e.key)) return;
+  e.preventDefault();
+  select(other);
+  // React hasn't re-rendered yet, so aria-checked on the DOM is still
+  // stale — with only two options, "the sibling that isn't me" is always
+  // the one about to become selected, no need to wait for the re-render.
+  const buttons = e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+  for (const button of buttons ?? []) {
+    if (button !== e.currentTarget) {
+      button.focus();
+      break;
+    }
+  }
+}
 
 /**
  * Full-or-partial refund, reason required. `refundableAmount` (paidTotal
@@ -54,7 +79,9 @@ export function RefundForm({
     refundableLabel: string;
   };
 }) {
+  const [reasonTouched, setReasonTouched] = useState(false);
   const reasonMissing = reason.trim().length === 0;
+  const showReasonError = reasonTouched && reasonMissing;
   const canSubmit = Boolean(onSubmit) && !reasonMissing;
 
   return (
@@ -66,12 +93,14 @@ export function RefundForm({
         </p>
       </div>
 
-      <div role="radiogroup" className="flex gap-sm">
+      <div role="radiogroup" aria-label={dict.title} className="flex gap-sm">
         <button
           type="button"
           role="radio"
           aria-checked={mode === "FULL"}
+          tabIndex={mode === "FULL" ? 0 : -1}
           onClick={() => onModeChange("FULL")}
+          onKeyDown={(e) => handleRadioKeyDown(e, "PARTIAL", onModeChange)}
           className={`flex-1 rounded-sm border px-sm py-[8px] text-[12.5px] font-medium transition-colors ${
             mode === "FULL"
               ? "border-primary bg-surface-ocean text-primary"
@@ -84,7 +113,9 @@ export function RefundForm({
           type="button"
           role="radio"
           aria-checked={mode === "PARTIAL"}
+          tabIndex={mode === "PARTIAL" ? 0 : -1}
           onClick={() => onModeChange("PARTIAL")}
+          onKeyDown={(e) => handleRadioKeyDown(e, "FULL", onModeChange)}
           className={`flex-1 rounded-sm border px-sm py-[8px] text-[12.5px] font-medium transition-colors ${
             mode === "PARTIAL"
               ? "border-primary bg-surface-ocean text-primary"
@@ -122,12 +153,16 @@ export function RefundForm({
           rows={2}
           value={reason}
           onChange={(e) => onReasonChange(e.target.value)}
+          onBlur={() => setReasonTouched(true)}
           placeholder={dict.reasonPlaceholder}
-          aria-invalid={reasonMissing}
+          aria-invalid={showReasonError}
+          aria-describedby={showReasonError ? "refund-reason-error" : undefined}
           className="w-full resize-none rounded-sm border border-border/50 bg-surface px-sm py-[8px] text-[13px] text-on-surface outline-none focus:border-primary"
         />
-        {reasonMissing && (
-          <p className="mt-[4px] text-[11.5px] text-on-surface-muted">{dict.reasonRequired}</p>
+        {showReasonError && (
+          <p id="refund-reason-error" className="mt-[4px] text-[11.5px] text-on-surface-muted">
+            {dict.reasonRequired}
+          </p>
         )}
       </div>
 

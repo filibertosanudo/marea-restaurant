@@ -1,6 +1,9 @@
 "use client";
 
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useRef } from "react";
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * The admin panel's side panel for content too rich for a Modal's centered
@@ -9,6 +12,10 @@ import { ReactNode, useEffect } from "react";
  * "20px 0 0 20px"` (only the interior corners — the right edge meets the
  * viewport), fixed `width: 480px`, `shadow-hero` to separate from the board
  * that stays visible behind it.
+ *
+ * `role="dialog"`/`aria-modal`, initial focus on open, and Tab containment
+ * within the panel — a keyboard user tabbing through the board behind it
+ * would otherwise reach content that's supposed to be covered.
  */
 export function Drawer({
   open,
@@ -21,10 +28,31 @@ export function Drawer({
   title?: string;
   children: ReactNode;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
+    panelRef.current?.focus();
+
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !panelRef.current) return;
+
+      const focusable = panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -39,7 +67,14 @@ export function Drawer({
         onClick={onClose}
         className="absolute inset-0 h-full w-full cursor-default bg-on-surface/40"
       />
-      <div className="relative flex h-full w-full max-w-[480px] flex-col rounded-l-[20px] bg-surface shadow-hero">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        className="relative flex h-full w-full max-w-[480px] flex-col rounded-l-[20px] bg-surface shadow-hero outline-none"
+      >
         <div className="flex shrink-0 items-center justify-between px-lg pt-lg">
           {title && <h3 className="font-display text-[18px] font-semibold text-on-surface">{title}</h3>}
           <button
