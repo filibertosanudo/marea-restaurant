@@ -78,10 +78,15 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
         let updated;
         try {
           updated = await stripe.paymentIntents.update(existing.id, { amount: currentAmount });
+          await prisma.payment.update({ where: { id: openPayment.id }, data: { amount: order.total } });
         } catch {
+          // Whether Stripe's update or the DB write failed, surface the
+          // same typed try_again the rest of this function uses rather
+          // than letting a transient error throw past the Server Action
+          // boundary — Stripe's own idempotency makes retrying this call
+          // safe either way.
           return { ok: false, error: "try_again" };
         }
-        await prisma.payment.update({ where: { id: openPayment.id }, data: { amount: order.total } });
         if (!updated.client_secret) return { ok: false, error: "try_again" };
         return { ok: true, clientSecret: updated.client_secret };
       }
