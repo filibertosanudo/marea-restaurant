@@ -9,7 +9,19 @@ const BOARD_INCLUDE = {
   // to show "Cobrar" reads computePaymentSummary over all of them (a card
   // attempt that failed, or that the guest abandoned for cash, must not
   // hide a still-open cash-register row just because it's not the newest).
-  payments: { orderBy: { createdAt: "desc" as const }, include: { refunds: true } },
+  // A `select`, not `include`, on both levels — the board re-fetches every
+  // order on every live SSE event, and computePaymentSummary/canCollectCash
+  // only ever read status/amount/provider, never stripePaymentIntentId,
+  // receiptUrl, or any of Payment's other columns.
+  payments: {
+    orderBy: { createdAt: "desc" as const },
+    select: {
+      status: true,
+      amount: true,
+      provider: true,
+      refunds: { select: { status: true, amount: true } },
+    },
+  },
 } satisfies Prisma.OrderInclude;
 
 // Live statuses (PENDING/PREPARING/READY) show regardless of age — an order

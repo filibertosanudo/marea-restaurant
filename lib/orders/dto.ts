@@ -96,7 +96,12 @@ export type BoardOrderDTO = {
 type RawBoardOrder = Order & {
   table: RestaurantTable | null;
   items: (OrderItem & { modifiers: OrderItemModifier[] })[];
-  payments: (Payment & { refunds: Refund[] })[];
+  // A projection, not the full Payment/Refund rows — matches BOARD_INCLUDE's
+  // own `select` in lib/orders/queries.ts, which only ever pulls the fields
+  // this function actually reads below.
+  payments: (Pick<Payment, "status" | "amount" | "provider"> & {
+    refunds: Pick<Refund, "status" | "amount">[];
+  })[];
 };
 
 export function toBoardOrderDTO(order: RawBoardOrder): BoardOrderDTO {
