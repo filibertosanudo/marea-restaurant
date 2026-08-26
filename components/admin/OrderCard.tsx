@@ -86,13 +86,15 @@ const SCALE = {
 } as const;
 
 // bg-border/16 + text-on-surface-muted is the same neutral pair
-// status-badge-neutral already uses elsewhere in the panel — reused here for
-// NONE (a cancelled order that was never paid) instead of inventing a
-// fifth color for a reading that isn't really an alert.
+// status-badge-neutral already uses elsewhere in the panel. REFUNDED reuses
+// it too, matching PaymentStatusPill's own REFUNDED mapping (see
+// components/admin/PaymentStatusPill.tsx) — the same payment must read as
+// the same color on the board card and in the drawer it opens into, which
+// is exactly what that shared pill exists to guarantee.
 const READING_STYLE: Record<PaymentReading, string> = {
   DUE: "bg-warning/12 text-warning",
   PAID: "bg-success/12 text-success",
-  REFUNDED: "bg-info/12 text-info",
+  REFUNDED: "bg-border/16 text-on-surface-muted",
   NONE: "bg-border/16 text-on-surface-muted",
 };
 
