@@ -7,26 +7,30 @@ import { Input } from "@/components/ui/Input";
 import { Tabs } from "@/components/ui/Tabs";
 import { TestimonialCard } from "@/components/ui/TestimonialCard";
 import { StatItem } from "@/components/ui/StatItem";
-import { STR, TIME_SLOTS, type Dish as DishData, type Lang } from "./content";
+import { STR, type Dish as DishData, type Lang } from "./content";
 import type { PublicMenuByLang } from "@/lib/menu/public-menu";
 import { Controls } from "./Controls";
-import { Dropdown } from "./Dropdown";
 import { SectionHead } from "./SectionHead";
 import { Placeholder } from "./Placeholder";
 import { OfferCard } from "./OfferCard";
 import { Dish } from "./Dish";
 import { Highlight } from "./Highlight";
 import { PreorderModal } from "./PreorderModal";
+import { ReservationForm } from "./ReservationForm";
 import { scrollToId } from "./scroll";
 import { ArrowIcon } from "./icons";
 import "./marea-landing.css";
 
 type Theme = "light" | "dark";
 
-export function MareaLandingPage({ menuByLang }: { menuByLang: PublicMenuByLang }) {
+export function MareaLandingPage({
+  menuByLang,
+  maxPartySize,
+}: {
+  menuByLang: PublicMenuByLang;
+  maxPartySize: number;
+}) {
   const [cat, setCat] = useState("mains");
-  const [guests, setGuests] = useState("2");
-  const [time, setTime] = useState("19:00");
   const [lang, setLang] = useState<Lang>("en");
   const [theme, setTheme] = useState<Theme>("light");
   const [preorderDish, setPreorderDish] = useState<DishData | null>(null);
@@ -53,12 +57,6 @@ export function MareaLandingPage({ menuByLang }: { menuByLang: PublicMenuByLang 
   }, [lang]);
 
   const t = STR[lang];
-  const guestOptions = [1, 2, 3, 4, 5, 6]
-    .map((n) => ({
-      value: String(n),
-      label: `${n} ${n === 1 ? t.reserve.guest : t.reserve.guestP}`,
-    }))
-    .concat([{ value: "7", label: t.reserve.guestPlus }]);
 
   return (
     <>
@@ -209,50 +207,9 @@ export function MareaLandingPage({ menuByLang }: { menuByLang: PublicMenuByLang 
         <div className="ml-reserve-inner">
           <div className="ml-reserve-form-wrap">
             <SectionHead eyebrow={t.reserve.eyebrow} title={t.reserve.title} />
-            <form
-              className="ml-form-card"
-              style={{ marginTop: 28 }}
-              onSubmit={(e) => e.preventDefault()}
-            >
-              <div className="field">
-                <Input id="r-name" label={t.reserve.name} placeholder={t.reserve.namePh} />
-              </div>
-              <div className="ml-form-row">
-                <div className="field">
-                  <Input id="r-contact" label={t.reserve.contact} placeholder={t.reserve.contactPh} />
-                </div>
-                <div className="field">
-                  <Dropdown
-                    id="r-guests"
-                    label={t.reserve.guests}
-                    options={guestOptions}
-                    value={guests}
-                    onChange={setGuests}
-                  />
-                </div>
-              </div>
-              <div className="ml-form-row">
-                <div className="field">
-                  <Input id="r-date" label={t.reserve.date} type="date" />
-                </div>
-                <div className="field">
-                  <Dropdown
-                    id="r-time"
-                    label={t.reserve.time}
-                    options={TIME_SLOTS}
-                    value={time}
-                    onChange={setTime}
-                  />
-                </div>
-              </div>
-              <div className="ml-ta-field">
-                <label htmlFor="r-notes">{t.reserve.comments}</label>
-                <textarea id="r-notes" placeholder={t.reserve.commentsPh} />
-              </div>
-              <Button variant="primary" type="submit" style={{ width: "100%" }}>
-                {t.reserve.submit}
-              </Button>
-            </form>
+            <div style={{ marginTop: 28 }}>
+              <ReservationForm lang={lang} maxPartySize={maxPartySize} />
+            </div>
           </div>
         </div>
       </section>
