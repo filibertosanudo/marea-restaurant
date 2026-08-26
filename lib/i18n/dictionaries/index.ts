@@ -6,6 +6,7 @@ export const dictionaries = { en, es } satisfies Record<Lang, typeof en>;
 
 export type AdminDictionary = (typeof dictionaries)[Lang]["admin"];
 export type OrderDictionary = (typeof dictionaries)[Lang]["order"];
+export type ReservationDictionary = (typeof dictionaries)[Lang]["reservation"];
 
 export function getDictionary(lang: Lang): AdminDictionary {
   return dictionaries[lang].admin;
@@ -13,4 +14,8 @@ export function getDictionary(lang: Lang): AdminDictionary {
 
 export function getOrderDictionary(lang: Lang): OrderDictionary {
   return dictionaries[lang].order;
+}
+
+export function getReservationDictionary(lang: Lang): ReservationDictionary {
+  return dictionaries[lang].reservation;
 }
