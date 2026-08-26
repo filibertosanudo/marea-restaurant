@@ -71,7 +71,7 @@ function logRejectedTransition(event: string, paymentId: string, from: PaymentSt
 }
 
 /**
- * The four events Fase 4 handles. Every handler looks the Payment up by
+ * The events this module handles. Every handler looks the Payment up by
  * stripePaymentIntentId/stripeChargeId and no-ops if it can't find one (an
  * event for an intent this app never created, or already fully applied) —
  * webhooks redeliver, so idempotent-by-lookup matters as much as the
@@ -86,6 +86,10 @@ export async function applyStripeEvent(
   switch (event.type) {
     case "payment_intent.succeeded":
       return handlePaymentIntentSucceeded(tx, event.data.object as Stripe.PaymentIntent, chargeDetails);
+    case "payment_intent.processing":
+      return handlePaymentIntentProcessing(tx, event.data.object as Stripe.PaymentIntent);
+    case "payment_intent.requires_action":
+      return handlePaymentIntentRequiresAction(tx, event.data.object as Stripe.PaymentIntent);
     case "payment_intent.payment_failed":
       return handlePaymentIntentFailed(tx, event.data.object as Stripe.PaymentIntent);
     case "payment_intent.canceled":
@@ -121,6 +125,36 @@ async function handlePaymentIntentSucceeded(
     },
   });
   await cancelOtherOpenPaymentsIfSettled(tx, payment.orderId, payment.id);
+}
+
+/**
+ * Some payment methods Stripe offers under `automatic_payment_methods`
+ * (bank debits, vouchers like OXXO) genuinely stay PROCESSING for minutes
+ * to days, not just the instant between confirm and succeeded — until this
+ * handled it, the DB had no way to ever show that instead of leaving the
+ * order stuck on PENDING.
+ */
+async function handlePaymentIntentProcessing(tx: TxClient, intent: Stripe.PaymentIntent): Promise<void> {
+  const payment = await tx.payment.findUnique({ where: { stripePaymentIntentId: intent.id } });
+  if (!payment) return;
+  if (!canTransitionPayment(payment.status, "PROCESSING")) {
+    logRejectedTransition("payment_intent.processing", payment.id, payment.status, "PROCESSING");
+    return;
+  }
+
+  await tx.payment.update({ where: { id: payment.id }, data: { status: "PROCESSING" } });
+}
+
+/** Mirrors handlePaymentIntentProcessing for a method that needs an out-of-band step this app's own confirm (redirect: "if_required") doesn't surface inline — a bank redirect, not the inline 3DS case Stripe already resolves before this event would ever fire. */
+async function handlePaymentIntentRequiresAction(tx: TxClient, intent: Stripe.PaymentIntent): Promise<void> {
+  const payment = await tx.payment.findUnique({ where: { stripePaymentIntentId: intent.id } });
+  if (!payment) return;
+  if (!canTransitionPayment(payment.status, "REQUIRES_ACTION")) {
+    logRejectedTransition("payment_intent.requires_action", payment.id, payment.status, "REQUIRES_ACTION");
+    return;
+  }
+
+  await tx.payment.update({ where: { id: payment.id }, data: { status: "REQUIRES_ACTION" } });
 }
 
 async function handlePaymentIntentFailed(tx: TxClient, intent: Stripe.PaymentIntent): Promise<void> {

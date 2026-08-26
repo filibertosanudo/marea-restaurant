@@ -326,7 +326,5 @@ export const es = {
     cardFailedBodyFallback: "Prueba con otra tarjeta, o paga en caja cuando llegue tu pedido.",
     cardRetry: "Intentar de nuevo",
     cardSwitchToCash: "Pagar en caja en su lugar",
-    cardSucceededTitle: "Pago recibido",
-    cardSucceededBody: "Este pedido está pagado por completo.",
   },
 };

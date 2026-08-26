@@ -322,7 +322,5 @@ export const en = {
     cardFailedBodyFallback: "Try a different card, or pay at the register when your order arrives.",
     cardRetry: "Try again",
     cardSwitchToCash: "Pay at the register instead",
-    cardSucceededTitle: "Payment received",
-    cardSucceededBody: "This order is paid in full.",
   },
 };
