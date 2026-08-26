@@ -61,8 +61,9 @@ export async function resolveChargeDetailsForEvent(event: Stripe.Event): Promise
 export async function resolveRefundsForEvent(event: Stripe.Event): Promise<Stripe.Refund[] | null> {
   if (event.type !== "charge.refunded") return null;
   const charge = event.data.object as Stripe.Charge;
-  const list = await stripe.refunds.list({ charge: charge.id });
-  return list.data;
+  // .list() on its own still defaults to a page of 10 — the exact ceiling
+  // this function exists to get past. autoPagingToArray walks every page.
+  return stripe.refunds.list({ charge: charge.id }).autoPagingToArray({ limit: 10_000 });
 }
 
 /** A transition the graph rejects is worth a trace even though the handler still no-ops and responds 2xx — otherwise a real state mismatch (Stripe says paid, the DB disagrees) leaves zero record anywhere. */
