@@ -105,6 +105,16 @@ export function CardPaymentPanel({
   }, [status]);
 
   useEffect(() => {
+    // The mount node only exists in the DOM while status === "form" (every
+    // other status is its own early-return branch below). Without this
+    // guard, retrying after a failed payment flips status back to "form"
+    // and React renders a brand-new, empty mount div that this effect never
+    // re-runs for — the guest sees the "Pagar" button with no card field
+    // above it. Depending on `status` here means a failed→form retry reruns
+    // this same mount logic against that new node instead of relying on a
+    // stale ref into a div React already discarded.
+    if (status !== "form") return;
+
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setElementReady(false);
@@ -139,16 +149,16 @@ export function CardPaymentPanel({
 
     return () => {
       cancelled = true;
-      // Unmounts the iframe before the next effect run (or this
-      // component's own unmount) creates a new one — without this, a
-      // clientSecret change while mounted would stack a second Payment
-      // Element into the same DOM node instead of replacing the first.
+      // Unmounts the iframe before the next effect run (a clientSecret
+      // change, or leaving and re-entering "form") creates a new one —
+      // without this, either case would stack a second Payment Element
+      // into the same DOM node instead of replacing the first.
       paymentElementRef.current?.unmount();
       paymentElementRef.current = null;
       elementsRef.current = null;
       stripeRef.current = null;
     };
-  }, [clientSecret]);
+  }, [clientSecret, status]);
 
   async function handleSubmit() {
     const stripeInstance = stripeRef.current;
