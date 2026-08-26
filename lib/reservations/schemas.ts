@@ -1,0 +1,49 @@
+import { z } from "zod";
+
+const dateParamSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "invalid_date")
+  .refine((value) => {
+    const [year, month, day] = value.split("-").map(Number);
+    // Rejects "2026-02-30" the way a naive regex-only check wouldn't —
+    // Date.UTC silently rolls an out-of-range day into the next month, so
+    // this round-trips it and checks nothing moved.
+    const d = new Date(Date.UTC(year, month - 1, day));
+    return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+  }, "invalid_date");
+
+const timeParamSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "invalid_time");
+
+export const reservationSlotsQuerySchema = z.object({
+  date: dateParamSchema,
+  partySize: z.coerce.number().int().min(1).max(200),
+});
+
+export const createReservationSchema = z
+  .object({
+    guestName: z.string().trim().min(1).max(120),
+    guestEmail: z
+      .union([z.email().max(200), z.literal("")])
+      .optional()
+      .transform((v) => (v ? v : undefined)),
+    guestPhone: z
+      .union([z.string().trim().min(5).max(30), z.literal("")])
+      .optional()
+      .transform((v) => (v ? v : undefined)),
+    partySize: z.coerce.number().int().min(1).max(200),
+    date: dateParamSchema,
+    time: timeParamSchema,
+    notes: z.string().trim().max(500).optional(),
+  })
+  .refine((data) => Boolean(data.guestEmail) || Boolean(data.guestPhone), {
+    message: "contact_required",
+    path: ["guestEmail"],
+  });
+
+export type CreateReservationInput = z.infer<typeof createReservationSchema>;
+
+/** Splits a validated "YYYY-MM-DD" into the {year, month, day} shape availability.ts takes — never `new Date(string)`, which is exactly the client-side date-parsing this module avoids. */
+export function parseDateParam(date: string): { year: number; month: number; day: number } {
+  const [year, month, day] = date.split("-").map(Number);
+  return { year, month, day };
+}

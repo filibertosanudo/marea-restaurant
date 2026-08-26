@@ -109,7 +109,14 @@ function getTimeZoneOffsetMinutes(instant: Date, timeZone: string): number {
  * actually applies on that date, not today's, since a timezone's UTC
  * offset changes across a DST transition.
  */
-function localWallClockToUtc(
+/**
+ * Exported (unlike this module's other internals) because the Server Action
+ * layer needs the exact same conversion to compute a UTC fetch window for
+ * the day being checked — reservations and closures both live as UTC
+ * instants in Postgres, and re-deriving this math a second way there would
+ * be exactly the "disponibilidad calculada dos veces" this module rules out.
+ */
+export function localWallClockToUtc(
   year: number,
   month: number,
   day: number,
