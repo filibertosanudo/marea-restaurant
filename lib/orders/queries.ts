@@ -109,6 +109,7 @@ export async function getOrderForPaymentIntentByPublicToken(businessId: string, 
       payments: {
         orderBy: { createdAt: "desc" },
         select: {
+          id: true,
           status: true,
           amount: true,
           provider: true,

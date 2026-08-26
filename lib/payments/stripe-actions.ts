@@ -26,6 +26,15 @@ const CONFIRMABLE_INTENT_STATUSES = ["requires_payment_method", "requires_confir
  * amount. The idempotency key is derived from the order itself (not a
  * fresh id per click), so two overlapping submissions for the same order
  * resolve to the same PaymentIntent at Stripe instead of two charges.
+ *
+ * No rate limit: this is a public Server Action guarded only by knowing a
+ * publicToken, but adding one the way lib/auth/rate-limit.ts does (a
+ * dedicated Postgres table keyed by identity) would mean a schema change,
+ * which this module doesn't authorize. The one concrete harm that absence
+ * used to enable — a fixed idempotency key trapping a changed amount
+ * behind Stripe's 24h window — is what keying it on the amount above
+ * closes; every other effect of hammering this action is a harmless extra
+ * PaymentIntent against an order it re-validates in full on every call.
  */
 export async function createPaymentIntentAction(publicToken: string): Promise<CreatePaymentIntentResult> {
   const business = await getCurrentBusiness();
@@ -51,10 +60,31 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
       p.stripePaymentIntentId &&
       (OPEN_STRIPE_STATUSES as readonly string[]).includes(p.status)
   );
+  const currentAmount = toStripeAmount(order.total);
+
   if (openPayment?.stripePaymentIntentId) {
     const existing = await stripe.paymentIntents.retrieve(openPayment.stripePaymentIntentId).catch(() => null);
     if (existing?.status === "succeeded") return { ok: false, error: "already_paid" };
     if (existing && CONFIRMABLE_INTENT_STATUSES.includes(existing.status) && existing.client_secret) {
+      // The order's total can move between the guest opening this page and
+      // confirming (a modifier's price changed, staff adjusted the order) —
+      // reusing the intent's original amount would then charge a number
+      // the order no longer agrees with. Bringing the intent up to date is
+      // safe pre-confirmation (Stripe rejects the update once a payment
+      // method has already been attached mid-confirm), and keeps this
+      // order-derived idempotency key meaning "this order's current total"
+      // rather than "whatever it was the first time".
+      if (existing.amount !== currentAmount) {
+        let updated;
+        try {
+          updated = await stripe.paymentIntents.update(existing.id, { amount: currentAmount });
+        } catch {
+          return { ok: false, error: "try_again" };
+        }
+        await prisma.payment.update({ where: { id: openPayment.id }, data: { amount: order.total } });
+        if (!updated.client_secret) return { ok: false, error: "try_again" };
+        return { ok: true, clientSecret: updated.client_secret };
+      }
       return { ok: true, clientSecret: existing.client_secret };
     }
     // Anything else (canceled, retrieve failed) falls through to create —
@@ -67,12 +97,17 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
   try {
     intent = await stripe.paymentIntents.create(
       {
-        amount: toStripeAmount(order.total),
+        amount: currentAmount,
         currency: order.currency.toLowerCase(),
         automatic_payment_methods: { enabled: true },
         metadata: { orderId: order.id, orderNumber: order.orderNumber, businessId: business.id },
       },
-      { idempotencyKey: `pi_create_${order.id}` }
+      // The amount is part of the key, not just the order id — otherwise a
+      // total that changes between two calls (see above) would collide
+      // with the first call's cached Stripe response under the same key
+      // and stay stuck on the stale amount for the rest of Stripe's 24h
+      // idempotency window, surfacing as a persistent try_again.
+      { idempotencyKey: `pi_create_${order.id}_${currentAmount}` }
     );
   } catch {
     return { ok: false, error: "try_again" };
