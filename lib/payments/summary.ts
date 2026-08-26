@@ -30,6 +30,19 @@ export type PaymentSummary = {
 };
 
 /**
+ * SUCCEEDED + PENDING — both are money already committed against the
+ * charge, whether or not Stripe's webhook has confirmed the PENDING one
+ * yet. Refunding the same amount twice while a first refund is still in
+ * flight is exactly what Stripe's own amount check would reject; counting
+ * only SUCCEEDED left that window open long enough to hit in practice.
+ */
+function sumCommittedRefunds(refunds: Pick<Refund, "status" | "amount">[]): Prisma.Decimal {
+  return refunds
+    .filter((r) => r.status === "SUCCEEDED" || r.status === "PENDING")
+    .reduce((sum, r) => sum.add(r.amount), new Prisma.Decimal(0));
+}
+
+/**
  * One payment's own refundable balance — a refund always targets a single
  * Stripe charge/PaymentIntent, never an abstract order total, so choosing
  * which Payment to refund against needs this, not computePaymentSummary's
@@ -42,7 +55,7 @@ export function refundableForPayment(
   if (payment.status !== "SUCCEEDED" && payment.status !== "PARTIALLY_REFUNDED") {
     return new Prisma.Decimal(0);
   }
-  const net = payment.amount.sub(sumSucceededRefunds(payment.refunds));
+  const net = payment.amount.sub(sumCommittedRefunds(payment.refunds));
   return net.lte(0) ? new Prisma.Decimal(0) : net;
 }
 
