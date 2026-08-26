@@ -46,6 +46,25 @@ export async function resolveChargeDetailsForEvent(event: Stripe.Event): Promise
   return null;
 }
 
+/**
+ * `charge.refunded`'s own payload carries `refunds` as a bare, unexpanded
+ * field since API version 2022-11-15 — Stripe's own SDK types it
+ * `ApiList<Refund> | null` — and even expanded it caps at ten. Listing the
+ * charge's refunds explicitly is the only way to see all of them, same
+ * reasoning as resolveChargeDetails needing a real extra request for the
+ * charge itself. Unlike that one, a failure here isn't swallowed to a
+ * degraded-but-applied event: an unknown refund total is money this app
+ * can't afford to silently miscount, so this throws and lets the webhook
+ * fail loud (Stripe retries) instead of applying the event as if nothing
+ * had been refunded.
+ */
+export async function resolveRefundsForEvent(event: Stripe.Event): Promise<Stripe.Refund[] | null> {
+  if (event.type !== "charge.refunded") return null;
+  const charge = event.data.object as Stripe.Charge;
+  const list = await stripe.refunds.list({ charge: charge.id });
+  return list.data;
+}
+
 /** A transition the graph rejects is worth a trace even though the handler still no-ops and responds 2xx — otherwise a real state mismatch (Stripe says paid, the DB disagrees) leaves zero record anywhere. */
 function logRejectedTransition(event: string, paymentId: string, from: PaymentStatus, to: PaymentStatus): void {
   console.error(`[stripe webhook] ${event}: rejected ${from} -> ${to} for payment ${paymentId}`);
@@ -61,7 +80,8 @@ function logRejectedTransition(event: string, paymentId: string, from: PaymentSt
 export async function applyStripeEvent(
   tx: TxClient,
   event: Stripe.Event,
-  chargeDetails: ChargeDetails | null
+  chargeDetails: ChargeDetails | null,
+  refunds: Stripe.Refund[] | null
 ): Promise<void> {
   switch (event.type) {
     case "payment_intent.succeeded":
@@ -71,7 +91,7 @@ export async function applyStripeEvent(
     case "payment_intent.canceled":
       return handlePaymentIntentCanceled(tx, event.data.object as Stripe.PaymentIntent);
     case "charge.refunded":
-      return handleChargeRefunded(tx, event.data.object as Stripe.Charge);
+      return handleChargeRefunded(tx, event.data.object as Stripe.Charge, refunds ?? []);
     default:
       return;
   }
@@ -138,7 +158,7 @@ async function handlePaymentIntentCanceled(tx: TxClient, intent: Stripe.PaymentI
  * Payment's own status and a Refund row per Stripe refund on the charge,
  * since the Dashboard case never went through this app's Refund.create.
  */
-async function handleChargeRefunded(tx: TxClient, charge: Stripe.Charge): Promise<void> {
+async function handleChargeRefunded(tx: TxClient, charge: Stripe.Charge, refunds: Stripe.Refund[]): Promise<void> {
   const paymentIntentId =
     typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent?.id;
   if (!paymentIntentId) return;
@@ -160,7 +180,7 @@ async function handleChargeRefunded(tx: TxClient, charge: Stripe.Charge): Promis
     }
   }
 
-  for (const refund of charge.refunds?.data ?? []) {
+  for (const refund of refunds) {
     await tx.refund.upsert({
       where: { stripeRefundId: refund.id },
       create: {

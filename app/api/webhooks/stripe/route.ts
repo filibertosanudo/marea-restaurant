@@ -1,7 +1,7 @@
 import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe/client";
-import { applyStripeEvent, resolveChargeDetailsForEvent } from "@/lib/payments/webhook-handlers";
+import { applyStripeEvent, resolveChargeDetailsForEvent, resolveRefundsForEvent } from "@/lib/payments/webhook-handlers";
 import { isUniqueConstraintError } from "@/lib/payments/prisma-errors";
 import { Prisma } from "@/lib/generated/prisma/client";
 
@@ -31,6 +31,7 @@ export async function POST(request: Request) {
   }
 
   const chargeDetails = await resolveChargeDetailsForEvent(event);
+  const refunds = await resolveRefundsForEvent(event);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
           processedAt: new Date(),
         },
       });
-      await applyStripeEvent(tx, event, chargeDetails);
+      await applyStripeEvent(tx, event, chargeDetails, refunds);
     });
   } catch (err) {
     if (isUniqueConstraintError(err)) {
