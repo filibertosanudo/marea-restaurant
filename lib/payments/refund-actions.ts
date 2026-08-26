@@ -82,6 +82,17 @@ async function refundOnePayment(
  * Stripe refund's would) so refundedTotal and the payment's own status
  * reflect it, instead of the admin seeing `ok: true` while nothing on
  * refundableTotal moved.
+ *
+ * Unlike refundOnePayment, there's no Stripe idempotency key to lean on for
+ * safety against a double-click or two admins acting on the same payment at
+ * once — so this locks the Payment row and re-reads its refund history
+ * inside its own transaction instead of trusting the `candidate` snapshot
+ * `createRefundAction` built before the loop started. A second, legitimate
+ * partial refund landing on top of an already-PARTIALLY_REFUNDED payment
+ * also can't move the status to that same value again (the transition graph
+ * only allows PARTIALLY_REFUNDED -> REFUNDED), so that case is a status
+ * no-op rather than a rejected transition — the Refund row still gets
+ * written either way.
  */
 async function refundCashPayment(
   candidate: Candidate,
@@ -90,13 +101,25 @@ async function refundCashPayment(
   staffId: string,
   currency: string
 ): Promise<void> {
-  const targetStatus: PaymentStatus = amount.gte(candidate.refundable) ? "REFUNDED" : "PARTIALLY_REFUNDED";
-  assertPaymentTransition(candidate.payment.status, targetStatus);
-
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Payment" WHERE id = ${candidate.payment.id} FOR UPDATE`;
+    const fresh = await tx.payment.findUniqueOrThrow({
+      where: { id: candidate.payment.id },
+      include: { refunds: true },
+    });
+    const refundable = refundableForPayment(fresh);
+    if (amount.gt(refundable)) {
+      throw new Error("cash refund amount exceeds the payment's current refundable balance");
+    }
+
+    const targetStatus: PaymentStatus = amount.gte(refundable) ? "REFUNDED" : "PARTIALLY_REFUNDED";
+    if (fresh.status !== targetStatus) {
+      assertPaymentTransition(fresh.status, targetStatus);
+    }
+
     await tx.refund.create({
       data: {
-        paymentId: candidate.payment.id,
+        paymentId: fresh.id,
         amount,
         currency,
         status: "SUCCEEDED",
@@ -105,8 +128,26 @@ async function refundCashPayment(
         processedAt: new Date(),
       },
     });
-    await tx.payment.update({ where: { id: candidate.payment.id }, data: { status: targetStatus } });
+    if (fresh.status !== targetStatus) {
+      await tx.payment.update({ where: { id: fresh.id }, data: { status: targetStatus } });
+    }
   });
+}
+
+/** Routes to the Stripe or cash refund path by whether the payment has a Stripe intent — the one place that decision is made, instead of the FULL and PARTIAL branches below each re-deriving it. */
+async function refundCandidate(
+  candidate: Candidate,
+  amount: Prisma.Decimal,
+  reason: string,
+  staffId: string,
+  orderId: string,
+  currency: string
+): Promise<void> {
+  if (candidate.payment.stripePaymentIntentId) {
+    await refundOnePayment(candidate, amount, reason, staffId, orderId, currency);
+  } else {
+    await refundCashPayment(candidate, amount, reason, staffId, currency);
+  }
 }
 
 /**
@@ -141,18 +182,14 @@ export async function createRefundAction(
       // in cash after a card retry also succeeded) — refund every
       // candidate's own balance, not just the first one.
       for (const candidate of candidates) {
-        if (candidate.payment.stripePaymentIntentId) {
-          await refundOnePayment(
-            candidate,
-            candidate.refundable,
-            trimmedReason,
-            session.user.id,
-            order.id,
-            order.currency
-          );
-        } else {
-          await refundCashPayment(candidate, candidate.refundable, trimmedReason, session.user.id, order.currency);
-        }
+        await refundCandidate(
+          candidate,
+          candidate.refundable,
+          trimmedReason,
+          session.user.id,
+          order.id,
+          order.currency
+        );
       }
     } else {
       let requestedAmount: Prisma.Decimal;
@@ -165,11 +202,7 @@ export async function createRefundAction(
       if (!target || requestedAmount.lte(0)) {
         return { ok: false, error: "amount_exceeds_refundable" };
       }
-      if (target.payment.stripePaymentIntentId) {
-        await refundOnePayment(target, requestedAmount, trimmedReason, session.user.id, order.id, order.currency);
-      } else {
-        await refundCashPayment(target, requestedAmount, trimmedReason, session.user.id, order.currency);
-      }
+      await refundCandidate(target, requestedAmount, trimmedReason, session.user.id, order.id, order.currency);
     }
   } catch {
     // Whatever refunds in a FULL-mode loop already succeeded at Stripe are
