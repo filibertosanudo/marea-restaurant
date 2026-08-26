@@ -4,6 +4,7 @@ import { Prisma } from "@/lib/generated/prisma/client";
 import type { PaymentStatus } from "@/lib/generated/prisma/client";
 import { stripe } from "@/lib/stripe/client";
 import { canTransitionPayment } from "./state-machine";
+import { cancelOtherOpenPaymentsIfSettled } from "./actions";
 
 type TxClient = Prisma.TransactionClient;
 
@@ -99,6 +100,7 @@ async function handlePaymentIntentSucceeded(
       receiptUrl: charge?.receiptUrl ?? null,
     },
   });
+  await cancelOtherOpenPaymentsIfSettled(tx, payment.orderId, payment.id);
 }
 
 async function handlePaymentIntentFailed(tx: TxClient, intent: Stripe.PaymentIntent): Promise<void> {

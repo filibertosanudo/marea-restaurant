@@ -7,6 +7,7 @@ import { STAFF_ROLES, ADMIN_ROLES } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
 import { getNextStatus, isCancellable } from "@/lib/orders/state-machine";
 import { cancelOpenPayments, markPaymentSucceeded } from "@/lib/payments/actions";
+import { computePaymentSummary } from "@/lib/payments/summary";
 import { IllegalPaymentTransitionError } from "@/lib/payments/state-machine";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
@@ -219,12 +220,24 @@ export async function collectCashPaymentAction(orderId: string): Promise<BoardAc
       // their own side, leaving a cancelled order "paid" (or vice versa).
       if (!(await lockOrderForUpdate(tx, business.id, orderId))) return { error: "not_found" } as const;
 
-      const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+      const order = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { payments: { include: { refunds: true } } },
+      });
       if (order.status === "CANCELLED") return { error: "order_cancelled" } as const;
 
-      const payment = await tx.payment.findFirst({
-        where: { orderId, businessId: business.id, provider: "CASH_REGISTER", status: "PENDING" },
-      });
+      // Closes the other half of the double-charge hole: a card payment on
+      // this same order can have already succeeded (webhook landed) while
+      // the cash-register row that createOrderFromCart always creates is
+      // still sitting PENDING — collecting it too would double the
+      // recorded total for an order that's already fully paid.
+      if (computePaymentSummary(order.payments, order.total).isSettled) {
+        return { error: "already_settled" } as const;
+      }
+
+      const payment = order.payments.find(
+        (p) => p.provider === "CASH_REGISTER" && p.status === "PENDING"
+      );
       if (!payment) return { error: "not_found" } as const;
 
       await markPaymentSucceeded(tx, payment, session.user.id);
