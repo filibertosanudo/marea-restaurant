@@ -5,10 +5,14 @@ import { computePaymentSummary } from "./summary";
 
 type TxClient = Prisma.TransactionClient;
 
-/** Cancels every still-open payment for an order (PENDING, and anything mid-flight — PROCESSING, REQUIRES_ACTION), called when the order itself is cancelled. */
-export async function cancelOpenPayments(tx: TxClient, orderId: string): Promise<void> {
+/** Cancels every still-open payment for an order (PENDING, and anything mid-flight — PROCESSING, REQUIRES_ACTION). `exceptPaymentId` excludes the payment that just succeeded and triggered the cancellation, so it doesn't try to cancel itself. */
+export async function cancelOpenPayments(tx: TxClient, orderId: string, exceptPaymentId?: string): Promise<void> {
   await tx.payment.updateMany({
-    where: { orderId, status: { in: CANCELLABLE_PAYMENT_STATUSES } },
+    where: {
+      orderId,
+      status: { in: CANCELLABLE_PAYMENT_STATUSES },
+      ...(exceptPaymentId ? { id: { not: exceptPaymentId } } : {}),
+    },
     data: { status: "CANCELLED" },
   });
 }
@@ -21,12 +25,23 @@ export async function cancelOpenPayments(tx: TxClient, orderId: string): Promise
  * webhook would collect again. Cancels by order total, not by counting
  * payments, since a split cash+card order can still have a third open
  * attempt that's genuinely no longer needed once the first two cover it.
+ *
+ * Locks the Order row first — the same resource collectCashPaymentAction's
+ * own lockOrderForUpdate locks — so this settlement check itself can't
+ * interleave with a concurrent caller's (a racing webhook delivery, a
+ * second collect) read of the same not-yet-settled payments. This doesn't
+ * cover every interleaving on its own (each caller's own write to the
+ * payment it just succeeded happens before this lock is taken), but it
+ * closes the specific race two settlement checks racing each other would
+ * otherwise hit.
  */
 export async function cancelOtherOpenPaymentsIfSettled(
   tx: TxClient,
   orderId: string,
   keepPaymentId: string
 ): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+
   const order = await tx.order.findUniqueOrThrow({
     where: { id: orderId },
     select: {
@@ -36,10 +51,7 @@ export async function cancelOtherOpenPaymentsIfSettled(
   });
   if (!computePaymentSummary(order.payments, order.total).isSettled) return;
 
-  await tx.payment.updateMany({
-    where: { orderId, id: { not: keepPaymentId }, status: { in: CANCELLABLE_PAYMENT_STATUSES } },
-    data: { status: "CANCELLED" },
-  });
+  await cancelOpenPayments(tx, orderId, keepPaymentId);
 }
 
 /** Marks a payment SUCCEEDED — the cash-register collection path. Validates the transition first, never applies it silently, and closes out any other open payment the order no longer needs. */
