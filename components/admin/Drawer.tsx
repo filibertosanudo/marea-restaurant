@@ -29,9 +29,15 @@ export function Drawer({
   children: ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // Whatever had focus before the drawer opened — almost always the board
+  // badge that triggered it. Restored on close so a keyboard user lands
+  // back where they were instead of at the top of the document, which is
+  // where focus goes by default once the panel it was trapped in unmounts.
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -55,7 +61,10 @@ export function Drawer({
       }
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      previouslyFocusedRef.current?.focus();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
