@@ -8,6 +8,7 @@ import { advanceOrderStatusAction, collectCashPaymentAction } from "@/lib/orders
 import { getNextStatus } from "@/lib/orders/state-machine";
 import { AgingIndicator } from "./AgingIndicator";
 import { AllergyIcon } from "./icons";
+import type { PaymentReading } from "@/lib/orders/dto";
 
 /**
  * The board's two surfaces are the same data, read from two different
@@ -83,6 +84,24 @@ const SCALE = {
     cancelLink: "min-h-[36px] text-[12px]",
   },
 } as const;
+
+// bg-border/16 + text-on-surface-muted is the same neutral pair
+// status-badge-neutral already uses elsewhere in the panel — reused here for
+// NONE (a cancelled order that was never paid) instead of inventing a
+// fifth color for a reading that isn't really an alert.
+const READING_STYLE: Record<PaymentReading, string> = {
+  DUE: "bg-warning/12 text-warning",
+  PAID: "bg-success/12 text-success",
+  REFUNDED: "bg-info/12 text-info",
+  NONE: "bg-border/16 text-on-surface-muted",
+};
+
+const READING_LABEL_KEY: Record<PaymentReading, keyof AdminDictionary["orders"]> = {
+  DUE: "paymentPending",
+  PAID: "paymentPaid",
+  REFUNDED: "paymentRefunded",
+  NONE: "paymentNone",
+};
 
 export function OrderCard({
   order,
@@ -177,11 +196,9 @@ export function OrderCard({
           type="button"
           onClick={() => onViewPayment(order)}
           aria-label={dict.viewPayment}
-          className={`rounded-sm font-semibold underline-offset-2 transition-[opacity,text-decoration] hover:underline active:opacity-60 ${s.paymentBadge} ${
-            order.paymentDue ? "bg-warning/12 text-warning" : "bg-success/12 text-success"
-          }`}
+          className={`rounded-sm font-semibold underline-offset-2 transition-[opacity,text-decoration] hover:underline active:opacity-60 ${s.paymentBadge} ${READING_STYLE[order.paymentReading]}`}
         >
-          {order.paymentDue ? dict.paymentPending : dict.paymentPaid}
+          {dict[READING_LABEL_KEY[order.paymentReading]]}
         </button>
         <span className={`font-semibold tabular-nums text-on-surface-muted ${s.price}`}>
           {formatMoney(order.total, order.currency, lang)}

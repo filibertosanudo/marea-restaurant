@@ -1,5 +1,5 @@
 import { decimalToString } from "@/lib/dto/money";
-import { computePaymentSummary } from "@/lib/payments/summary";
+import { computePaymentSummary, type PaymentSummary } from "@/lib/payments/summary";
 import { Prisma } from "@/lib/generated/prisma/client";
 import type {
   Order,
@@ -54,6 +54,23 @@ export function toTrackedOrderDTO(order: RawOrder): TrackedOrderDTO {
   };
 }
 
+/**
+ * The board's three honest readings of "what does this order owe" — never
+ * just two. A due/paid boolean has no room for "money already came back",
+ * so a refunded order fell back to reading as "due" (paymentStatus wasn't
+ * literally SUCCEEDED) on a screen built to be read at a glance from across
+ * the kitchen. NONE covers a cancelled order that was never paid at all —
+ * neither "due" (nothing to collect, cancelling already closed its
+ * payments) nor "paid" (no money actually moved).
+ */
+export type PaymentReading = "DUE" | "PAID" | "REFUNDED" | "NONE";
+
+function derivePaymentReading(orderStatus: Order["status"], summary: PaymentSummary): PaymentReading {
+  if (summary.refundedTotal.gt(0)) return "REFUNDED";
+  if (summary.isSettled) return "PAID";
+  return orderStatus === "CANCELLED" ? "NONE" : "DUE";
+}
+
 export type BoardOrderDTO = {
   id: string;
   orderNumber: string;
@@ -64,8 +81,7 @@ export type BoardOrderDTO = {
   placedAt: string;
   total: string;
   currency: string;
-  /** Sum of SUCCEEDED payments covers the order total — never one payment's own status. */
-  paymentDue: boolean;
+  paymentReading: PaymentReading;
   /** An open (PENDING) cash-register payment exists on this order and it isn't already settled — the one condition the board's "Cobrar" button needs. */
   canCollectCash: boolean;
   items: {
@@ -95,7 +111,7 @@ export function toBoardOrderDTO(order: RawBoardOrder): BoardOrderDTO {
     placedAt: order.placedAt.toISOString(),
     total: decimalToString(order.total) ?? "0.00",
     currency: order.currency,
-    paymentDue: !summary.isSettled,
+    paymentReading: derivePaymentReading(order.status, summary),
     canCollectCash:
       !summary.isSettled && order.payments.some((p) => p.provider === "CASH_REGISTER" && p.status === "PENDING"),
     items: order.items.map((item) => ({

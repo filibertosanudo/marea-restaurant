@@ -143,6 +143,8 @@ export const es = {
       takeaway: "Para llevar",
       paymentPending: "Pendiente de cobro",
       paymentPaid: "Pagado",
+      paymentRefunded: "Reembolsado",
+      paymentNone: "Nada por cobrar",
       viewPayment: "Ver detalle de pago",
       advanceFromPending: "Comenzar preparación",
       advanceFromPreparing: "Marcar listo",

@@ -141,6 +141,8 @@ export const en = {
       takeaway: "Takeaway",
       paymentPending: "Payment due",
       paymentPaid: "Paid",
+      paymentRefunded: "Refunded",
+      paymentNone: "Nothing due",
       viewPayment: "View payment details",
       advanceFromPending: "Start preparing",
       advanceFromPreparing: "Mark ready",
