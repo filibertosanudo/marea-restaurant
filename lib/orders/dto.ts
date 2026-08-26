@@ -64,8 +64,10 @@ export type BoardOrderDTO = {
   placedAt: string;
   total: string;
   currency: string;
-  paymentStatus: Payment["status"] | null;
-  paymentProvider: Payment["provider"] | null;
+  /** Sum of SUCCEEDED payments covers the order total — never one payment's own status. */
+  paymentDue: boolean;
+  /** An open (PENDING) cash-register payment exists on this order and it isn't already settled — the one condition the board's "Cobrar" button needs. */
+  canCollectCash: boolean;
   items: {
     id: string;
     name: string;
@@ -78,11 +80,11 @@ export type BoardOrderDTO = {
 type RawBoardOrder = Order & {
   table: RestaurantTable | null;
   items: (OrderItem & { modifiers: OrderItemModifier[] })[];
-  payments: Payment[];
+  payments: (Payment & { refunds: Refund[] })[];
 };
 
 export function toBoardOrderDTO(order: RawBoardOrder): BoardOrderDTO {
-  const latestPayment = order.payments[0] ?? null;
+  const summary = computePaymentSummary(order.payments, order.total);
   return {
     id: order.id,
     orderNumber: order.orderNumber,
@@ -93,8 +95,9 @@ export function toBoardOrderDTO(order: RawBoardOrder): BoardOrderDTO {
     placedAt: order.placedAt.toISOString(),
     total: decimalToString(order.total) ?? "0.00",
     currency: order.currency,
-    paymentStatus: latestPayment?.status ?? null,
-    paymentProvider: latestPayment?.provider ?? null,
+    paymentDue: !summary.isSettled,
+    canCollectCash:
+      !summary.isSettled && order.payments.some((p) => p.provider === "CASH_REGISTER" && p.status === "PENDING"),
     items: order.items.map((item) => ({
       id: item.id,
       name: item.nameSnapshot,

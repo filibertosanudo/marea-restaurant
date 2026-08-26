@@ -5,7 +5,11 @@ import type { OrderType, Prisma } from "@/lib/generated/prisma/client";
 const BOARD_INCLUDE = {
   table: true,
   items: { include: { modifiers: true }, orderBy: { createdAt: "asc" as const } },
-  payments: { orderBy: { createdAt: "desc" as const }, take: 1 },
+  // Every payment attempt, not just the latest — the card deciding whether
+  // to show "Cobrar" reads computePaymentSummary over all of them (a card
+  // attempt that failed, or that the guest abandoned for cash, must not
+  // hide a still-open cash-register row just because it's not the newest).
+  payments: { orderBy: { createdAt: "desc" as const }, include: { refunds: true } },
 } satisfies Prisma.OrderInclude;
 
 // Live statuses (PENDING/PREPARING/READY) show regardless of age — an order

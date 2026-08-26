@@ -112,13 +112,6 @@ export function OrderCard({
 
   const nextStatus = getNextStatus(order.status);
   const isDelivered = order.status === "DELIVERED";
-  // Anything short of SUCCEEDED reads as "not paid yet" — before Stripe,
-  // PENDING was the only non-paid status a cash order could hold, but a
-  // card attempt can also sit at PROCESSING/REQUIRES_ACTION/FAILED, and
-  // all three used to render this badge green ("Paid") since only PENDING
-  // was checked. REFUNDED/PARTIALLY_REFUNDED aren't reachable yet (Fase 5
-  // isn't wired), so they aren't given their own badge here.
-  const paymentDue = order.paymentStatus !== "SUCCEEDED";
 
   function advance() {
     startTransition(async () => {
@@ -185,10 +178,10 @@ export function OrderCard({
           onClick={() => onViewPayment(order)}
           aria-label={dict.viewPayment}
           className={`rounded-sm font-semibold underline-offset-2 transition-[opacity,text-decoration] hover:underline active:opacity-60 ${s.paymentBadge} ${
-            paymentDue ? "bg-warning/12 text-warning" : "bg-success/12 text-success"
+            order.paymentDue ? "bg-warning/12 text-warning" : "bg-success/12 text-success"
           }`}
         >
-          {paymentDue ? dict.paymentPending : dict.paymentPaid}
+          {order.paymentDue ? dict.paymentPending : dict.paymentPaid}
         </button>
         <span className={`font-semibold tabular-nums text-on-surface-muted ${s.price}`}>
           {formatMoney(order.total, order.currency, lang)}
@@ -215,7 +208,7 @@ export function OrderCard({
               gloved hands, not clicked at a desk, so it steps outside the
               admin panel's usual dense button padding (button-primary-admin)
               while keeping the same rounded-sm/color tokens. */}
-          {paymentDue && order.paymentProvider === "CASH_REGISTER" && (
+          {order.canCollectCash && (
             <button
               type="button"
               onClick={collectCash}
