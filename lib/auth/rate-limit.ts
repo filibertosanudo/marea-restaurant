@@ -39,15 +39,24 @@ export async function recordLoginAttempt(
   await prisma.loginAttempt.create({
     data: { email: normalizeEmail(email), ipAddress, succeeded },
   });
-  // A correct password proves the account owner is behind the wheel, so a
-  // few earlier typos (from them or a colleague on the same shared login)
-  // shouldn't still count against them for the rest of the 15-minute
-  // window. Cleared by email only, regardless of which IP they're on now.
-  if (succeeded) {
-    await prisma.loginAttempt.deleteMany({
-      where: { email: normalizeEmail(email), succeeded: false },
-    });
-  }
+
+  // One combined cleanup instead of two separate round-trips: a correct
+  // password proves the account owner is behind the wheel, so a few earlier
+  // typos (from them or a colleague on the same shared login) shouldn't
+  // still count against them for the rest of the window — cleared by email
+  // only, regardless of which IP they're on now. Separately, anything
+  // already outside the window is dead weight regardless of whose email it
+  // is — isRateLimited never reads past `since` anyway, so leaving it is
+  // pure growth with no purpose (an email that never once succeeds, a
+  // typo'd address, a spray attack, otherwise only ever grows this table).
+  await prisma.loginAttempt.deleteMany({
+    where: {
+      OR: [
+        ...(succeeded ? [{ email: normalizeEmail(email), succeeded: false }] : []),
+        { createdAt: { lt: new Date(Date.now() - WINDOW_MS) } },
+      ],
+    },
+  });
 }
 
 /**

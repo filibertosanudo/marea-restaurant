@@ -34,3 +34,15 @@ export const STAFF_ROLES: UserRole[] = [
   UserRole.SUPER_ADMIN,
 ];
 export const ADMIN_ROLES: UserRole[] = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN];
+
+/**
+ * The single BUSINESS_ADMIN+ check pages use to decide what to render for
+ * the current session (cancel a pedido, refund a payment, edit the menu —
+ * every "the matrix says only an admin" UI gate) — one allowlist instead of
+ * each page independently writing `role !== STAFF`, which reads as an
+ * exclusion (permits everything that isn't STAFF) rather than the
+ * allowlist the permission matrix actually specifies.
+ */
+export function isAdminRole(role: UserRole): boolean {
+  return ADMIN_ROLES.includes(role);
+}

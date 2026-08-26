@@ -6,8 +6,32 @@ import { requireRole, ForbiddenError } from "@/lib/auth/permissions";
 import { STAFF_ROLES, ADMIN_ROLES } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
 import { getNextStatus, isCancellable } from "@/lib/orders/state-machine";
+import { cancelOpenPayments, markPaymentSucceeded } from "@/lib/payments/actions";
+import { IllegalPaymentTransitionError } from "@/lib/payments/state-machine";
+import type { Prisma } from "@/lib/generated/prisma/client";
 
 export type BoardActionState = { error?: string } | undefined;
+
+/**
+ * Lock an Order row before reading its status, shared by every board action
+ * that needs to serialize with the others (advance, cancel, collect cash).
+ * Without this, two overlapping calls on the same order — a double-tap
+ * before the UI re-renders, two devices watching the same board, a collect
+ * racing a cancel — both read the same pre-transaction state and each
+ * commit their own side. FOR UPDATE makes whichever call arrives second
+ * block until the first commits, then re-read a status that's already
+ * moved on. Returns whether the row was found (and thus locked).
+ */
+async function lockOrderForUpdate(
+  tx: Prisma.TransactionClient,
+  businessId: string,
+  orderId: string
+): Promise<boolean> {
+  const locked = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id FROM "Order" WHERE id = ${orderId} AND "businessId" = ${businessId} FOR UPDATE
+  `;
+  return Boolean(locked[0]);
+}
 
 /**
  * The board's one-tap "advance" button. STAFF and up — per
@@ -22,17 +46,7 @@ export async function advanceOrderStatusAction(orderId: string): Promise<BoardAc
   const business = await getCurrentBusiness();
 
   const result = await prisma.$transaction(async (tx) => {
-    // Lock the Order row before reading its status. Without this, two
-    // overlapping taps on the one-tap advance button (a double-tap before
-    // the UI re-renders, or two devices watching the same board) both read
-    // the same pre-transaction status, both compute the same nextStatus,
-    // and both commit — producing two OrderStatusEvent rows for one real
-    // transition. FOR UPDATE makes the second call block until the first
-    // commits, then re-read a status that's already moved on.
-    const locked = await tx.$queryRaw<{ id: string }[]>`
-      SELECT id FROM "Order" WHERE id = ${orderId} AND "businessId" = ${business.id} FOR UPDATE
-    `;
-    if (!locked[0]) return { error: "not_found" } as const;
+    if (!(await lockOrderForUpdate(tx, business.id, orderId))) return { error: "not_found" } as const;
 
     const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
     const nextStatus = getNextStatus(order.status);
@@ -106,21 +120,58 @@ export async function cancelOrderAction(
   if (!trimmedReason) return { error: "reason_required" };
 
   const result = await prisma.$transaction(async (tx) => {
-    // Same lock-before-read reasoning as advanceOrderStatusAction — two
-    // concurrent cancellations of the same order (two admin tabs) must not
-    // both commit a CANCELLED transition with possibly different reasons.
-    const locked = await tx.$queryRaw<{ id: string }[]>`
-      SELECT id FROM "Order" WHERE id = ${orderId} AND "businessId" = ${business.id} FOR UPDATE
-    `;
-    if (!locked[0]) return { error: "not_found" } as const;
+    if (!(await lockOrderForUpdate(tx, business.id, orderId))) return { error: "not_found" } as const;
 
-    const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+    const order = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      include: { items: { select: { menuItemId: true, quantity: true } } },
+    });
     if (!isCancellable(order.status)) return { error: "not_cancellable" } as const;
 
     await tx.order.update({
       where: { id: order.id },
       data: { status: "CANCELLED", cancelledAt: new Date(), cancellationReason: trimmedReason },
     });
+
+    // A cancelled order must not stay "owed" forever — a PENDING payment
+    // (cash-register or otherwise) that survives the cancellation would let
+    // collectCashPaymentAction still collect it, and would never let a shift
+    // cash-out reconcile since it'd sit as outstanding for an order that no
+    // longer exists in any real sense.
+    await cancelOpenPayments(tx, order.id);
+
+    // Give back whatever this order's checkout decremented (see
+    // createOrderFromCart's stock check), for dishes that still track
+    // inventory today. Without this, every cancellation of a tracked dish
+    // permanently shrinks real stock nobody actually used — and if the
+    // original decrement had crossed zero, the dish stays hidden from the
+    // menu forever with no path back short of a manual DB edit.
+    const quantityByMenuItem = new Map<string, number>();
+    for (const item of order.items) {
+      if (!item.menuItemId) continue;
+      quantityByMenuItem.set(
+        item.menuItemId,
+        (quantityByMenuItem.get(item.menuItemId) ?? 0) + item.quantity
+      );
+    }
+    for (const [menuItemId, quantity] of quantityByMenuItem) {
+      const restocked = await tx.menuItem.updateMany({
+        where: { id: menuItemId, businessId: business.id, trackInventory: true },
+        data: { stockQuantity: { increment: quantity } },
+      });
+      if (restocked.count > 0) {
+        // Symmetric with the decrement's auto-hide: stock crossing back
+        // above zero auto-restores visibility too. A manual re-disable an
+        // admin applied for an unrelated reason after the auto-hide is
+        // indistinguishable from the auto-hide itself once isAvailable is
+        // just a boolean, so this can't tell the two apart — same
+        // limitation the decrement path already has in the other direction.
+        await tx.menuItem.updateMany({
+          where: { id: menuItemId, businessId: business.id, stockQuantity: { gt: 0 } },
+          data: { isAvailable: true },
+        });
+      }
+    }
 
     await tx.orderStatusEvent.create({
       data: {
@@ -158,20 +209,38 @@ export async function collectCashPaymentAction(orderId: string): Promise<BoardAc
   const session = await requireRole(...STAFF_ROLES);
   const business = await getCurrentBusiness();
 
-  const payment = await prisma.payment.findFirst({
-    where: {
-      orderId,
-      businessId: business.id,
-      provider: "CASH_REGISTER",
-      status: "PENDING",
-    },
-  });
-  if (!payment) return { error: "not_found" };
+  let result;
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      // Locking the same Order row cancelOrderAction locks — not because
+      // this action writes to Order, but because it's the one resource
+      // that serializes the two: without it, a collect and a concurrent
+      // cancel could both read a pre-transition state and each commit
+      // their own side, leaving a cancelled order "paid" (or vice versa).
+      if (!(await lockOrderForUpdate(tx, business.id, orderId))) return { error: "not_found" } as const;
 
-  await prisma.payment.update({
-    where: { id: payment.id },
-    data: { status: "SUCCEEDED", paidAt: new Date(), collectedByUserId: session.user.id },
-  });
+      const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+      if (order.status === "CANCELLED") return { error: "order_cancelled" } as const;
 
+      const payment = await tx.payment.findFirst({
+        where: { orderId, businessId: business.id, provider: "CASH_REGISTER", status: "PENDING" },
+      });
+      if (!payment) return { error: "not_found" } as const;
+
+      await markPaymentSucceeded(tx, payment, session.user.id);
+
+      return undefined;
+    });
+  } catch (err) {
+    // markPaymentSucceeded's assertPaymentTransition can't fail from this
+    // call site today (the findFirst above only ever returns a PENDING
+    // payment), but it will once a second caller lands — a Stripe webhook
+    // racing this same collect. Fail as a normal board error, not a raw
+    // uncaught 500.
+    if (err instanceof IllegalPaymentTransitionError) return { error: "invalid_transition" };
+    throw err;
+  }
+
+  if (result?.error) return result;
   revalidatePath("/admin/pedidos");
 }

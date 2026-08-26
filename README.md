@@ -57,6 +57,47 @@ npm run db:studio     # visual inspector
 
 Needs `DATABASE_URL` and `DIRECT_URL` in `.env` (see `.env.example`). For local dev without Supabase, any Postgres works — point both vars at the same instance.
 
+## Payments (Stripe)
+
+Test mode only. Card payments and cash-register collection both exist; a
+guest sees the card option only when `Business.acceptsOnlinePayment` is
+true. The webhook (`app/api/webhooks/stripe/route.ts`) is the only place a
+payment is ever marked `SUCCEEDED` — the client returning from Stripe
+proves nothing, it's a URL.
+
+Env vars (see `.env.example`): `STRIPE_SECRET_KEY`,
+`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`. Get test-mode
+keys from the [Stripe Dashboard](https://dashboard.stripe.com/test/apikeys).
+
+To receive webhooks locally, forward them with the
+[Stripe CLI](https://docs.stripe.com/stripe-cli):
+
+```bash
+stripe login
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+
+`stripe listen` prints a `whsec_...` value on startup — put that in
+`STRIPE_WEBHOOK_SECRET` (it's different from the Dashboard's webhook
+secret; the CLI mints its own for local forwarding). Leave `stripe listen`
+running in a second terminal alongside `npm run dev`.
+
+Test cards ([full list](https://docs.stripe.com/testing)):
+
+| Card | Result |
+|---|---|
+| `4242 4242 4242 4242` | Succeeds immediately |
+| `4000 0025 0000 3155` | Requires 3D Secure — Stripe's own challenge modal appears mid-confirm |
+| `4000 0000 0000 9995` | Declined (insufficient funds) |
+
+Any future expiry date, any 3-digit CVC, any postal code.
+
+To replay an event (checking that a redelivery doesn't double-apply):
+
+```bash
+stripe trigger payment_intent.succeeded
+```
+
 ## Admin panel
 
 `/admin` — staff-only, no public signup. Auth.js (NextAuth v5) with a Credentials provider, argon2id password hashing, JWT sessions.

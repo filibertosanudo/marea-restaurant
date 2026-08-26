@@ -8,7 +8,10 @@ import type { Lang } from "@/lib/i18n/lang";
 
 export type CheckoutState =
   | { error: "invalid_input"; fieldErrors: Record<string, string> }
-  | { error: "empty_cart" | "item_unavailable" | "modifier_unavailable"; dishName?: string }
+  | {
+      error: "empty_cart" | "item_unavailable" | "modifier_unavailable" | "modifier_invalid";
+      dishName?: string;
+    }
   | undefined;
 
 export async function createOrderAction(

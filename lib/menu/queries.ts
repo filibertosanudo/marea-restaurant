@@ -139,7 +139,14 @@ export async function getPublicMenuRaw(businessId: string) {
     include: {
       translations: true,
       items: {
-        where: { isAvailable: true, deletedAt: null },
+        // A tracked dish at stockQuantity 0 is out, same as isAvailable
+        // false, even though nothing flips its isAvailable flag until the
+        // next checkout's decrement crosses zero (see createOrderFromCart).
+        where: {
+          isAvailable: true,
+          deletedAt: null,
+          OR: [{ trackInventory: false }, { stockQuantity: { gt: 0 } }],
+        },
         orderBy: { sortOrder: "asc" },
         include: {
           translations: true,

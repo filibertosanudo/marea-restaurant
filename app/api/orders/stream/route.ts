@@ -5,6 +5,12 @@ import { getCurrentBusiness } from "@/lib/business";
 import { prisma } from "@/lib/prisma";
 
 const POLL_INTERVAL_MS = 2000;
+// A kitchen display left open for a shift would otherwise poll forever — 2
+// queries/2s for 12h is ~43k queries a day, and on Vercel it's one
+// continuously-billed invocation per open tab. Closing cleanly here costs
+// nothing: EventSource reconnects on its own, and useEventStream's backoff
+// treats this exactly like any other dropped connection.
+const MAX_LIFETIME_MS = 75_000;
 
 type Scope = { kind: "board"; businessId: string } | { kind: "order"; orderId: string };
 
@@ -94,7 +100,23 @@ export async function GET(request: NextRequest) {
         lastSignature = null;
       }
 
+      const deadline = Date.now() + MAX_LIFETIME_MS;
+
       while (!closed) {
+        if (Date.now() >= deadline) {
+          // A plain close() here would look identical to a real drop to the
+          // client: EventSource fires the same "error" event for any
+          // server-initiated close, so useEventStream would flip to
+          // "offline" every ~75s on a healthy connection. Telling the
+          // client first lets it close and reconnect itself instead — a
+          // client-initiated close() never fires "error" — so the scheduled
+          // handoff never shows as an outage on a kitchen display that's
+          // read at a glance, not debugged.
+          controller.enqueue(encoder.encode(`event: reconnect\ndata: ${Date.now()}\n\n`));
+          close();
+          break;
+        }
+
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
         if (closed) break;
 

@@ -4,9 +4,11 @@ import { Prisma } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
 import { getCartSessionToken } from "@/lib/cart/cookie";
 import { pickTranslation } from "@/lib/i18n/translations";
+import { toPublicModifierGroup } from "@/lib/menu/public-menu";
+import { validateModifierSelection } from "@/lib/cart/modifier-validation";
 
 export class CheckoutError extends Error {
-  code: "empty_cart" | "item_unavailable" | "modifier_unavailable";
+  code: "empty_cart" | "item_unavailable" | "modifier_unavailable" | "modifier_invalid";
   dishName?: string;
   constructor(code: CheckoutError["code"], dishName?: string) {
     super(code);
@@ -56,7 +58,28 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
         items: {
           include: {
             menuItem: {
-              include: { translations: true, category: true },
+              include: {
+                translations: true,
+                category: true,
+                // Needed to re-run validateModifierSelection below — the
+                // group's minSelections/maxSelections/isRequired can change
+                // after an item was already sitting in someone's cart.
+                modifierGroups: {
+                  orderBy: { sortOrder: "asc" },
+                  include: {
+                    group: {
+                      include: {
+                        translations: true,
+                        options: {
+                          where: { deletedAt: null },
+                          orderBy: { sortOrder: "asc" },
+                          include: { translations: true },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
             modifiers: {
               include: { option: { include: { translations: true } } },
@@ -88,6 +111,18 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
         throw new CheckoutError("modifier_unavailable", dishName);
       }
 
+      // Same rule addToCartAction enforces (minSelections/maxSelections/
+      // isRequired), re-run here because a group's requirements can change
+      // while the item is sitting in an open cart — without this, a cart
+      // built before a group became required checks out with the group
+      // simply missing.
+      const publicGroups = item.menuItem.modifierGroups.map((mg) => toPublicModifierGroup(mg.group, lang));
+      const selectedOptionIds = item.modifiers.map((m) => m.option.id);
+      const modifierValidation = validateModifierSelection(publicGroups, selectedOptionIds);
+      if (!modifierValidation.ok) {
+        throw new CheckoutError("modifier_invalid", dishName);
+      }
+
       const unitPrice = item.modifiers
         .reduce((sum, m) => sum.add(m.option.priceDelta), item.menuItem.basePrice)
         .toDecimalPlaces(2);
@@ -107,6 +142,41 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
         })),
       };
     });
+
+    // Stock check + decrement, only for dishes that track inventory
+    // (trackInventory false is the common case and ignores stockQuantity
+    // entirely, per the schema). Aggregated per menu item first — a cart
+    // can hold two lines for the same dish with different modifiers, and
+    // stock belongs to the dish, not the line.
+    const stockByMenuItem = new Map<string, { quantity: number; dishName: string }>();
+    for (const item of cart.items) {
+      if (!item.menuItem.trackInventory) continue;
+      const dishName = pickTranslation(item.menuItem.translations, lang)?.name ?? item.menuItem.slug;
+      const existing = stockByMenuItem.get(item.menuItem.id);
+      stockByMenuItem.set(item.menuItem.id, {
+        quantity: (existing?.quantity ?? 0) + item.quantity,
+        dishName,
+      });
+    }
+    for (const [menuItemId, { quantity, dishName }] of stockByMenuItem) {
+      // The `stockQuantity: { gte: quantity }` guard makes this an atomic
+      // check-and-decrement: if a concurrent checkout already ate the stock
+      // between our read of the cart and here, this simply matches zero
+      // rows instead of taking stock negative.
+      const decremented = await tx.menuItem.updateMany({
+        where: { id: menuItemId, businessId, stockQuantity: { gte: quantity } },
+        data: { stockQuantity: { decrement: quantity } },
+      });
+      if (decremented.count === 0) {
+        throw new CheckoutError("item_unavailable", dishName);
+      }
+    }
+    if (stockByMenuItem.size > 0) {
+      await tx.menuItem.updateMany({
+        where: { id: { in: [...stockByMenuItem.keys()] }, businessId, stockQuantity: { lte: 0 } },
+        data: { isAvailable: false },
+      });
+    }
 
     const subtotal = lineInputs
       .reduce((sum, l) => sum.add(l.lineTotal), new Prisma.Decimal(0))
@@ -150,6 +220,10 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
         statusEvents: {
           create: { toStatus: "PENDING" },
         },
+        // Creates the first Payment row at PENDING — outside lib/payments/
+        // on purpose: that module owns *transitions* (an existing payment
+        // moving from one status to another), and a brand-new row has no
+        // prior state to validate against.
         payments: {
           create: {
             businessId,
