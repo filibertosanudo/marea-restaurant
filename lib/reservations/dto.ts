@@ -11,6 +11,18 @@ import type { Reservation, ReservationStatus, RestaurantTable } from "@/lib/gene
  */
 export const MIN_CANCEL_LEAD_MINUTES = 120;
 
+/**
+ * The other half of the same lead-time question, at the opposite end of a
+ * reservation's life: a slot that starts in the next few minutes isn't
+ * bookable online either — the kitchen and the host stand need some
+ * runway, and a restaurant that lets a guest book for "ten minutes from
+ * now" while requiring two hours' notice to cancel has the asymmetry
+ * backwards. Same caveat as MIN_CANCEL_LEAD_MINUTES: a business decision,
+ * not a derived constant — thirty minutes is a reasonable default for
+ * booking specifically, unrelated to cancellation's own two-hour figure.
+ */
+export const MIN_BOOKING_LEAD_MINUTES = 30;
+
 const CANCELLABLE_STATUSES: ReservationStatus[] = ["PENDING", "CONFIRMED"];
 
 /** Pure so it's trivial to reason about from the definition of done ("cancelarla si todavía falta tiempo suficiente") without spinning up a request. */

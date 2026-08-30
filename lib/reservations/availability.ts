@@ -63,6 +63,8 @@ export type AvailabilityInput = {
   now: Date;
   /** Minutes between candidate slot starts. Defaults to 30, matching the granularity the landing's old hardcoded TIME_SLOTS used. */
   stepMinutes?: number;
+  /** How far past `now` a slot must start to be bookable — a business rule (MIN_BOOKING_LEAD_MINUTES), not something this pure module decides on its own. Defaults to 0 (bare "must be in the future") so existing callers/tests that don't care about lead time are unaffected. */
+  minLeadMinutes?: number;
 };
 
 export type AvailableSlot = {
@@ -185,6 +187,7 @@ export function getAvailableSlots(input: AvailabilityInput): AvailableSlot[] {
   if (input.partySize < 1 || input.partySize > input.maxPartySize) return [];
 
   const step = input.stepMinutes ?? 30;
+  const earliestBookable = new Date(input.now.getTime() + (input.minLeadMinutes ?? 0) * 60_000);
   const dayOfWeek = new Date(Date.UTC(input.date.year, input.date.month - 1, input.date.day)).getUTCDay();
   const windows = input.openingHours.filter((h) => h.dayOfWeek === dayOfWeek && !h.isClosed);
 
@@ -195,7 +198,7 @@ export function getAvailableSlots(input: AvailabilityInput): AvailableSlot[] {
       const startsAt = localWallClockToUtc(input.date.year, input.date.month, input.date.day, minute, input.timezone);
       const endsAt = new Date(startsAt.getTime() + input.durationMinutes * 60_000);
 
-      if (startsAt <= input.now) continue;
+      if (startsAt <= earliestBookable) continue;
       if (isInsideClosure(startsAt, endsAt, input.closures)) continue;
 
       const tableId = findFreeTable(startsAt, endsAt, input.partySize, input.tables, input.existingReservations);

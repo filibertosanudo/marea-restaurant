@@ -15,7 +15,7 @@ import {
 } from "./queries";
 import { reservationSlotsQuerySchema, createReservationSchema, parseDateParam } from "./schemas";
 import { isExclusionConstraintError } from "./prisma-errors";
-import { canCancelReservation } from "./dto";
+import { canCancelReservation, MIN_BOOKING_LEAD_MINUTES } from "./dto";
 
 const CANCELLATION_REASON_BY_LOCALE: Record<string, string> = {
   en: "Cancelled by the guest",
@@ -73,6 +73,7 @@ async function loadAvailabilityForDay(business: Business, date: string, partySiz
     tables,
     existingReservations,
     now,
+    minLeadMinutes: MIN_BOOKING_LEAD_MINUTES,
   };
 }
 

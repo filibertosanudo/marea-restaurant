@@ -98,6 +98,20 @@ describe("getAvailableSlots", () => {
     expect(slots.find((s) => s.time === "13:30")).toBeDefined();
   });
 
+  it("excludes a slot that's in the future but inside minLeadMinutes", () => {
+    // now = 11:50 local; a 30-minute lead means nothing before 12:20 qualifies.
+    const slots = getAvailableSlots(
+      baseInput({ now: new Date("2026-02-27T18:50:00Z"), minLeadMinutes: 30 })
+    );
+    expect(slots.find((s) => s.time === "12:00")).toBeUndefined();
+    expect(slots.find((s) => s.time === "12:30")).toBeDefined();
+  });
+
+  it("defaults minLeadMinutes to 0 — only bare future matters when omitted", () => {
+    const slots = getAvailableSlots(baseInput({ now: new Date("2026-02-27T18:59:00Z") })); // 11:59 local
+    expect(slots.find((s) => s.time === "12:00")).toBeDefined();
+  });
+
   it("picks the smallest table that fits, leaving larger tables free", () => {
     const slots = getAvailableSlots(baseInput({ partySize: 2 }));
     expect(slots.every((s) => s.tableId === "t-small")).toBe(true);
