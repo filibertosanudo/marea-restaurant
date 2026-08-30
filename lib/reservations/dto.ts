@@ -96,6 +96,8 @@ export type AgendaReservationDTO = {
   partySize: number;
   /** "H:mm AM/PM", business-local — display only; the actual instant is `reservedFor` on the raw row, never re-derived from this string. */
   timeLabel: string;
+  /** The hour this slot falls in, as its own label ("12 PM") — a grouping key computed once here, so the client groups rows by hour without re-parsing timeLabel's localized string. */
+  hourLabel: string;
   status: ReservationStatus;
   tableId: string | null;
   tableLabel: string | null;
@@ -111,10 +113,15 @@ export function toAgendaReservationDTO(
   lang: string,
   now: Date
 ): AgendaReservationDTO {
-  const timeLabel = new Intl.DateTimeFormat(toIntlLocale(lang), {
+  const locale = toIntlLocale(lang);
+  const timeLabel = new Intl.DateTimeFormat(locale, {
     timeZone: timezone,
     hour: "numeric",
     minute: "2-digit",
+  }).format(reservation.reservedFor);
+  const hourLabel = new Intl.DateTimeFormat(locale, {
+    timeZone: timezone,
+    hour: "numeric",
   }).format(reservation.reservedFor);
 
   return {
@@ -122,6 +129,7 @@ export function toAgendaReservationDTO(
     guestName: reservation.guestName,
     partySize: reservation.partySize,
     timeLabel,
+    hourLabel,
     status: reservation.status,
     tableId: reservation.tableId,
     tableLabel: formatTableLabel(reservation.table),
