@@ -2,35 +2,29 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import type { ReservationDictionary } from "@/lib/i18n/dictionaries";
 import { cancelReservationByCodeAction } from "@/lib/reservations/actions";
-
-type CancelDictionary = {
-  cancelButton: string;
-  cancelConfirmTitle: string;
-  cancelConfirmBody: string;
-  cancelConfirmYes: string;
-  cancelConfirmNo: string;
-  cancelTooLateError: string;
-  cancelGenericError: string;
-};
 
 /**
  * confirmationCode is the only auth this page has — this component never
- * receives more than that string plus its own display copy, so there's
+ * receives more than that string plus the page's own dictionary, so there's
  * nothing here for a client-side inspector to learn beyond what the page
  * already rendered.
+ *
+ * Reuses ConfirmDialog (the same destructive-confirm pattern the admin
+ * panel's cancel-order flow uses) instead of a second hand-rolled dialog.
  */
 export function CancelReservationButton({
   confirmationCode,
   dict,
 }: {
   confirmationCode: string;
-  dict: CancelDictionary;
+  dict: ReservationDictionary;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [succeeded, setSucceeded] = useState(false);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -40,11 +34,20 @@ export function CancelReservationButton({
       const result = await cancelReservationByCodeAction(confirmationCode);
       if (result.ok) {
         setOpen(false);
+        setSucceeded(true);
+        // The page's own status badge and cancellation-reason line are the
+        // lasting record of this — refreshing brings the server-rendered
+        // reservation up to date, which also makes this component unmount
+        // (canCancel becomes false) once the new data lands.
         router.refresh();
         return;
       }
       setError(result.error === "too_late" ? dict.cancelTooLateError : dict.cancelGenericError);
     });
+  }
+
+  if (succeeded) {
+    return <p className="text-[13px] font-medium text-success">{dict.cancelSuccessBody}</p>;
   }
 
   return (
@@ -56,23 +59,21 @@ export function CancelReservationButton({
       >
         {dict.cancelButton}
       </button>
-      <Modal open={open} onClose={() => setOpen(false)} title={dict.cancelConfirmTitle}>
-        <p className="text-[14px] text-on-surface-muted">{dict.cancelConfirmBody}</p>
-        {error && <p className="mt-sm text-[13px] font-medium text-error">{error}</p>}
-        <div className="mt-lg flex justify-end gap-sm">
-          <Button type="button" variant="secondary" onClick={() => setOpen(false)} disabled={pending}>
-            {dict.cancelConfirmNo}
-          </Button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={pending}
-            className="inline-flex items-center justify-center rounded-full bg-error px-[28px] py-[14px] text-[15px] font-medium tracking-[0.01em] text-on-primary transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {dict.cancelConfirmYes}
-          </button>
-        </div>
-      </Modal>
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        onConfirm={handleConfirm}
+        title={dict.cancelConfirmTitle}
+        body={
+          <>
+            {dict.cancelConfirmBody}
+            {error && <span className="mt-sm block text-[13px] font-medium text-error">{error}</span>}
+          </>
+        }
+        confirmLabel={dict.cancelConfirmYes}
+        cancelLabel={dict.cancelConfirmNo}
+        pending={pending}
+      />
     </>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 
@@ -8,7 +9,7 @@ type ConfirmDialogProps = {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  body: string;
+  body: ReactNode;
   confirmLabel: string;
   cancelLabel: string;
   destructive?: boolean;

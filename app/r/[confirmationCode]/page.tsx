@@ -5,6 +5,7 @@ import { toReservationLookupDTO } from "@/lib/reservations/dto";
 import { getOrderLang } from "@/lib/i18n/cookie";
 import { getReservationDictionary } from "@/lib/i18n/dictionaries";
 import { CancelReservationButton } from "@/components/reservation/CancelReservationButton";
+import { ReservationStatusBadge } from "@/components/reservation/ReservationStatusBadge";
 import type { ReservationDictionary } from "@/lib/i18n/dictionaries";
 import type { ReservationStatus } from "@/lib/generated/prisma/client";
 
@@ -57,9 +58,7 @@ export default async function ReservationLookupPage({
       <div className="w-full max-w-[380px] rounded-lg bg-surface p-lg text-left">
         <div className="mb-sm flex items-center justify-between">
           <span className="text-[15px] font-semibold text-on-surface">{reservation.guestName}</span>
-          <span className="rounded-sm bg-surface-ocean px-sm py-[3px] text-[12px] font-semibold text-primary">
-            {dict[STATUS_LABEL_KEY[reservation.status]]}
-          </span>
+          <ReservationStatusBadge status={reservation.status} label={dict[STATUS_LABEL_KEY[reservation.status]]} />
         </div>
         <div className="flex flex-col gap-[4px] text-[13px] text-on-surface-muted">
           <span>{partyLabel}</span>
@@ -84,18 +83,7 @@ export default async function ReservationLookupPage({
 
       {reservation.canCancel && (
         <div className="mt-lg">
-          <CancelReservationButton
-            confirmationCode={reservation.confirmationCode}
-            dict={{
-              cancelButton: dict.cancelButton,
-              cancelConfirmTitle: dict.cancelConfirmTitle,
-              cancelConfirmBody: dict.cancelConfirmBody,
-              cancelConfirmYes: dict.cancelConfirmYes,
-              cancelConfirmNo: dict.cancelConfirmNo,
-              cancelTooLateError: dict.cancelTooLateError,
-              cancelGenericError: dict.cancelGenericError,
-            }}
-          />
+          <CancelReservationButton confirmationCode={reservation.confirmationCode} dict={dict} />
         </div>
       )}
     </div>
