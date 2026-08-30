@@ -38,6 +38,8 @@ export type ReservableTable = {
 };
 
 export type ExistingReservation = {
+  /** Optional — only needed by isTableFreeForRange, to exclude a reservation from colliding with its own row when checking a table reassignment for it. getAvailableSlots/findSlot never need it, since a not-yet-created reservation can't already be in this list. */
+  id?: string;
   tableId: string | null;
   reservedFor: Date;
   endsAt: Date;
@@ -175,6 +177,31 @@ function findFreeTable(
     if (!isTaken) return table.id;
   }
   return null;
+}
+
+/**
+ * Whether one specific table is free for [startsAt, endsAt) — the check a
+ * staff member's table reassignment needs, as opposed to findFreeTable's
+ * "pick the best table" for a brand-new booking. The same overlap rule
+ * either way (same BLOCKING_STATUSES, same rangesOverlap), so a
+ * reassignment can never be validated by a rule this module doesn't also
+ * use for creation — "ninguna disponibilidad se calcula dos veces" applies
+ * here too, not just to the guest-facing flow.
+ */
+export function isTableFreeForRange(
+  tableId: string,
+  startsAt: Date,
+  endsAt: Date,
+  existingReservations: ExistingReservation[],
+  excludeReservationId?: string
+): boolean {
+  return !existingReservations.some(
+    (r) =>
+      r.tableId === tableId &&
+      r.id !== excludeReservationId &&
+      BLOCKING_STATUSES.includes(r.status) &&
+      rangesOverlap(startsAt, endsAt, r.reservedFor, r.endsAt)
+  );
 }
 
 /**

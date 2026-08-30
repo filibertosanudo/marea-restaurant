@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAvailableSlots, findSlot, type AvailabilityInput } from "./availability";
+import { getAvailableSlots, findSlot, isTableFreeForRange, type AvailabilityInput } from "./availability";
 
 // America/Hermosillo is UTC-7 year-round (Sonora doesn't observe DST) — a
 // deterministic zone to assert exact UTC instants against, matching
@@ -250,5 +250,34 @@ describe("findSlot", () => {
       ],
     });
     expect(findSlot(input, 720)).toBeNull(); // 12:00
+  });
+});
+
+describe("isTableFreeForRange", () => {
+  const startsAt = new Date("2026-02-27T19:00:00Z");
+  const endsAt = new Date("2026-02-27T20:30:00Z");
+
+  it("is free when nothing overlaps it", () => {
+    expect(isTableFreeForRange("t-1", startsAt, endsAt, [])).toBe(true);
+  });
+
+  it("is taken by an overlapping blocking reservation on the same table", () => {
+    const existing = [{ id: "r-1", tableId: "t-1", reservedFor: startsAt, endsAt, status: "CONFIRMED" as const }];
+    expect(isTableFreeForRange("t-1", startsAt, endsAt, existing)).toBe(false);
+  });
+
+  it("ignores an overlap on a different table", () => {
+    const existing = [{ id: "r-1", tableId: "t-2", reservedFor: startsAt, endsAt, status: "CONFIRMED" as const }];
+    expect(isTableFreeForRange("t-1", startsAt, endsAt, existing)).toBe(true);
+  });
+
+  it("ignores a non-blocking status (CANCELLED)", () => {
+    const existing = [{ id: "r-1", tableId: "t-1", reservedFor: startsAt, endsAt, status: "CANCELLED" as const }];
+    expect(isTableFreeForRange("t-1", startsAt, endsAt, existing)).toBe(true);
+  });
+
+  it("excludes the reservation being reassigned from colliding with itself", () => {
+    const existing = [{ id: "r-1", tableId: "t-1", reservedFor: startsAt, endsAt, status: "CONFIRMED" as const }];
+    expect(isTableFreeForRange("t-1", startsAt, endsAt, existing, "r-1")).toBe(true);
   });
 });
