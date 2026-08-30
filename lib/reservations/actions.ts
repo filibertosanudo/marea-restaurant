@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/business";
+import type { Business } from "@/lib/generated/prisma/client";
 import { getAvailableSlots, findSlot, localWallClockToUtc } from "./availability";
 import {
   getOpeningHours,
@@ -14,14 +15,21 @@ import { reservationSlotsQuerySchema, createReservationSchema, parseDateParam } 
 import { isExclusionConstraintError } from "./prisma-errors";
 import { canCancelReservation } from "./dto";
 
+const CANCELLATION_REASON_BY_LOCALE: Record<string, string> = {
+  en: "Cancelled by the guest",
+  es: "Cancelada por el cliente",
+};
+
 /**
  * Loads exactly what availability.ts needs for one calendar day and calls
  * it — the one place this happens, so the public slots list (this file) and
  * the create action below (which re-checks the guest's specific pick) can
- * never drift into two different definitions of "available".
+ * never drift into two different definitions of "available". Takes the
+ * already-resolved `business`, not a businessId, since both callers already
+ * fetched it — calling getCurrentBusiness() a second time here would be a
+ * redundant DB round-trip on every slot lookup and every booking attempt.
  */
-async function loadAvailabilityForDay(businessId: string, date: string, partySize: number, now: Date) {
-  const business = await getCurrentBusiness();
+async function loadAvailabilityForDay(business: Business, date: string, partySize: number, now: Date) {
   const dateParts = parseDateParam(date);
 
   const dayStart = localWallClockToUtc(dateParts.year, dateParts.month, dateParts.day, 0, business.timezone);
@@ -66,7 +74,7 @@ export async function getReservationSlotsAction(date: string, partySize: number)
   if (!parsed.success) return { ok: false, error: "invalid_input" };
 
   const business = await getCurrentBusiness();
-  const input = await loadAvailabilityForDay(business.id, parsed.data.date, parsed.data.partySize, new Date());
+  const input = await loadAvailabilityForDay(business, parsed.data.date, parsed.data.partySize, new Date());
   const slots = getAvailableSlots(input);
 
   return { ok: true, times: slots.map((s) => s.time), maxPartySize: business.maxPartySize };
@@ -106,12 +114,7 @@ export async function createReservationAction(input: {
   }
 
   const business = await getCurrentBusiness();
-  const availabilityInput = await loadAvailabilityForDay(
-    business.id,
-    parsed.data.date,
-    parsed.data.partySize,
-    new Date()
-  );
+  const availabilityInput = await loadAvailabilityForDay(business, parsed.data.date, parsed.data.partySize, new Date());
   const slot = findSlot(availabilityInput, parsed.data.time);
   if (!slot) return { ok: false, error: "slot_taken" };
 
@@ -179,14 +182,18 @@ export async function cancelReservationByCodeAction(confirmationCode: string): P
   const now = new Date();
   if (!canCancelReservation(reservation, now)) return { ok: false, error: "too_late" };
 
-  await prisma.reservation.updateMany({
+  // Guarded by the status this action itself just read: staff could have
+  // confirmed/seated/cancelled the same reservation in the gap between that
+  // read and this write, in which case `count` comes back 0 and this must
+  // not report success for a write that didn't happen.
+  const result = await prisma.reservation.updateMany({
     where: { id: reservation.id, status: reservation.status },
     data: {
       status: "CANCELLED",
       cancelledAt: now,
-      cancellationReason: "Cancelada por el cliente",
+      cancellationReason: CANCELLATION_REASON_BY_LOCALE[business.defaultLocale] ?? CANCELLATION_REASON_BY_LOCALE.es,
     },
   });
 
-  return { ok: true };
+  return result.count > 0 ? { ok: true } : { ok: false, error: "too_late" };
 }

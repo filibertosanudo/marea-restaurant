@@ -4,7 +4,7 @@ const dateParamSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "invalid_date")
   .refine((value) => {
-    const [year, month, day] = value.split("-").map(Number);
+    const { year, month, day } = parseDateParam(value);
     // Rejects "2026-02-30" the way a naive regex-only check wouldn't —
     // Date.UTC silently rolls an out-of-range day into the next month, so
     // this round-trips it and checks nothing moved.
