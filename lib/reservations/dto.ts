@@ -50,6 +50,11 @@ export type ReservationLookupDTO = {
 
 type RawReservation = Reservation & { table: Pick<RestaurantTable, "code" | "zone"> | null };
 
+function formatTableLabel(table: Pick<RestaurantTable, "code" | "zone"> | null): string | null {
+  if (!table) return null;
+  return table.zone ? `${table.zone} · ${table.code}` : table.code;
+}
+
 export function toReservationLookupDTO(
   reservation: RawReservation,
   timezone: string,
@@ -71,9 +76,75 @@ export function toReservationLookupDTO(
     partySize: reservation.partySize,
     reservedForLabel,
     status: reservation.status,
-    tableLabel: reservation.table ? (reservation.table.zone ? `${reservation.table.zone} · ${reservation.table.code}` : reservation.table.code) : null,
+    tableLabel: formatTableLabel(reservation.table),
     notes: reservation.notes,
     canCancel: canCancelReservation(reservation, now),
     cancellationReason: reservation.cancellationReason,
   };
+}
+
+/** PENDING/CONFIRMED and already past its own start time — the row the agenda design specifically calls out: the one that decides whether it becomes a NO_SHOW, and the one an at-a-glance screen must not let blend into the rest. */
+const OVERDUE_STATUSES: ReservationStatus[] = ["PENDING", "CONFIRMED"];
+
+export function isReservationOverdue(reservation: Pick<Reservation, "status" | "reservedFor">, now: Date): boolean {
+  return OVERDUE_STATUSES.includes(reservation.status) && reservation.reservedFor.getTime() < now.getTime();
+}
+
+export type AgendaReservationDTO = {
+  id: string;
+  guestName: string;
+  partySize: number;
+  /** "H:mm AM/PM", business-local — display only; the actual instant is `reservedFor` on the raw row, never re-derived from this string. */
+  timeLabel: string;
+  status: ReservationStatus;
+  tableId: string | null;
+  tableLabel: string | null;
+  notes: string | null;
+  isOverdue: boolean;
+};
+
+type RawAgendaReservation = Reservation & { table: Pick<RestaurantTable, "id" | "code" | "zone"> | null };
+
+export function toAgendaReservationDTO(
+  reservation: RawAgendaReservation,
+  timezone: string,
+  lang: string,
+  now: Date
+): AgendaReservationDTO {
+  const timeLabel = new Intl.DateTimeFormat(toIntlLocale(lang), {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(reservation.reservedFor);
+
+  return {
+    id: reservation.id,
+    guestName: reservation.guestName,
+    partySize: reservation.partySize,
+    timeLabel,
+    status: reservation.status,
+    tableId: reservation.tableId,
+    tableLabel: formatTableLabel(reservation.table),
+    notes: reservation.notes,
+    isOverdue: isReservationOverdue(reservation, now),
+  };
+}
+
+export type AgendaSummary = {
+  total: number;
+  pending: number;
+  seated: number;
+  overdue: number;
+};
+
+export function summarizeAgenda(reservations: Pick<AgendaReservationDTO, "status" | "isOverdue">[]): AgendaSummary {
+  return reservations.reduce(
+    (acc, r) => ({
+      total: acc.total + 1,
+      pending: acc.pending + (r.status === "PENDING" ? 1 : 0),
+      seated: acc.seated + (r.status === "SEATED" ? 1 : 0),
+      overdue: acc.overdue + (r.isOverdue ? 1 : 0),
+    }),
+    { total: 0, pending: 0, seated: 0, overdue: 0 }
+  );
 }

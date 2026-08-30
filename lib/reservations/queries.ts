@@ -42,7 +42,25 @@ export async function getReservationsOverlapping(
 ): Promise<ExistingReservation[]> {
   return prisma.reservation.findMany({
     where: { businessId, reservedFor: { lt: rangeEnd }, endsAt: { gt: rangeStart } },
-    select: { tableId: true, reservedFor: true, endsAt: true, status: true },
+    select: { id: true, tableId: true, reservedFor: true, endsAt: true, status: true },
+  });
+}
+
+/** Every reservation for one calendar day, in the shape the panel agenda reads — ordered by time, the way the agenda is read, not by status the way a kanban would group it. */
+export async function getAgendaReservationsRaw(businessId: string, dayStart: Date, dayEnd: Date) {
+  return prisma.reservation.findMany({
+    where: { businessId, reservedFor: { gte: dayStart, lt: dayEnd } },
+    orderBy: { reservedFor: "asc" },
+    include: { table: { select: { id: true, code: true, zone: true } } },
+  });
+}
+
+/** Tables for the agenda's "reassign" picker — richer than getReservableTables (which only carries what availability.ts needs), since the UI has to show a human a code and a zone, not just an id. */
+export async function getReservableTablesForAgenda(businessId: string) {
+  return prisma.restaurantTable.findMany({
+    where: { businessId, isActive: true, deletedAt: null },
+    orderBy: [{ zone: "asc" }, { sortOrder: "asc" }],
+    select: { id: true, code: true, zone: true, seats: true },
   });
 }
 
