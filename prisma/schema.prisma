@@ -1015,7 +1015,12 @@ model Reservation {
   id         String @id @default(cuid())
   businessId String
   customerId String? // null si reservó sin cuenta
-  tableId    String? // se asigna al confirmar, puede quedar null mientras tanto
+  // Se asigna desde la creación, no al confirmar: en la EXCLUDE constraint
+  // (ver el comentario al final del modelo) un tableId nulo no choca con
+  // nada, así que una reservación sin mesa no reservaría nada en absoluto —
+  // dos huéspedes podrían tomar el mismo horario sin que la constraint lo
+  // note. Confirmar puede *reasignar* a otra mesa, nunca asignar desde cero.
+  tableId String?
 
   // Contacto congelado, igual que en Order y por la misma razón.
   guestName  String
