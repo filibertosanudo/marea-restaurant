@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/lib/generated/prisma/client";
 import type { OpeningHourWindow, ClosureWindow, ReservableTable, ExistingReservation } from "./availability";
 
 /** Every opening-hour block the business has, across all seven days — a small table, always fetched whole. */
@@ -34,13 +35,19 @@ export async function getReservableTables(businessId: string): Promise<Reservabl
  * BLOCKING_STATUSES filter is the single place that decides which statuses
  * hold a table — duplicating that filter into the query would be the two
  * places disagreeing eventually.
+ *
+ * Takes the Prisma client rather than importing the module-level one, so a
+ * caller running inside a `$transaction` (staff-actions.ts's table
+ * reassignment, which needs this to see its own row lock) can pass `tx`
+ * instead of a second, transaction-blind copy of this query.
  */
 export async function getReservationsOverlapping(
+  client: Prisma.TransactionClient,
   businessId: string,
   rangeStart: Date,
   rangeEnd: Date
 ): Promise<ExistingReservation[]> {
-  return prisma.reservation.findMany({
+  return client.reservation.findMany({
     where: { businessId, reservedFor: { lt: rangeEnd }, endsAt: { gt: rangeStart } },
     select: { id: true, tableId: true, reservedFor: true, endsAt: true, status: true },
   });

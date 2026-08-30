@@ -59,7 +59,7 @@ async function loadAvailabilityForDay(business: Business, date: string, partySiz
     getOpeningHours(business.id),
     getBusinessClosures(business.id),
     getReservableTables(business.id),
-    getReservationsOverlapping(business.id, dayStart, dayEnd),
+    getReservationsOverlapping(prisma, business.id, dayStart, dayEnd),
   ]);
 
   return {
