@@ -32,12 +32,12 @@ describe("getAvailableSlots", () => {
   it("offers a slot inside the opening window with a free table", () => {
     const slots = getAvailableSlots(baseInput());
     expect(slots.length).toBeGreaterThan(0);
-    expect(slots[0]).toMatchObject({ time: "12:00", tableId: "t-small" });
+    expect(slots[0]).toMatchObject({ minutesFromMidnight: 720, tableId: "t-small" }); // 12:00
   });
 
   it("resolves the local wall-clock time to the correct UTC instant", () => {
     const slots = getAvailableSlots(baseInput());
-    const noon = slots.find((s) => s.time === "12:00")!;
+    const noon = slots.find((s) => s.minutesFromMidnight === 720)!; // 12:00
     // 12:00 in UTC-7 is 19:00 UTC.
     expect(noon.startsAt.toISOString()).toBe("2026-02-27T19:00:00.000Z");
   });
@@ -68,10 +68,10 @@ describe("getAvailableSlots", () => {
 
   it("never offers a slot that would seat the party past closing", () => {
     const slots = getAvailableSlots(baseInput({ durationMinutes: 90 }));
-    const lastStart = Math.max(...slots.map((s) => Number(s.time.replace(":", ""))));
-    // Window closes at 23:00 (2300 in HHmm terms); a 90-minute reservation
-    // can start no later than 21:30.
-    expect(lastStart).toBeLessThanOrEqual(2130);
+    const lastStart = Math.max(...slots.map((s) => s.minutesFromMidnight));
+    // Window closes at minute 1380 (23:00); a 90-minute reservation can
+    // start no later than minute 1290 (21:30).
+    expect(lastStart).toBeLessThanOrEqual(1290);
   });
 
   it("excludes a slot that falls inside a BusinessClosure", () => {
@@ -85,31 +85,29 @@ describe("getAvailableSlots", () => {
         ],
       })
     );
-    expect(slots.find((s) => s.time === "12:00")).toBeUndefined();
-    expect(slots.find((s) => s.time === "14:30")).toBeDefined();
+    expect(slots.find((s) => s.minutesFromMidnight === 720)).toBeUndefined(); // 12:00
+    expect(slots.find((s) => s.minutesFromMidnight === 870)).toBeDefined(); // 14:30
   });
 
   it("excludes a slot that starts at or before `now`", () => {
     const slots = getAvailableSlots(
       baseInput({ now: new Date("2026-02-27T20:00:00Z") }) // 13:00 local
     );
-    expect(slots.find((s) => s.time === "12:00")).toBeUndefined();
-    expect(slots.find((s) => s.time === "12:30")).toBeUndefined();
-    expect(slots.find((s) => s.time === "13:30")).toBeDefined();
+    expect(slots.find((s) => s.minutesFromMidnight === 720)).toBeUndefined(); // 12:00
+    expect(slots.find((s) => s.minutesFromMidnight === 750)).toBeUndefined(); // 12:30
+    expect(slots.find((s) => s.minutesFromMidnight === 810)).toBeDefined(); // 13:30
   });
 
   it("excludes a slot that's in the future but inside minLeadMinutes", () => {
     // now = 11:50 local; a 30-minute lead means nothing before 12:20 qualifies.
-    const slots = getAvailableSlots(
-      baseInput({ now: new Date("2026-02-27T18:50:00Z"), minLeadMinutes: 30 })
-    );
-    expect(slots.find((s) => s.time === "12:00")).toBeUndefined();
-    expect(slots.find((s) => s.time === "12:30")).toBeDefined();
+    const slots = getAvailableSlots(baseInput({ now: new Date("2026-02-27T18:50:00Z"), minLeadMinutes: 30 }));
+    expect(slots.find((s) => s.minutesFromMidnight === 720)).toBeUndefined(); // 12:00
+    expect(slots.find((s) => s.minutesFromMidnight === 750)).toBeDefined(); // 12:30
   });
 
   it("defaults minLeadMinutes to 0 — only bare future matters when omitted", () => {
     const slots = getAvailableSlots(baseInput({ now: new Date("2026-02-27T18:59:00Z") })); // 11:59 local
-    expect(slots.find((s) => s.time === "12:00")).toBeDefined();
+    expect(slots.find((s) => s.minutesFromMidnight === 720)).toBeDefined(); // 12:00
   });
 
   it("picks the smallest table that fits, leaving larger tables free", () => {
@@ -131,7 +129,7 @@ describe("getAvailableSlots", () => {
         ],
       })
     );
-    const noon = slots.find((s) => s.time === "12:00")!;
+    const noon = slots.find((s) => s.minutesFromMidnight === 720)!; // 12:00
     expect(noon.tableId).toBe("t-medium");
   });
 
@@ -149,7 +147,7 @@ describe("getAvailableSlots", () => {
             },
           ],
         })
-      ).some((s) => s.time === "12:00");
+      ).some((s) => s.minutesFromMidnight === 720); // 12:00
 
     expect(overlapping("PENDING")).toBe(false);
     expect(overlapping("CONFIRMED")).toBe(false);
@@ -176,7 +174,7 @@ describe("getAvailableSlots", () => {
         ],
       })
     );
-    expect(slots.find((s) => s.time === "12:00")).toBeDefined();
+    expect(slots.find((s) => s.minutesFromMidnight === 720)).toBeDefined(); // 12:00
   });
 
   it("rolls a close-after-midnight window into the next calendar day", () => {
@@ -187,16 +185,55 @@ describe("getAvailableSlots", () => {
         durationMinutes: 60,
       })
     );
-    const lateSlot = slots.find((s) => s.time === "01:00");
+    const lateSlot = slots.find((s) => s.minutesFromMidnight === 1500); // 01:00 the next calendar day
     expect(lateSlot).toBeDefined();
     // 01:00 the night of Feb 27 (Fri) rolls into Feb 28 local, i.e. 08:00 UTC Feb 28.
     expect(lateSlot!.startsAt.toISOString()).toBe("2026-02-28T08:00:00.000Z");
+  });
+
+  it("never collapses a same-day slot and a next-day slot into the same identity", () => {
+    // Two windows the same Friday: an early-morning one (00:00-01:00, from
+    // Thursday night's close) and a late one that runs past midnight
+    // (20:00-02:00 Saturday). Minute 30 (00:30 today) and minute 1470
+    // (00:30 the *next* calendar day) both exist — the exact collision
+    // minutesToHHMM used to produce by reducing both to the string "00:30".
+    const slots = getAvailableSlots(
+      baseInput({
+        openingHours: [
+          { dayOfWeek: 5, opensAt: 0, closesAt: 60, isClosed: false },
+          { dayOfWeek: 5, opensAt: 1200, closesAt: 1560, isClosed: false },
+        ],
+        durationMinutes: 30,
+        now: new Date("2026-02-26T00:00:00Z"),
+      })
+    );
+
+    const sameDay = slots.find((s) => s.minutesFromMidnight === 30);
+    const nextDay = slots.find((s) => s.minutesFromMidnight === 1470);
+    expect(sameDay).toBeDefined();
+    expect(nextDay).toBeDefined();
+    expect(sameDay!.startsAt.getTime()).not.toBe(nextDay!.startsAt.getTime());
+    // 00:30 today (Feb 27, UTC-7) is 07:30 UTC the same date.
+    expect(sameDay!.startsAt.toISOString()).toBe("2026-02-27T07:30:00.000Z");
+    // 00:30 the *next* day (Feb 28, UTC-7) is 07:30 UTC Feb 28.
+    expect(nextDay!.startsAt.toISOString()).toBe("2026-02-28T07:30:00.000Z");
+
+    // findSlot must resolve each minute value to its own distinct instant,
+    // not "the first slot with a matching label".
+    expect(findSlot(baseInput({
+      openingHours: [
+        { dayOfWeek: 5, opensAt: 0, closesAt: 60, isClosed: false },
+        { dayOfWeek: 5, opensAt: 1200, closesAt: 1560, isClosed: false },
+      ],
+      durationMinutes: 30,
+      now: new Date("2026-02-26T00:00:00Z"),
+    }), 30)!.startsAt.toISOString()).toBe("2026-02-27T07:30:00.000Z");
   });
 });
 
 describe("findSlot", () => {
   it("returns the matching slot when it's still available", () => {
-    const slot = findSlot(baseInput(), "12:00");
+    const slot = findSlot(baseInput(), 720); // 12:00
     expect(slot?.tableId).toBe("t-small");
   });
 
@@ -212,6 +249,6 @@ describe("findSlot", () => {
         },
       ],
     });
-    expect(findSlot(input, "12:00")).toBeNull();
+    expect(findSlot(input, 720)).toBeNull(); // 12:00
   });
 });

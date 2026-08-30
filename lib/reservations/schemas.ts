@@ -21,7 +21,14 @@ const dateParamSchema = z
     return target <= horizon;
   }, "too_far_ahead");
 
-const timeParamSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "invalid_time");
+// Minutes since the requested day's local midnight, not a "HH:mm" string —
+// a close-after-midnight window can offer two slots that would share the
+// same "HH:mm" label (00:30 today vs. 00:30 the next calendar day), so the
+// wire value has to be the raw, unreduced minute count availability.ts
+// itself uses as each slot's actual identity. 4320 (3 days worth) is a
+// generous sanity bound, not a business rule — nothing about how far a
+// closesAt can run past midnight is capped elsewhere.
+const timeParamSchema = z.coerce.number().int().min(0).max(4320);
 
 export const reservationSlotsQuerySchema = z.object({
   date: dateParamSchema,

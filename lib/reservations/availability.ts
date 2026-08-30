@@ -68,8 +68,19 @@ export type AvailabilityInput = {
 };
 
 export type AvailableSlot = {
-  /** "HH:mm", 24h, business-local — the value a guest picks and the value the create action re-validates against, not a display label. */
-  time: string;
+  /**
+   * Minutes since the requested day's local midnight — the raw value, never
+   * reduced mod 1440. A business that closes after midnight can offer both
+   * a slot at minute 30 (00:30 that same nominal day, if some earlier
+   * window opens that early) and a slot at minute 1470 (00:30 the *next*
+   * calendar day, from a window that runs past midnight); collapsing both
+   * to the string "00:30" would make them indistinguishable to whoever
+   * picks one. This is the value a guest's pick round-trips through create
+   * — never re-derive a "HH:mm" identity from it without keeping this raw
+   * number as the actual identity, or the ambiguity this field exists to
+   * avoid comes right back.
+   */
+  minutesFromMidnight: number;
   /** The exact UTC instant this slot starts — ready to store as Reservation.reservedFor. */
   startsAt: Date;
   /** The specific table this slot would seat the party at, already chosen (smallest table that fits) — see the module comment on why a table is picked this early instead of at confirm. */
@@ -110,8 +121,7 @@ function getTimeZoneOffsetMinutes(instant: Date, timeZone: string): number {
  * an opening hour six months out must resolve against the offset that
  * actually applies on that date, not today's, since a timezone's UTC
  * offset changes across a DST transition.
- */
-/**
+ *
  * Exported (unlike this module's other internals) because the Server Action
  * layer needs the exact same conversion to compute a UTC fetch window for
  * the day being checked — reservations and closures both live as UTC
@@ -167,13 +177,6 @@ function findFreeTable(
   return null;
 }
 
-function minutesToHHMM(minutesFromMidnight: number): string {
-  const normalized = ((minutesFromMidnight % 1440) + 1440) % 1440;
-  const hh = Math.floor(normalized / 60);
-  const mm = normalized % 60;
-  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
-}
-
 /**
  * Every slot a guest could book for one calendar day, each already paired
  * with the specific table it would seat them at. A slot only appears if,
@@ -204,7 +207,7 @@ export function getAvailableSlots(input: AvailabilityInput): AvailableSlot[] {
       const tableId = findFreeTable(startsAt, endsAt, input.partySize, input.tables, input.existingReservations);
       if (!tableId) continue;
 
-      slots.push({ time: minutesToHHMM(minute), startsAt, tableId });
+      slots.push({ minutesFromMidnight: minute, startsAt, tableId });
     }
   }
 
@@ -220,6 +223,8 @@ export function getAvailableSlots(input: AvailabilityInput): AvailableSlot[] {
  * reservation_no_overlap), for the sliver of time between this check and
  * the INSERT itself.
  */
-export function findSlot(input: AvailabilityInput, requestedTime: string): AvailableSlot | null {
-  return getAvailableSlots(input).find((slot) => slot.time === requestedTime) ?? null;
+export function findSlot(input: AvailabilityInput, requestedMinutesFromMidnight: number): AvailableSlot | null {
+  return (
+    getAvailableSlots(input).find((slot) => slot.minutesFromMidnight === requestedMinutesFromMidnight) ?? null
+  );
 }

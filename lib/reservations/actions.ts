@@ -78,14 +78,18 @@ async function loadAvailabilityForDay(business: Business, date: string, partySiz
 }
 
 export type ReservationSlotsResult =
-  | { ok: true; times: string[]; maxPartySize: number }
+  | { ok: true; slots: number[]; maxPartySize: number }
   | { ok: false; error: "invalid_input" };
 
 /**
  * Called from the landing's reservation form whenever the guest picks a
- * date or changes the party size. Returns bare "HH:mm" strings, business-
- * local — the form paints exactly this list and never filters it further
- * (Fase 3's "ninguna disponibilidad se calcula dos veces" rule).
+ * date or changes the party size. Returns each slot's raw minutesFromMidnight
+ * — never a "HH:mm" string, which a close-after-midnight window could
+ * produce twice for two genuinely different instants (see availability.ts's
+ * own doc comment on AvailableSlot) — business-local. The form paints
+ * exactly this list and never filters it further (Fase 3's "ninguna
+ * disponibilidad se calcula dos veces" rule); labelling for display is the
+ * client's job, done from this same unreduced number.
  */
 export async function getReservationSlotsAction(date: string, partySize: number): Promise<ReservationSlotsResult> {
   const parsed = reservationSlotsQuerySchema.safeParse({ date, partySize });
@@ -95,7 +99,7 @@ export async function getReservationSlotsAction(date: string, partySize: number)
   const input = await loadAvailabilityForDay(business, parsed.data.date, parsed.data.partySize, new Date());
   const slots = getAvailableSlots(input);
 
-  return { ok: true, times: slots.map((s) => s.time), maxPartySize: business.maxPartySize };
+  return { ok: true, slots: slots.map((s) => s.minutesFromMidnight), maxPartySize: business.maxPartySize };
 }
 
 export type CreateReservationResult =
@@ -122,7 +126,8 @@ export async function createReservationAction(input: {
   guestPhone?: string;
   partySize: number;
   date: string;
-  time: string;
+  /** Minutes since the requested day's local midnight — the exact value getReservationSlotsAction listed, never a re-derived "HH:mm" string. */
+  time: number;
   notes?: string;
 }): Promise<CreateReservationResult> {
   const parsed = createReservationSchema.safeParse(input);

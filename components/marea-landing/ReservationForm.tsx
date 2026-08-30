@@ -12,12 +12,23 @@ import { MAX_BOOKING_HORIZON_DAYS } from "@/lib/reservations/schemas";
 type SlotsState = "idle" | "loading" | "loaded";
 type SubmitState = "idle" | "submitting" | "success";
 
-/** "14:30" -> "2:30 PM" — display only, the value sent back to the server is always the raw "HH:mm" the slots action returned. */
-function formatTimeLabel(time: string): string {
-  const [h, m] = time.split(":").map(Number);
+/**
+ * minutesFromMidnight -> "2:30 PM" — display only. The value sent back to
+ * the server is always the raw number a slot came with, never this label:
+ * a close-after-midnight window can offer minute 30 (00:30 today) and
+ * minute 1470 (00:30 the *next* calendar day) as two different slots that
+ * would share this exact label — appending a suffix here keeps them
+ * readable as distinct without touching the value identity itself.
+ */
+function formatTimeLabel(minutesFromMidnight: number, nextDaySuffix: string): string {
+  const daysAhead = Math.floor(minutesFromMidnight / 1440);
+  const normalized = minutesFromMidnight % 1440;
+  const h = Math.floor(normalized / 60);
+  const m = normalized % 60;
   const period = h >= 12 ? "PM" : "AM";
   const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+  const base = `${h12}:${String(m).padStart(2, "0")} ${period}`;
+  return daysAhead > 0 ? `${base}${nextDaySuffix}` : base;
 }
 
 export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySize: number }) {
@@ -31,7 +42,7 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
 
-  const [slots, setSlots] = useState<string[]>([]);
+  const [slots, setSlots] = useState<number[]>([]);
   const [slotsState, setSlotsState] = useState<SlotsState>("idle");
 
   const [nameError, setNameError] = useState<string | null>(null);
@@ -66,10 +77,10 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
     setConflict(false);
     getReservationSlotsAction(date, Number(partySize)).then((result) => {
       if (cancelled) return;
-      const times = result.ok ? result.times : [];
-      setSlots(times);
+      const nextSlots = result.ok ? result.slots : [];
+      setSlots(nextSlots);
       setSlotsState("loaded");
-      setTime((prev) => (times.includes(prev) ? prev : ""));
+      setTime((prev) => (prev !== "" && nextSlots.includes(Number(prev)) ? prev : ""));
     });
     return () => {
       cancelled = true;
@@ -80,7 +91,7 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
     value: String(n),
     label: `${n} ${n === 1 ? t.guest : t.guestP}`,
   }));
-  const timeOptions = slots.map((s) => ({ value: s, label: formatTimeLabel(s) }));
+  const timeOptions = slots.map((s) => ({ value: String(s), label: formatTimeLabel(s, t.nextDaySuffix) }));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -99,7 +110,7 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
       guestPhone: guestPhone || undefined,
       partySize: Number(partySize),
       date,
-      time,
+      time: Number(time),
       notes: notes || undefined,
     });
 
@@ -114,7 +125,7 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
       setConflict(true);
       setTime("");
       const refreshed = await getReservationSlotsAction(date, Number(partySize));
-      setSlots(refreshed.ok ? refreshed.times : []);
+      setSlots(refreshed.ok ? refreshed.slots : []);
     } else if (result.error === "rate_limited") {
       setGenericError(t.rateLimitedError);
     } else {
@@ -147,7 +158,7 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
           <p style={{ margin: 0, color: "rgb(var(--color-on-surface-muted))" }}>
             {t.successBody
               .replace("{date}", date)
-              .replace("{time}", formatTimeLabel(time))
+              .replace("{time}", formatTimeLabel(Number(time), t.nextDaySuffix))
               .replace("{guests}", partySize)}
           </p>
           <div>
