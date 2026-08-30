@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import type { AgendaReservationDTO } from "@/lib/reservations/dto";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import { cancelReservationAction } from "@/lib/reservations/staff-actions";
 
+/** Reuses ConfirmDialog, same as the guest-facing CancelReservationButton — the reason textarea and its validation error are just phrasing content passed through `body`, not a reason to hand-roll a second dialog. */
 export function CancelReservationDialog({
   reservation,
   dict,
@@ -38,44 +38,44 @@ export function CancelReservationDialog({
         setError(dict.cancelForbidden);
         return;
       }
+      if (result?.error) {
+        setError(dict.errorGeneric);
+        return;
+      }
       handleClose();
     });
   }
 
   return (
-    <Modal open={reservation !== null} onClose={handleClose} title={dict.cancelAction}>
-      {reservation && (
-        <>
-          <p className="mb-md text-[13.5px] text-on-surface-muted">{reservation.guestName}</p>
-          <label className="mb-[4px] block text-[13px] font-medium text-on-surface">
-            {dict.cancelReasonLabel}
-          </label>
-          <textarea
-            value={reason}
-            onChange={(e) => {
-              setReason(e.target.value);
-              setError(null);
-            }}
-            placeholder={dict.cancelReasonPlaceholder}
-            rows={3}
-            className="w-full resize-none rounded-sm border border-border/50 bg-surface px-sm py-[8px] text-[13.5px] text-on-surface outline-none focus:border-primary"
-          />
-          {error && <p className="mt-[4px] text-[12px] text-error">{error}</p>}
-          <div className="mt-lg flex justify-end gap-sm">
-            <Button type="button" variant="secondary" onClick={handleClose}>
-              {dict.cancelBack}
-            </Button>
-            <button
-              type="button"
-              onClick={confirm}
-              disabled={pending}
-              className="inline-flex items-center justify-center rounded-full bg-error px-[28px] py-[14px] text-[15px] font-medium tracking-[0.01em] text-on-primary transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {dict.cancelConfirm}
-            </button>
-          </div>
-        </>
-      )}
-    </Modal>
+    <ConfirmDialog
+      open={reservation !== null}
+      onClose={handleClose}
+      onConfirm={confirm}
+      title={dict.cancelAction}
+      confirmLabel={dict.cancelConfirm}
+      cancelLabel={dict.cancelBack}
+      pending={pending}
+      body={
+        reservation && (
+          <>
+            <span className="mb-md block text-[13.5px] text-on-surface-muted">{reservation.guestName}</span>
+            <label className="mb-[4px] block text-[13px] font-medium text-on-surface">
+              {dict.cancelReasonLabel}
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => {
+                setReason(e.target.value);
+                setError(null);
+              }}
+              placeholder={dict.cancelReasonPlaceholder}
+              rows={3}
+              className="w-full resize-none rounded-sm border border-border/50 bg-surface px-sm py-[8px] text-[13.5px] text-on-surface outline-none focus:border-primary"
+            />
+            {error && <span className="mt-[4px] block text-[12px] text-error">{error}</span>}
+          </>
+        )
+      }
+    />
   );
 }
