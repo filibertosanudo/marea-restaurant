@@ -27,7 +27,7 @@ const ADMIN_ONLY = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN];
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: "menu", href: "/admin/menu", roles: STAFF_UP, enabled: true },
   { key: "orders", href: "/admin/pedidos", roles: STAFF_UP, enabled: true },
-  { key: "reservations", href: "/admin/reservaciones", roles: STAFF_UP, enabled: false },
+  { key: "reservations", href: "/admin/reservaciones", roles: STAFF_UP, enabled: true },
   { key: "promotions", href: "/admin/promociones", roles: ADMIN_ONLY, enabled: false },
   { key: "tables", href: "/admin/mesas", roles: ADMIN_ONLY, enabled: false },
   { key: "testimonials", href: "/admin/testimonios", roles: ADMIN_ONLY, enabled: false },
