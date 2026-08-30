@@ -28,7 +28,12 @@ const dateParamSchema = z
 // itself uses as each slot's actual identity. 4320 (3 days worth) is a
 // generous sanity bound, not a business rule — nothing about how far a
 // closesAt can run past midnight is capped elsewhere.
-const timeParamSchema = z.coerce.number().int().min(0).max(4320);
+//
+// Not z.coerce.number(): the only caller sends a real number over the
+// Server Action already (ReservationForm.tsx's `Number(time)`), and
+// coercing here would silently turn "", null, or false into 0 — a "valid"
+// midnight slot — instead of rejecting a malformed direct call.
+const timeParamSchema = z.number().int().min(0).max(4320);
 
 export const reservationSlotsQuerySchema = z.object({
   date: dateParamSchema,
