@@ -111,6 +111,8 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
       setTime("");
       const refreshed = await getReservationSlotsAction(date, Number(partySize));
       setSlots(refreshed.ok ? refreshed.times : []);
+    } else if (result.error === "rate_limited") {
+      setGenericError(t.rateLimitedError);
     } else {
       setGenericError(t.genericError);
     }

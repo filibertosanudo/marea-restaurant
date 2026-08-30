@@ -1,13 +1,20 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getCurrentBusiness } from "@/lib/business";
 import { getReservationByConfirmationCode } from "@/lib/reservations/queries";
 import { toReservationLookupDTO } from "@/lib/reservations/dto";
 import { getOrderLang } from "@/lib/i18n/cookie";
 import { getReservationDictionary } from "@/lib/i18n/dictionaries";
+import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import { CancelReservationButton } from "@/components/reservation/CancelReservationButton";
 import { ReservationStatusBadge } from "@/components/reservation/ReservationStatusBadge";
 import type { ReservationDictionary } from "@/lib/i18n/dictionaries";
 import type { ReservationStatus } from "@/lib/generated/prisma/client";
+
+// Same guessing-surface reasoning as cancelReservationByCodeAction's own
+// scope — a rate-limited request 404s exactly like a genuinely wrong code,
+// never a distinguishable response.
+const LOOKUP_SCOPE = "reservation:lookup";
 
 const STATUS_LABEL_KEY: Record<ReservationStatus, keyof ReservationDictionary> = {
   PENDING: "statusPending",
@@ -24,6 +31,10 @@ export default async function ReservationLookupPage({
   params: Promise<{ confirmationCode: string }>;
 }) {
   const { confirmationCode } = await params;
+  const ip = getClientIp(await headers());
+  if (await isScopeRateLimited(LOOKUP_SCOPE, ip)) notFound();
+  await recordScopeAttempt(LOOKUP_SCOPE, ip);
+
   const business = await getCurrentBusiness();
   const lang = await getOrderLang(business.defaultLocale === "en" ? "en" : "es");
   const dict = getReservationDictionary(lang);

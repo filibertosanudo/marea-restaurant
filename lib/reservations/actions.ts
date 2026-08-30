@@ -1,8 +1,10 @@
 "use server";
 
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/business";
 import type { Business } from "@/lib/generated/prisma/client";
+import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import { getAvailableSlots, findSlot, localWallClockToUtc } from "./availability";
 import {
   getOpeningHours,
@@ -19,6 +21,21 @@ const CANCELLATION_REASON_BY_LOCALE: Record<string, string> = {
   en: "Cancelled by the guest",
   es: "Cancelada por el cliente",
 };
+
+// Creating a reservation is the one action here with no auth at all beyond
+// "you filled out a form" — five per hour is more than any real party or
+// family books in one sitting, and is exactly the volume that would fill a
+// Friday night with fake covers in minutes.
+const CREATE_SCOPE = "reservation:create";
+const CREATE_MAX_ATTEMPTS = 5;
+const CREATE_WINDOW_MS = 60 * 60 * 1000;
+
+// Guessing surface — confirmationCode is toda la autenticación for viewing
+// and cancelling. cuid(2)'s search space already makes brute-forcing
+// impractical, but a rate limit doesn't get to depend on the token being
+// long; reuses login's own per-IP tolerance (20 / 15 min) since this is the
+// same class of guessing attempt, not a fresh number invented for this case.
+const CANCEL_SCOPE = "reservation:cancel";
 
 /**
  * Loads exactly what availability.ts needs for one calendar day and calls
@@ -83,7 +100,8 @@ export async function getReservationSlotsAction(date: string, partySize: number)
 export type CreateReservationResult =
   | { ok: true; confirmationCode: string }
   | { ok: false; error: "invalid_input"; fieldErrors: Record<string, string> }
-  | { ok: false; error: "slot_taken" };
+  | { ok: false; error: "slot_taken" }
+  | { ok: false; error: "rate_limited" };
 
 /**
  * Reserving without an account, same as ordering without one: guestName is
@@ -112,6 +130,12 @@ export async function createReservationAction(input: {
     for (const issue of parsed.error.issues) fieldErrors[issue.path.join(".")] = issue.message;
     return { ok: false, error: "invalid_input", fieldErrors };
   }
+
+  const ip = getClientIp(await headers());
+  if (await isScopeRateLimited(CREATE_SCOPE, ip, CREATE_MAX_ATTEMPTS, CREATE_WINDOW_MS)) {
+    return { ok: false, error: "rate_limited" };
+  }
+  await recordScopeAttempt(CREATE_SCOPE, ip);
 
   const business = await getCurrentBusiness();
   const availabilityInput = await loadAvailabilityForDay(business, parsed.data.date, parsed.data.partySize, new Date());
@@ -175,6 +199,13 @@ export type CancelReservationResult = { ok: true } | { ok: false; error: "not_fo
  * oracle to enumerate codes beyond what loading the page itself would take.
  */
 export async function cancelReservationByCodeAction(confirmationCode: string): Promise<CancelReservationResult> {
+  const ip = getClientIp(await headers());
+  // Rate-limited attempts collapse into the same not_found a genuinely
+  // missing code returns — a distinct "you're being throttled" response
+  // would itself be a new way to tell a guessed code apart from a real one.
+  if (await isScopeRateLimited(CANCEL_SCOPE, ip)) return { ok: false, error: "not_found" };
+  await recordScopeAttempt(CANCEL_SCOPE, ip);
+
   const business = await getCurrentBusiness();
   const reservation = await getReservationByConfirmationCode(business.id, confirmationCode);
   if (!reservation) return { ok: false, error: "not_found" };
