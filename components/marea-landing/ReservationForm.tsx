@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Dropdown } from "./Dropdown";
 import { STR, type Lang } from "./content";
 import { getReservationSlotsAction, createReservationAction } from "@/lib/reservations/actions";
+import { MAX_BOOKING_HORIZON_DAYS } from "@/lib/reservations/schemas";
 
 type SlotsState = "idle" | "loading" | "loaded";
 type SubmitState = "idle" | "submitting" | "success";
@@ -42,6 +43,9 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
   const [codeCopied, setCodeCopied] = useState(false);
 
   const todayLocal = useState(() => new Date().toISOString().slice(0, 10))[0];
+  const maxBookableDate = useState(
+    () => new Date(Date.now() + MAX_BOOKING_HORIZON_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  )[0];
   const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -233,6 +237,7 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
             label={t.date}
             type="date"
             min={todayLocal}
+            max={maxBookableDate}
             value={date}
             onChange={(e) => setDate(e.target.value)}
             disabled={submitting}

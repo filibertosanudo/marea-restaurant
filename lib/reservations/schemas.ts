@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** How far out a guest can even ask about — rejected here, not in the action, so every caller of either schema gets it for free instead of remembering to check separately. 90 days is the common horizon real booking systems use; a business decision, not a derived constant. */
+export const MAX_BOOKING_HORIZON_DAYS = 90;
+
 const dateParamSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "invalid_date")
@@ -10,7 +13,13 @@ const dateParamSchema = z
     // this round-trips it and checks nothing moved.
     const d = new Date(Date.UTC(year, month - 1, day));
     return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
-  }, "invalid_date");
+  }, "invalid_date")
+  .refine((value) => {
+    const { year, month, day } = parseDateParam(value);
+    const target = Date.UTC(year, month - 1, day);
+    const horizon = Date.now() + MAX_BOOKING_HORIZON_DAYS * 24 * 60 * 60 * 1000;
+    return target <= horizon;
+  }, "too_far_ahead");
 
 const timeParamSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "invalid_time");
 
