@@ -8,5 +8,5 @@ export default async function Home() {
   const categories = await getPublicMenuRaw(business.id);
   const menuByLang = toPublicMenuByLang(categories);
 
-  return <MareaLandingPage menuByLang={menuByLang} />;
+  return <MareaLandingPage menuByLang={menuByLang} maxPartySize={business.maxPartySize} />;
 }

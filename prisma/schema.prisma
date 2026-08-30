@@ -1015,7 +1015,12 @@ model Reservation {
   id         String @id @default(cuid())
   businessId String
   customerId String? // null si reservó sin cuenta
-  tableId    String? // se asigna al confirmar, puede quedar null mientras tanto
+  // Se asigna desde la creación, no al confirmar: en la EXCLUDE constraint
+  // (ver el comentario al final del modelo) un tableId nulo no choca con
+  // nada, así que una reservación sin mesa no reservaría nada en absoluto —
+  // dos huéspedes podrían tomar el mismo horario sin que la constraint lo
+  // note. Confirmar puede *reasignar* a otra mesa, nunca asignar desde cero.
+  tableId String?
 
   // Contacto congelado, igual que en Order y por la misma razón.
   guestName  String
@@ -1036,8 +1041,14 @@ model Reservation {
   status ReservationStatus @default(PENDING)
   notes  String? @db.Text // "alergias, ocasión especial, preferencia de mesa"
 
-  /// Código que se le manda al cliente para consultar o cancelar sin cuenta.
-  confirmationCode String @unique @default(cuid())
+  /// Código que se le manda al cliente para consultar o cancelar sin cuenta —
+  /// toda la autenticación de esa pantalla, y la única que además puede
+  /// *cancelar*, no sólo ver. cuid(2) y no cuid() por la misma razón que
+  /// Order.publicToken documenta junto a su propio campo: el cuid() por
+  /// defecto es CUID v1, estructurado, y acota demasiado el espacio de
+  /// búsqueda de alguien adivinando el código de otra reservación hecha casi
+  /// al mismo tiempo.
+  confirmationCode String @unique @default(cuid(2))
 
   confirmedAt DateTime?
   seatedAt    DateTime?

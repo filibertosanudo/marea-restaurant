@@ -27,3 +27,6 @@ lib/generated/
 .ds-sync/
 ds-bundle/
 skills-lock.json
+
+# Graphify — salida y cache del analisis de codigo (se regenera con `graphify`)
+graphify-out/

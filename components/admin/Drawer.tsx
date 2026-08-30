@@ -29,10 +29,29 @@ export function Drawer({
   children: ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // Whatever had focus before the drawer opened — almost always the board
+  // badge that triggered it. Restored on close so a keyboard user lands
+  // back where they were instead of at the top of the document, which is
+  // where focus goes by default once the panel it was trapped in unmounts.
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  // Capturing and restoring focus only keys off `open` — not `onClose` — on
+  // purpose. onClose is an inline arrow function at every call site
+  // (OrdersBoard re-creates it on every render), and the board re-renders
+  // on every live order event over SSE even while this drawer sits open.
+  // Keying this effect on `onClose` too would re-run it on each of those
+  // unrelated re-renders, yanking focus out to the just-restored element
+  // and back in — an admin mid-keystroke in RefundForm would feel their
+  // cursor jump every time a different order changed on the board.
+  useEffect(() => {
+    if (!open) return;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus();
+    return () => previouslyFocusedRef.current?.focus();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    panelRef.current?.focus();
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {

@@ -8,6 +8,7 @@ import { advanceOrderStatusAction, collectCashPaymentAction } from "@/lib/orders
 import { getNextStatus } from "@/lib/orders/state-machine";
 import { AgingIndicator } from "./AgingIndicator";
 import { AllergyIcon } from "./icons";
+import type { PaymentReading } from "@/lib/orders/dto";
 
 /**
  * The board's two surfaces are the same data, read from two different
@@ -84,6 +85,26 @@ const SCALE = {
   },
 } as const;
 
+// bg-border/16 + text-on-surface-muted is the same neutral pair
+// status-badge-neutral already uses elsewhere in the panel. REFUNDED reuses
+// it too, matching PaymentStatusPill's own REFUNDED mapping (see
+// components/admin/PaymentStatusPill.tsx) — the same payment must read as
+// the same color on the board card and in the drawer it opens into, which
+// is exactly what that shared pill exists to guarantee.
+const READING_STYLE: Record<PaymentReading, string> = {
+  DUE: "bg-warning/12 text-warning",
+  PAID: "bg-success/12 text-success",
+  REFUNDED: "bg-border/16 text-on-surface-muted",
+  NONE: "bg-border/16 text-on-surface-muted",
+};
+
+const READING_LABEL_KEY: Record<PaymentReading, keyof AdminDictionary["orders"]> = {
+  DUE: "paymentPending",
+  PAID: "paymentPaid",
+  REFUNDED: "paymentRefunded",
+  NONE: "paymentNone",
+};
+
 export function OrderCard({
   order,
   dict,
@@ -112,13 +133,6 @@ export function OrderCard({
 
   const nextStatus = getNextStatus(order.status);
   const isDelivered = order.status === "DELIVERED";
-  // Anything short of SUCCEEDED reads as "not paid yet" — before Stripe,
-  // PENDING was the only non-paid status a cash order could hold, but a
-  // card attempt can also sit at PROCESSING/REQUIRES_ACTION/FAILED, and
-  // all three used to render this badge green ("Paid") since only PENDING
-  // was checked. REFUNDED/PARTIALLY_REFUNDED aren't reachable yet (Fase 5
-  // isn't wired), so they aren't given their own badge here.
-  const paymentDue = order.paymentStatus !== "SUCCEEDED";
 
   function advance() {
     startTransition(async () => {
@@ -184,11 +198,9 @@ export function OrderCard({
           type="button"
           onClick={() => onViewPayment(order)}
           aria-label={dict.viewPayment}
-          className={`rounded-sm font-semibold underline-offset-2 transition-[opacity,text-decoration] hover:underline active:opacity-60 ${s.paymentBadge} ${
-            paymentDue ? "bg-warning/12 text-warning" : "bg-success/12 text-success"
-          }`}
+          className={`rounded-sm font-semibold underline-offset-2 transition-[opacity,text-decoration] hover:underline active:opacity-60 ${s.paymentBadge} ${READING_STYLE[order.paymentReading]}`}
         >
-          {paymentDue ? dict.paymentPending : dict.paymentPaid}
+          {dict[READING_LABEL_KEY[order.paymentReading]]}
         </button>
         <span className={`font-semibold tabular-nums text-on-surface-muted ${s.price}`}>
           {formatMoney(order.total, order.currency, lang)}
@@ -215,7 +227,7 @@ export function OrderCard({
               gloved hands, not clicked at a desk, so it steps outside the
               admin panel's usual dense button padding (button-primary-admin)
               while keeping the same rounded-sm/color tokens. */}
-          {paymentDue && order.paymentProvider === "CASH_REGISTER" && (
+          {order.canCollectCash && (
             <button
               type="button"
               onClick={collectCash}

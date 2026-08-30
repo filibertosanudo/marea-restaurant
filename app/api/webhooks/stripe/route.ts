@@ -1,7 +1,7 @@
 import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe/client";
-import { applyStripeEvent, resolveChargeDetailsForEvent } from "@/lib/payments/webhook-handlers";
+import { applyStripeEvent, resolveChargeDetailsForEvent, resolveRefundsForEvent } from "@/lib/payments/webhook-handlers";
 import { isUniqueConstraintError } from "@/lib/payments/prisma-errors";
 import { Prisma } from "@/lib/generated/prisma/client";
 
@@ -30,7 +30,20 @@ export async function POST(request: Request) {
     return new Response("Invalid signature", { status: 400 });
   }
 
-  const chargeDetails = await resolveChargeDetailsForEvent(event);
+  // Best-effort enrichment only (brand/last4/receipt) — a network blip or
+  // rate limit here must not turn into a 500 that sends Stripe into its
+  // retry loop for an event this app can otherwise apply just fine.
+  // Unlike resolveRefundsForEvent below, losing this never misrepresents
+  // money: the Payment row still gets marked SUCCEEDED, just without the
+  // card's last four digits, backfillable later.
+  let chargeDetails: Awaited<ReturnType<typeof resolveChargeDetailsForEvent>>;
+  try {
+    chargeDetails = await resolveChargeDetailsForEvent(event);
+  } catch (err) {
+    console.error("Stripe webhook: failed to resolve charge details", event.type, err);
+    chargeDetails = null;
+  }
+  const refunds = await resolveRefundsForEvent(event);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -42,7 +55,7 @@ export async function POST(request: Request) {
           processedAt: new Date(),
         },
       });
-      await applyStripeEvent(tx, event, chargeDetails);
+      await applyStripeEvent(tx, event, chargeDetails, refunds);
     });
   } catch (err) {
     if (isUniqueConstraintError(err)) {

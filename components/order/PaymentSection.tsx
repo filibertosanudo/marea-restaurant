@@ -174,8 +174,6 @@ export function PaymentSection({
                 failedBodyFallback: dict.cardFailedBodyFallback,
                 retry: dict.cardRetry,
                 switchToCash: dict.cardSwitchToCash,
-                succeededTitle: dict.cardSucceededTitle,
-                succeededBody: dict.cardSucceededBody,
               }}
             />
           )}

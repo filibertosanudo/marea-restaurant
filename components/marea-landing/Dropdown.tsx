@@ -11,9 +11,10 @@ type DropdownProps = {
   options: Option[];
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 };
 
-export function Dropdown({ id, label, options, value, onChange }: DropdownProps) {
+export function Dropdown({ id, label, options, value, onChange, disabled = false }: DropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -48,6 +49,7 @@ export function Dropdown({ id, label, options, value, onChange }: DropdownProps)
         className="ml-dd-trigger"
         aria-haspopup="listbox"
         aria-expanded={open}
+        disabled={disabled}
         onClick={() => setOpen((o) => !o)}
       >
         <span>{sel ? sel.label : ""}</span>

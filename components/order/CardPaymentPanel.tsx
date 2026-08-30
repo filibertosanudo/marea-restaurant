@@ -13,7 +13,7 @@ import { getStripe } from "@/lib/stripe/browser";
 // at a spinner forever.
 const STUCK_PROCESSING_MS = 20_000;
 
-export type CardPaymentStatus = "form" | "processing" | "requires_action" | "failed" | "succeeded";
+export type CardPaymentStatus = "form" | "processing" | "requires_action" | "failed";
 
 function Spinner() {
   return (
@@ -50,11 +50,15 @@ function readColorToken(name: string, fallback: string): string {
  * updates the order's real payment status, and PaymentSection's own
  * top-level branch takes over from there.
  *
- * `requires_action`/`succeeded` stay as render branches for design
- * completeness (a future manual-confirmation flow could drive them), but
- * `redirect: "if_required"` has Stripe show its own 3D Secure challenge
- * inline as part of confirmPayment's own UI — this component never gets a
- * mid-flight callback to switch into `requires_action` itself.
+ * `requires_action` stays as a render branch for design completeness (a
+ * future manual-confirmation flow could drive it), but `redirect:
+ * "if_required"` has Stripe show its own 3D Secure challenge inline as part
+ * of confirmPayment's own UI — this component never gets a mid-flight
+ * callback to switch into `requires_action` itself. There's deliberately no
+ * "succeeded" branch here: nothing in this component ever sets that status
+ * (see the paragraph above), so it can only ever be reached by leaving the
+ * order in a state its own confirmPayment call never produces — the
+ * webhook-driven success screen lives one level up, in PaymentSection.
  */
 export function CardPaymentPanel({
   clientSecret,
@@ -80,8 +84,6 @@ export function CardPaymentPanel({
     failedBodyFallback: string;
     retry: string;
     switchToCash: string;
-    succeededTitle: string;
-    succeededBody: string;
   };
 }) {
   const [status, setStatus] = useState<CardPaymentStatus>("form");
@@ -105,6 +107,16 @@ export function CardPaymentPanel({
   }, [status]);
 
   useEffect(() => {
+    // The mount node only exists in the DOM while status === "form" (every
+    // other status is its own early-return branch below). Without this
+    // guard, retrying after a failed payment flips status back to "form"
+    // and React renders a brand-new, empty mount div that this effect never
+    // re-runs for — the guest sees the "Pagar" button with no card field
+    // above it. Depending on `status` here means a failed→form retry reruns
+    // this same mount logic against that new node instead of relying on a
+    // stale ref into a div React already discarded.
+    if (status !== "form") return;
+
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setElementReady(false);
@@ -139,16 +151,16 @@ export function CardPaymentPanel({
 
     return () => {
       cancelled = true;
-      // Unmounts the iframe before the next effect run (or this
-      // component's own unmount) creates a new one — without this, a
-      // clientSecret change while mounted would stack a second Payment
-      // Element into the same DOM node instead of replacing the first.
+      // Unmounts the iframe before the next effect run (a clientSecret
+      // change, or leaving and re-entering "form") creates a new one —
+      // without this, either case would stack a second Payment Element
+      // into the same DOM node instead of replacing the first.
       paymentElementRef.current?.unmount();
       paymentElementRef.current = null;
       elementsRef.current = null;
       stripeRef.current = null;
     };
-  }, [clientSecret]);
+  }, [clientSecret, status]);
 
   async function handleSubmit() {
     const stripeInstance = stripeRef.current;
@@ -242,20 +254,6 @@ export function CardPaymentPanel({
             {dict.switchToCash}
           </button>
         </div>
-      </div>
-    );
-  }
-
-  if (status === "succeeded") {
-    return (
-      <div className="flex flex-col items-center gap-sm rounded-lg border border-success/30 bg-success/8 p-lg text-center">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-success/16 text-success">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <p className="text-[14px] font-semibold text-on-surface">{dict.succeededTitle}</p>
-        <p className="text-[12.5px] text-on-surface-muted">{dict.succeededBody}</p>
       </div>
     );
   }
