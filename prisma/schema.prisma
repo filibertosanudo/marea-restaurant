@@ -1036,8 +1036,14 @@ model Reservation {
   status ReservationStatus @default(PENDING)
   notes  String? @db.Text // "alergias, ocasión especial, preferencia de mesa"
 
-  /// Código que se le manda al cliente para consultar o cancelar sin cuenta.
-  confirmationCode String @unique @default(cuid())
+  /// Código que se le manda al cliente para consultar o cancelar sin cuenta —
+  /// toda la autenticación de esa pantalla, y la única que además puede
+  /// *cancelar*, no sólo ver. cuid(2) y no cuid() por la misma razón que
+  /// Order.publicToken documenta junto a su propio campo: el cuid() por
+  /// defecto es CUID v1, estructurado, y acota demasiado el espacio de
+  /// búsqueda de alguien adivinando el código de otra reservación hecha casi
+  /// al mismo tiempo.
+  confirmationCode String @unique @default(cuid(2))
 
   confirmedAt DateTime?
   seatedAt    DateTime?
