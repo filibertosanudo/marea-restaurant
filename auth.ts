@@ -76,7 +76,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const parsed = loginSchema.safeParse(rawCredentials);
         if (!parsed.success) return null;
         const { email, password } = parsed.data;
-        const ipAddress = getClientIp(request);
+        const ipAddress = getClientIp(request.headers);
 
         if (await isRateLimited(email, ipAddress)) return null;
 
