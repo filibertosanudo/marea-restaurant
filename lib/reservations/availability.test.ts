@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { getAvailableSlots, findSlot, isTableFreeForRange, type AvailabilityInput } from "./availability";
+import {
+  getAvailableSlots,
+  findSlot,
+  isTableFreeForRange,
+  getOpeningWindowsForDate,
+  isMinuteWithinWindows,
+  type AvailabilityInput,
+} from "./availability";
 
 // America/Hermosillo is UTC-7 year-round (Sonora doesn't observe DST) — a
 // deterministic zone to assert exact UTC instants against, matching
@@ -279,5 +286,36 @@ describe("isTableFreeForRange", () => {
   it("excludes the reservation being reassigned from colliding with itself", () => {
     const existing = [{ id: "r-1", tableId: "t-1", reservedFor: startsAt, endsAt, status: "CONFIRMED" as const }];
     expect(isTableFreeForRange("t-1", startsAt, endsAt, existing, "r-1")).toBe(true);
+  });
+});
+
+describe("getOpeningWindowsForDate / isMinuteWithinWindows", () => {
+  // Same source of truth the panel agenda uses to decide which reservations
+  // belong to a business day — this is what closes the gap a close-after-
+  // midnight window would otherwise open in a naive midnight-to-midnight query.
+  const windows = [
+    { dayOfWeek: 5, opensAt: 720, closesAt: 1560, isClosed: false }, // Fri 12:00–2:00am next day
+    { dayOfWeek: 6, opensAt: 600, closesAt: 900, isClosed: false }, // Sat, irrelevant to Friday
+  ];
+
+  it("returns only the requested weekday's own windows", () => {
+    expect(getOpeningWindowsForDate(BUSINESS_DAY, windows)).toEqual([windows[0]]);
+  });
+
+  it("excludes a closed window even on the right weekday", () => {
+    const closed = [{ dayOfWeek: 5, opensAt: 720, closesAt: 1380, isClosed: true }];
+    expect(getOpeningWindowsForDate(BUSINESS_DAY, closed)).toEqual([]);
+  });
+
+  it("treats a minute past 1440 as belonging to the day whose window runs that late", () => {
+    const fridayWindows = getOpeningWindowsForDate(BUSINESS_DAY, windows);
+    expect(isMinuteWithinWindows(1500, fridayWindows)).toBe(true); // 1:00am, still Friday's late service
+    expect(isMinuteWithinWindows(1620, fridayWindows)).toBe(false); // past closing, belongs to no window
+  });
+
+  it("rejects a minute before opening or exactly at closing", () => {
+    const fridayWindows = getOpeningWindowsForDate(BUSINESS_DAY, windows);
+    expect(isMinuteWithinWindows(600, fridayWindows)).toBe(false);
+    expect(isMinuteWithinWindows(1560, fridayWindows)).toBe(false);
   });
 });

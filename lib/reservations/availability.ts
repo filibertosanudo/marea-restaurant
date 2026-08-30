@@ -204,6 +204,25 @@ export function isTableFreeForRange(
   );
 }
 
+/** 0 = domingo … 6 = sábado, matching Date.getDay() and OpeningHour.dayOfWeek — the one place this gets derived from a {year, month, day}. */
+function dayOfWeekFor(date: { year: number; month: number; day: number }): number {
+  return new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay();
+}
+
+/** This calendar day's own OpeningHour windows — the same definition of "belongs to this day" that getAvailableSlots books against, so anything deciding whether a given reservation belongs to a business day (the panel agenda, for one) uses the identical rule instead of a re-guessed one. */
+export function getOpeningWindowsForDate(
+  date: { year: number; month: number; day: number },
+  openingHours: OpeningHourWindow[]
+): OpeningHourWindow[] {
+  const dayOfWeek = dayOfWeekFor(date);
+  return openingHours.filter((h) => h.dayOfWeek === dayOfWeek && !h.isClosed);
+}
+
+/** Whether a slot identity (possibly past 1440, for a close-after-midnight window) falls inside any of this day's own windows. */
+export function isMinuteWithinWindows(minutesFromMidnight: number, windows: OpeningHourWindow[]): boolean {
+  return windows.some((w) => minutesFromMidnight >= w.opensAt && minutesFromMidnight < w.closesAt);
+}
+
 /**
  * Every slot a guest could book for one calendar day, each already paired
  * with the specific table it would seat them at. A slot only appears if,
@@ -218,8 +237,7 @@ export function getAvailableSlots(input: AvailabilityInput): AvailableSlot[] {
 
   const step = input.stepMinutes ?? 30;
   const earliestBookable = new Date(input.now.getTime() + (input.minLeadMinutes ?? 0) * 60_000);
-  const dayOfWeek = new Date(Date.UTC(input.date.year, input.date.month - 1, input.date.day)).getUTCDay();
-  const windows = input.openingHours.filter((h) => h.dayOfWeek === dayOfWeek && !h.isClosed);
+  const windows = getOpeningWindowsForDate(input.date, input.openingHours);
 
   const slots: AvailableSlot[] = [];
 

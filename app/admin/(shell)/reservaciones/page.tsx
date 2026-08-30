@@ -4,8 +4,8 @@ import { isAdminRole } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
-import { localWallClockToUtc } from "@/lib/reservations/availability";
-import { getAgendaReservationsRaw, getReservableTablesForAgenda } from "@/lib/reservations/queries";
+import { localWallClockToUtc, getOpeningWindowsForDate, isMinuteWithinWindows } from "@/lib/reservations/availability";
+import { getAgendaReservationsRaw, getReservableTablesForAgenda, getOpeningHours } from "@/lib/reservations/queries";
 import { toAgendaReservationDTO, summarizeAgenda } from "@/lib/reservations/dto";
 import { ReservationsAgenda } from "@/components/admin/reservations/ReservationsAgenda";
 
@@ -54,15 +54,27 @@ export default async function ReservationsAgendaPage({
   const { year, month, day } = parseDateParts(dateParam);
 
   const dayStart = localWallClockToUtc(year, month, day, 0, business.timezone);
-  const dayEnd = localWallClockToUtc(year, month, day, 1440, business.timezone);
+  // Widened past this day's own midnight for the same reason
+  // loadAvailabilityForDay is: a close-after-midnight window can seat a
+  // reservation whose reservedFor timestamp falls on the next calendar day
+  // while it's still tonight's service. getOpeningWindowsForDate below is
+  // what actually decides which of those belong to *this* day, so the wide
+  // fetch can't leak a reservation into two days at once.
+  const dayEnd = localWallClockToUtc(year, month, day, 2880, business.timezone);
 
-  const [rawReservations, tables] = await Promise.all([
+  const [rawReservations, tables, openingHours] = await Promise.all([
     getAgendaReservationsRaw(business.id, dayStart, dayEnd),
     getReservableTablesForAgenda(business.id),
+    getOpeningHours(business.id),
   ]);
 
+  const windowsForDay = getOpeningWindowsForDate({ year, month, day }, openingHours);
+  const reservationsForDay = rawReservations.filter((r) =>
+    isMinuteWithinWindows((r.reservedFor.getTime() - dayStart.getTime()) / 60_000, windowsForDay)
+  );
+
   const now = new Date();
-  const reservations = rawReservations.map((r) => toAgendaReservationDTO(r, business.timezone, lang, now));
+  const reservations = reservationsForDay.map((r) => toAgendaReservationDTO(r, business.timezone, lang, now));
   const summary = summarizeAgenda(reservations);
 
   const dateLabel = new Intl.DateTimeFormat(lang === "es" ? "es-MX" : "en-US", {
