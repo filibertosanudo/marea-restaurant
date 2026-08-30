@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -25,7 +25,7 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
-  const [partySize, setPartySize] = useState("2");
+  const [partySize, setPartySize] = useState(() => String(Math.min(2, maxPartySize)));
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
@@ -42,6 +42,13 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
   const [codeCopied, setCodeCopied] = useState(false);
 
   const todayLocal = useState(() => new Date().toISOString().slice(0, 10))[0];
+  const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!date) {
@@ -52,6 +59,7 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
     }
     let cancelled = false;
     setSlotsState("loading");
+    setConflict(false);
     getReservationSlotsAction(date, Number(partySize)).then((result) => {
       if (cancelled) return;
       const times = result.ok ? result.times : [];
@@ -113,7 +121,8 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
     try {
       await navigator.clipboard.writeText(confirmationCode);
       setCodeCopied(true);
-      setTimeout(() => setCodeCopied(false), 2000);
+      if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+      copyResetTimer.current = setTimeout(() => setCodeCopied(false), 2000);
     } catch {
       // Clipboard access can be denied — the code is still visible to copy by hand.
     }
@@ -207,7 +216,14 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
 
       <div className="ml-form-row">
         <div className="field">
-          <Dropdown id="r-guests" label={t.guests} options={guestOptions} value={partySize} onChange={setPartySize} />
+          <Dropdown
+            id="r-guests"
+            label={t.guests}
+            options={guestOptions}
+            value={partySize}
+            onChange={setPartySize}
+            disabled={submitting}
+          />
         </div>
         <div className="field">
           <Input
@@ -243,7 +259,11 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
             label={t.time}
             options={[{ value: "", label: t.chooseTime }, ...timeOptions]}
             value={time}
-            onChange={setTime}
+            onChange={(v) => {
+              setConflict(false);
+              setTime(v);
+            }}
+            disabled={submitting}
           />
         )}
         {date && slotsState === "loaded" && timeOptions.length === 0 && (
@@ -252,7 +272,9 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
               <circle cx="12" cy="12" r="10" />
               <path d="M12 8v4M12 16h.01" />
             </svg>
-            <span>{t.noSlotsBody.replace("{n}", partySize)}</span>
+            <span>
+              <strong>{t.noSlotsTitle}</strong> — {t.noSlotsBody.replace("{n}", partySize)}
+            </span>
           </div>
         )}
         {conflict && (
