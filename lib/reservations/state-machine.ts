@@ -23,16 +23,7 @@ export function canTransitionReservation(from: ReservationStatus, to: Reservatio
   return LEGAL_TRANSITIONS[from].includes(to);
 }
 
-export class IllegalReservationTransitionError extends Error {
-  constructor(from: ReservationStatus, to: ReservationStatus) {
-    super(`Cannot transition reservation from ${from} to ${to}`);
-    this.name = "IllegalReservationTransitionError";
-  }
-}
-
-/** Throws IllegalReservationTransitionError instead of silently applying a transition the graph above doesn't allow. */
-export function assertReservationTransition(from: ReservationStatus, to: ReservationStatus): void {
-  if (!canTransitionReservation(from, to)) {
-    throw new IllegalReservationTransitionError(from, to);
-  }
-}
+/** Derived from the graph above, same as payments' CANCELLABLE_PAYMENT_STATUSES — so the agenda's Cancel button and dto.ts's canCancelReservation can't drift from a change to LEGAL_TRANSITIONS the way a hand-listed status set would. */
+export const CANCELLABLE_RESERVATION_STATUSES: ReservationStatus[] = (
+  Object.keys(LEGAL_TRANSITIONS) as ReservationStatus[]
+).filter((status) => canTransitionReservation(status, "CANCELLED"));

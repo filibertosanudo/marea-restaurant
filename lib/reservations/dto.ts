@@ -1,4 +1,5 @@
 import { toIntlLocale } from "@/lib/dto/money";
+import { CANCELLABLE_RESERVATION_STATUSES } from "./state-machine";
 import type { Reservation, ReservationStatus, RestaurantTable } from "@/lib/generated/prisma/client";
 
 /**
@@ -23,17 +24,28 @@ export const MIN_CANCEL_LEAD_MINUTES = 120;
  */
 export const MIN_BOOKING_LEAD_MINUTES = 30;
 
-const CANCELLABLE_STATUSES: ReservationStatus[] = ["PENDING", "CONFIRMED"];
-
 /** Pure so it's trivial to reason about from the definition of done ("cancelarla si todavía falta tiempo suficiente") without spinning up a request. */
 export function canCancelReservation(
   reservation: Pick<Reservation, "status" | "reservedFor">,
   now: Date
 ): boolean {
-  if (!CANCELLABLE_STATUSES.includes(reservation.status)) return false;
+  if (!CANCELLABLE_RESERVATION_STATUSES.includes(reservation.status)) return false;
   const minutesUntil = (reservation.reservedFor.getTime() - now.getTime()) / 60_000;
   return minutesUntil >= MIN_CANCEL_LEAD_MINUTES;
 }
+
+/** The six status labels every reservation-status dictionary carries — ReservationDictionary (guest-facing) and AdminDictionary["reservations"] (panel) each define these same key names, so one map serves both instead of each screen re-listing the same six pairs. */
+export const RESERVATION_STATUS_LABEL_KEY: Record<
+  ReservationStatus,
+  "statusPending" | "statusConfirmed" | "statusSeated" | "statusCompleted" | "statusCancelled" | "statusNoShow"
+> = {
+  PENDING: "statusPending",
+  CONFIRMED: "statusConfirmed",
+  SEATED: "statusSeated",
+  COMPLETED: "statusCompleted",
+  CANCELLED: "statusCancelled",
+  NO_SHOW: "statusNoShow",
+};
 
 export type ReservationLookupDTO = {
   confirmationCode: string;

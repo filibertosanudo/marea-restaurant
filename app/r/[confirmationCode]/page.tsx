@@ -2,28 +2,17 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getCurrentBusiness } from "@/lib/business";
 import { getReservationByConfirmationCode } from "@/lib/reservations/queries";
-import { toReservationLookupDTO } from "@/lib/reservations/dto";
+import { toReservationLookupDTO, RESERVATION_STATUS_LABEL_KEY } from "@/lib/reservations/dto";
 import { getOrderLang } from "@/lib/i18n/cookie";
 import { getReservationDictionary } from "@/lib/i18n/dictionaries";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import { CancelReservationButton } from "@/components/reservation/CancelReservationButton";
 import { ReservationStatusBadge } from "@/components/reservation/ReservationStatusBadge";
-import type { ReservationDictionary } from "@/lib/i18n/dictionaries";
-import type { ReservationStatus } from "@/lib/generated/prisma/client";
 
 // Same guessing-surface reasoning as cancelReservationByCodeAction's own
 // scope — a rate-limited request 404s exactly like a genuinely wrong code,
 // never a distinguishable response.
 const LOOKUP_SCOPE = "reservation:lookup";
-
-const STATUS_LABEL_KEY: Record<ReservationStatus, keyof ReservationDictionary> = {
-  PENDING: "statusPending",
-  CONFIRMED: "statusConfirmed",
-  SEATED: "statusSeated",
-  COMPLETED: "statusCompleted",
-  CANCELLED: "statusCancelled",
-  NO_SHOW: "statusNoShow",
-};
 
 export default async function ReservationLookupPage({
   params,
@@ -69,7 +58,10 @@ export default async function ReservationLookupPage({
       <div className="w-full max-w-[380px] rounded-lg bg-surface p-lg text-left">
         <div className="mb-sm flex items-center justify-between">
           <span className="text-[15px] font-semibold text-on-surface">{reservation.guestName}</span>
-          <ReservationStatusBadge status={reservation.status} label={dict[STATUS_LABEL_KEY[reservation.status]]} />
+          <ReservationStatusBadge
+            status={reservation.status}
+            label={dict[RESERVATION_STATUS_LABEL_KEY[reservation.status]]}
+          />
         </div>
         <div className="flex flex-col gap-[4px] text-[13px] text-on-surface-muted">
           <span>{partyLabel}</span>

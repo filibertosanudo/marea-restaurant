@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import type { AgendaReservationDTO, AgendaSummary } from "@/lib/reservations/dto";
+import { RESERVATION_STATUS_LABEL_KEY } from "@/lib/reservations/dto";
+import { CANCELLABLE_RESERVATION_STATUSES } from "@/lib/reservations/state-machine";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import {
   confirmReservationAction,
@@ -10,33 +12,11 @@ import {
   completeReservationAction,
   markNoShowAction,
 } from "@/lib/reservations/staff-actions";
+import { ReservationStatusBadge } from "@/components/reservation/ReservationStatusBadge";
 import { CancelReservationDialog } from "./CancelReservationDialog";
 
 type Table = { id: string; code: string; zone: string | null; seats: number };
 type ReservationDict = AdminDictionary["reservations"];
-
-const STATUS_LABEL_KEY = {
-  PENDING: "statusPending",
-  CONFIRMED: "statusConfirmed",
-  SEATED: "statusSeated",
-  COMPLETED: "statusCompleted",
-  CANCELLED: "statusCancelled",
-  NO_SHOW: "statusNoShow",
-} as const satisfies Record<AgendaReservationDTO["status"], keyof ReservationDict>;
-
-// Neutral for what needs no action yet (PENDING, CANCELLED), info for
-// confirmed-but-not-here-yet, success for SEATED/COMPLETED alike (neither
-// is a problem — the only difference is whether the table's been freed),
-// warning for the one status that genuinely needs a human to notice it.
-// Same mapping ReservationStatusBadge uses on the public lookup page.
-const STATUS_STYLE: Record<AgendaReservationDTO["status"], string> = {
-  PENDING: "bg-border/16 text-on-surface-muted",
-  CONFIRMED: "bg-info/12 text-info",
-  SEATED: "bg-success/12 text-success",
-  COMPLETED: "bg-success/12 text-success",
-  CANCELLED: "bg-border/16 text-on-surface-muted",
-  NO_SHOW: "bg-warning/12 text-warning",
-};
 
 const DIMMED_STATUSES = new Set<AgendaReservationDTO["status"]>(["COMPLETED", "CANCELLED", "NO_SHOW"]);
 
@@ -123,9 +103,7 @@ function ReservationRow({
           </span>
         )}
 
-        <span className={`rounded-sm px-sm py-[3px] text-[12px] font-semibold ${STATUS_STYLE[reservation.status]}`}>
-          {dict[STATUS_LABEL_KEY[reservation.status]]}
-        </span>
+        <ReservationStatusBadge status={reservation.status} label={dict[RESERVATION_STATUS_LABEL_KEY[reservation.status]]} />
 
         <div className="flex flex-wrap items-center gap-[6px]">
           {reservation.status === "PENDING" && (
@@ -168,7 +146,7 @@ function ReservationRow({
               {dict.completeAction}
             </button>
           )}
-          {canCancel && (reservation.status === "PENDING" || reservation.status === "CONFIRMED") && (
+          {canCancel && CANCELLABLE_RESERVATION_STATUSES.includes(reservation.status) && (
             <button
               type="button"
               onClick={() => onCancel(reservation)}
