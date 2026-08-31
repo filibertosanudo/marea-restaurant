@@ -31,6 +31,18 @@
 //     En TypeScript esto llega como Prisma.Decimal — usa .toString() para
 //     mostrar y conviértelo a centavos enteros justo antes de hablar con
 //     Stripe (Stripe siempre trabaja en la unidad mínima).
+//
+//  7) Ningún token público de capacidad usa cuid() — Order.publicToken,
+//     Reservation.confirmationCode y RestaurantTable.qrToken usan cuid(2).
+//     cuid() es CUID v1: estructurado y con un prefijo de timestamp, así que
+//     dos filas creadas en el mismo lote (los doce QR de una apertura, un
+//     lote de reservaciones) tienen ids que difieren solo en unos pocos
+//     bits — exactamente el caso donde es más débil como token de acceso.
+//     cuid(2) no tiene esa estructura. Cart.sessionToken usa en cambio un
+//     CSPRNG explícito (ver su propio comentario) porque además necesita
+//     rotar sin colisionar con el id del carrito; para un campo que solo
+//     necesita "impredecible", cuid(2) ya alcanza y no agrega una tabla ni
+//     una dependencia nueva.
 // ============================================================================
 
 generator client {
@@ -691,7 +703,7 @@ model RestaurantTable {
   code       String // etiqueta visible: "M-04", "Terraza 2"
   zone       String? // "Terraza", "Barra", "Salón principal"
   seats      Int         @default(2)
-  qrToken    String      @unique @default(cuid())
+  qrToken    String      @unique @default(cuid(2))
   qrRotatedAt DateTime?
   status     TableStatus @default(AVAILABLE)
   isActive   Boolean     @default(true)
