@@ -53,10 +53,31 @@ export async function getReservationsOverlapping(
   });
 }
 
-/** Every reservation for one calendar day, in the shape the panel agenda reads — ordered by time, the way the agenda is read, not by status the way a kanban would group it. */
-export async function getAgendaReservationsRaw(businessId: string, dayStart: Date, dayEnd: Date) {
+/**
+ * The panel agenda's own definition of "business day": a fixed local
+ * clock-time cutover, not a function of any OpeningHour row. A restaurant's
+ * hours can be edited or deleted after a reservation was already booked
+ * against them (this module's Fase 3 adds a screen for exactly that), and
+ * a reservation that's already on the books must not disappear from its
+ * own night — or jump to a different one — just because the catalog
+ * changed. 6am is generous: well past any ordinary dinner service's
+ * closes-after-midnight overflow, well before any ordinary opensAt.
+ */
+export const AGENDA_DAY_BOUNDARY_MINUTES = 360;
+
+/**
+ * Every reservation for one business day, in the shape the panel agenda
+ * reads — ordered by time, the way the agenda is read, not by status the
+ * way a kanban would group it. `dayStart` is this calendar day's own local
+ * midnight (in UTC); the actual query window runs from AGENDA_DAY_BOUNDARY_MINUTES
+ * past that to the same offset the next day, so a 1am reservation stays on
+ * the night it started instead of appearing on tomorrow's agenda.
+ */
+export async function getAgendaReservationsRaw(businessId: string, dayStart: Date) {
+  const windowStart = new Date(dayStart.getTime() + AGENDA_DAY_BOUNDARY_MINUTES * 60_000);
+  const windowEnd = new Date(windowStart.getTime() + 24 * 60 * 60_000);
   return prisma.reservation.findMany({
-    where: { businessId, reservedFor: { gte: dayStart, lt: dayEnd } },
+    where: { businessId, reservedFor: { gte: windowStart, lt: windowEnd } },
     orderBy: { reservedFor: "asc" },
     include: { table: { select: { id: true, code: true, zone: true } } },
   });

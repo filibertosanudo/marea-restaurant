@@ -4,7 +4,6 @@ import {
   findSlot,
   isTableFreeForRange,
   getOpeningWindowsForDate,
-  isMinuteWithinWindows,
   businessLocalDateParts,
   type AvailabilityInput,
 } from "./availability";
@@ -290,10 +289,7 @@ describe("isTableFreeForRange", () => {
   });
 });
 
-describe("getOpeningWindowsForDate / isMinuteWithinWindows", () => {
-  // Same source of truth the panel agenda uses to decide which reservations
-  // belong to a business day — this is what closes the gap a close-after-
-  // midnight window would otherwise open in a naive midnight-to-midnight query.
+describe("getOpeningWindowsForDate", () => {
   const windows = [
     { dayOfWeek: 5, opensAt: 720, closesAt: 1560, isClosed: false }, // Fri 12:00–2:00am next day
     { dayOfWeek: 6, opensAt: 600, closesAt: 900, isClosed: false }, // Sat, irrelevant to Friday
@@ -306,18 +302,6 @@ describe("getOpeningWindowsForDate / isMinuteWithinWindows", () => {
   it("excludes a closed window even on the right weekday", () => {
     const closed = [{ dayOfWeek: 5, opensAt: 720, closesAt: 1380, isClosed: true }];
     expect(getOpeningWindowsForDate(BUSINESS_DAY, closed)).toEqual([]);
-  });
-
-  it("treats a minute past 1440 as belonging to the day whose window runs that late", () => {
-    const fridayWindows = getOpeningWindowsForDate(BUSINESS_DAY, windows);
-    expect(isMinuteWithinWindows(1500, fridayWindows)).toBe(true); // 1:00am, still Friday's late service
-    expect(isMinuteWithinWindows(1620, fridayWindows)).toBe(false); // past closing, belongs to no window
-  });
-
-  it("rejects a minute before opening or exactly at closing", () => {
-    const fridayWindows = getOpeningWindowsForDate(BUSINESS_DAY, windows);
-    expect(isMinuteWithinWindows(600, fridayWindows)).toBe(false);
-    expect(isMinuteWithinWindows(1560, fridayWindows)).toBe(false);
   });
 });
 

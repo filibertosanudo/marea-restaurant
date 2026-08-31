@@ -227,18 +227,13 @@ function dayOfWeekFor(date: { year: number; month: number; day: number }): numbe
   return new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay();
 }
 
-/** This calendar day's own OpeningHour windows — the same definition of "belongs to this day" that getAvailableSlots books against, so anything deciding whether a given reservation belongs to a business day (the panel agenda, for one) uses the identical rule instead of a re-guessed one. */
+/** This calendar day's own OpeningHour windows — the definition getAvailableSlots books slots against. */
 export function getOpeningWindowsForDate(
   date: { year: number; month: number; day: number },
   openingHours: OpeningHourWindow[]
 ): OpeningHourWindow[] {
   const dayOfWeek = dayOfWeekFor(date);
   return openingHours.filter((h) => h.dayOfWeek === dayOfWeek && !h.isClosed);
-}
-
-/** Whether a slot identity (possibly past 1440, for a close-after-midnight window) falls inside any of this day's own windows. */
-export function isMinuteWithinWindows(minutesFromMidnight: number, windows: OpeningHourWindow[]): boolean {
-  return windows.some((w) => minutesFromMidnight >= w.opensAt && minutesFromMidnight < w.closesAt);
 }
 
 /**
