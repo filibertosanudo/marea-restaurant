@@ -44,16 +44,23 @@ export async function recordLoginAttempt(
   // password proves the account owner is behind the wheel, so a few earlier
   // typos (from them or a colleague on the same shared login) shouldn't
   // still count against them for the rest of the window — cleared by email
-  // only, regardless of which IP they're on now. Separately, anything
-  // already outside the window is dead weight regardless of whose email it
-  // is — isRateLimited never reads past `since` anyway, so leaving it is
-  // pure growth with no purpose (an email that never once succeeds, a
-  // typo'd address, a spray attack, otherwise only ever grows this table).
+  // only, regardless of which IP they're on now. Separately, any login
+  // attempt outside login's own window is dead weight regardless of whose
+  // email it is — isRateLimited never reads past `since` anyway.
+  //
+  // The stale-row branch is scoped to `email: { contains: "@" }` — real
+  // email addresses only — because this table is shared with
+  // isScopeRateLimited/recordScopeAttempt below, which store a bare scope
+  // string (never containing "@", by convention) in this same column with
+  // their own, often longer, window. Without that filter, any login
+  // anywhere deleted every scope's rows the moment they turned 15 minutes
+  // old, silently shrinking a 60-minute reservation-creation window down to
+  // login's own 15.
   await prisma.loginAttempt.deleteMany({
     where: {
       OR: [
         ...(succeeded ? [{ email: normalizeEmail(email), succeeded: false }] : []),
-        { createdAt: { lt: new Date(Date.now() - WINDOW_MS) } },
+        { email: { contains: "@" }, createdAt: { lt: new Date(Date.now() - WINDOW_MS) } },
       ],
     },
   });
@@ -104,6 +111,11 @@ export const DEFAULT_SCOPE_WINDOW_MS = WINDOW_MS;
  * Unlike isRateLimited, this counts every attempt regardless of outcome:
  * a spammer's 200 *successful* reservations are exactly the harm being
  * limited, not just failed ones, so there's no `succeeded` filter here.
+ *
+ * Contract: `scope` must never contain "@" — recordLoginAttempt's own
+ * stale-row cleanup uses that to tell a real login attempt from a scope
+ * row sharing this table, so a scope shaped like an email would get its
+ * rows swept by login's shorter window instead of living out its own.
  */
 export async function isScopeRateLimited(
   scope: string,
