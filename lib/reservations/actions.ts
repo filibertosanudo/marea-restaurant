@@ -157,8 +157,9 @@ export async function createReservationAction(input: {
   const slot = findSlot(availabilityInput, parsed.data.time);
   if (!slot) return { ok: false, error: "slot_taken" };
 
+  let reservation;
   try {
-    const reservation = await prisma.$transaction(async (tx) => {
+    reservation = await prisma.$transaction(async (tx) => {
       const created = await tx.reservation.create({
         data: {
           businessId: business.id,
@@ -195,18 +196,23 @@ export async function createReservationAction(input: {
 
       return created;
     });
-
-    // Recorded only once a reservation is actually created, not on every
-    // attempt — a slot that turns out taken (here or by the EXCLUDE
-    // constraint below) shouldn't spend the same budget a real booking
-    // does, or three unlucky guesses on a full Friday night lock out the
-    // next guest who would have found a real opening.
-    await recordScopeAttempt(CREATE_SCOPE, ip);
-    return { ok: true, confirmationCode: reservation.confirmationCode };
   } catch (err) {
     if (isExclusionConstraintError(err)) return { ok: false, error: "slot_taken" };
     throw err;
   }
+
+  // Recorded only once a reservation is actually created, not on every
+  // attempt — a slot that turns out taken shouldn't spend the same budget
+  // a real booking does. Best-effort and outside the block above on
+  // purpose: the reservation already committed, so a hiccup in this
+  // bookkeeping write must never turn an actually-successful booking into
+  // an error the guest sees with no confirmation code.
+  try {
+    await recordScopeAttempt(CREATE_SCOPE, ip);
+  } catch {
+    // swallowed — see comment above
+  }
+  return { ok: true, confirmationCode: reservation.confirmationCode };
 }
 
 export type CancelReservationResult = { ok: true } | { ok: false; error: "not_found" | "too_late" };
