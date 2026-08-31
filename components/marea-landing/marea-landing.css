@@ -464,16 +464,10 @@ html {
   margin-top: 4px;
 }
 .ml-price {
-  /* Deliberately not the primary accent — only the Preorder button
-     should read as the accented element on this card. */
   font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
   font-weight: 600;
   font-size: 18px;
   color: rgb(var(--color-on-surface));
-}
-.ml-dish-foot button {
-  padding: 9px 20px !important;
-  font-size: 13px !important;
 }
 .ml-menu-actions {
   display: flex;
@@ -864,61 +858,6 @@ html {
   border-radius: 12px;
   padding: 14px 26px;
   margin: 6px 0;
-}
-
-/* Preorder modal */
-.ml-preorder-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.ml-preorder-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 4px;
-}
-.ml-preorder-thumb {
-  width: 64px;
-  height: 64px;
-  border-radius: 12px;
-  overflow: hidden;
-  flex: 0 0 auto;
-}
-.ml-preorder-price {
-  font-family: var(--font-montserrat-alternates, "Montserrat Alternates", sans-serif);
-  font-weight: 600;
-  font-size: 22px;
-  color: rgb(var(--color-on-surface));
-}
-.ml-qty {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  border: 1px solid rgb(var(--color-border));
-  border-radius: 999px;
-  padding: 8px 16px;
-  flex: 0 0 auto;
-}
-.ml-qty button {
-  width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  color: rgb(var(--color-on-surface));
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-.ml-qty span {
-  min-width: 16px;
-  text-align: center;
-  font-weight: 600;
-  color: rgb(var(--color-on-surface));
 }
 
 .ml-ta-field {
