@@ -116,13 +116,21 @@ export const DEFAULT_SCOPE_WINDOW_MS = WINDOW_MS;
  * stale-row cleanup uses that to tell a real login attempt from a scope
  * row sharing this table, so a scope shaped like an email would get its
  * rows swept by login's shorter window instead of living out its own.
+ * Enforced at runtime by assertValidScope below, not just by convention.
  */
+function assertValidScope(scope: string): void {
+  if (scope.includes("@")) {
+    throw new Error(`Invalid rate-limit scope "${scope}": scopes must not contain "@" (reserved for real emails)`);
+  }
+}
+
 export async function isScopeRateLimited(
   scope: string,
   ipAddress: string,
   maxAttempts: number = DEFAULT_SCOPE_MAX_ATTEMPTS_PER_IP,
   windowMs: number = DEFAULT_SCOPE_WINDOW_MS
 ): Promise<boolean> {
+  assertValidScope(scope);
   const since = new Date(Date.now() - windowMs);
   const count = await prisma.loginAttempt.count({
     where: { email: scope, ipAddress, createdAt: { gte: since } },
@@ -132,6 +140,7 @@ export async function isScopeRateLimited(
 
 /** Records one attempt against `scope`+`ipAddress` and prunes anything old enough that no caller's window could still read it — a scope with no other cleanup would otherwise only ever grow this table. */
 export async function recordScopeAttempt(scope: string, ipAddress: string): Promise<void> {
+  assertValidScope(scope);
   await prisma.loginAttempt.create({ data: { email: scope, ipAddress, succeeded: true } });
   await prisma.loginAttempt.deleteMany({
     where: { email: scope, ipAddress, createdAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
