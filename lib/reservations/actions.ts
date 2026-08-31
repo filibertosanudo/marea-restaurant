@@ -141,7 +141,6 @@ export async function createReservationAction(input: {
   if (await isScopeRateLimited(CREATE_SCOPE, ip, CREATE_MAX_ATTEMPTS, CREATE_WINDOW_MS)) {
     return { ok: false, error: "rate_limited" };
   }
-  await recordScopeAttempt(CREATE_SCOPE, ip);
 
   const business = await getCurrentBusiness();
   const availabilityInput = await loadAvailabilityForDay(business, parsed.data.date, parsed.data.partySize, new Date());
@@ -187,6 +186,12 @@ export async function createReservationAction(input: {
       return created;
     });
 
+    // Recorded only once a reservation is actually created, not on every
+    // attempt — a slot that turns out taken (here or by the EXCLUDE
+    // constraint below) shouldn't spend the same budget a real booking
+    // does, or three unlucky guesses on a full Friday night lock out the
+    // next guest who would have found a real opening.
+    await recordScopeAttempt(CREATE_SCOPE, ip);
     return { ok: true, confirmationCode: reservation.confirmationCode };
   } catch (err) {
     if (isExclusionConstraintError(err)) return { ok: false, error: "slot_taken" };
