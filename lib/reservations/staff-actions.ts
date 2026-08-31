@@ -43,17 +43,26 @@ async function lockReservationForUpdate(
   return rows[0];
 }
 
-/** The shared shape every plain status transition below follows: lock, validate against the state machine, write. confirmReservationAction doesn't use this directly — its optional table reassignment needs an extra step in between. */
+/**
+ * The shared shape every plain status transition below follows: lock,
+ * validate against the state machine, optionally run one more check that
+ * the graph itself can't express, write. confirmReservationAction doesn't
+ * use this directly — its optional table reassignment needs an extra step
+ * in between.
+ */
 async function transitionReservation(
   tx: Prisma.TransactionClient,
   businessId: string,
   reservationId: string,
   targetStatus: ReservationStatus,
-  extraData: Record<string, unknown> = {}
-): Promise<{ error: "not_found" | "invalid_transition" } | undefined> {
+  extraData: Record<string, unknown> = {},
+  guard?: (reservation: Reservation) => string | undefined
+): Promise<{ error: string } | undefined> {
   const reservation = await lockReservationForUpdate(tx, businessId, reservationId);
   if (!reservation) return { error: "not_found" };
   if (!canTransitionReservation(reservation.status, targetStatus)) return { error: "invalid_transition" };
+  const guardError = guard?.(reservation);
+  if (guardError) return { error: guardError };
 
   await tx.reservation.update({ where: { id: reservationId }, data: { status: targetStatus, ...extraData } });
   return undefined;
@@ -196,13 +205,24 @@ export async function completeReservationAction(reservationId: string): Promise<
   revalidatePath("/admin/reservaciones");
 }
 
-/** STAFF and up — a confirmed party that never showed. */
+/**
+ * STAFF and up — a party that never showed. CONFIRMED can be marked
+ * no-show any time staff judges the party isn't coming; PENDING's
+ * no-show path is only for a reservation that's already overdue (the
+ * agenda only ever renders that button once `isOverdue` is true) —
+ * enforced here too, not just by the button being hidden, so a direct
+ * call can't mark a reservation that hasn't even started yet.
+ */
 export async function markNoShowAction(reservationId: string): Promise<ReservationActionState> {
   const forbidden = await requireRoleOrForbidden(...STAFF_ROLES);
   if (forbidden) return forbidden;
   const business = await getCurrentBusiness();
 
-  const result = await prisma.$transaction((tx) => transitionReservation(tx, business.id, reservationId, "NO_SHOW"));
+  const result = await prisma.$transaction((tx) =>
+    transitionReservation(tx, business.id, reservationId, "NO_SHOW", {}, (reservation) =>
+      reservation.status === "PENDING" && reservation.reservedFor.getTime() >= Date.now() ? "not_overdue" : undefined
+    )
+  );
   if (result?.error) return result;
   revalidatePath("/admin/reservaciones");
 }
