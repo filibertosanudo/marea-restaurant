@@ -29,7 +29,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: "orders", href: "/admin/pedidos", roles: STAFF_UP, enabled: true },
   { key: "reservations", href: "/admin/reservaciones", roles: STAFF_UP, enabled: true },
   { key: "promotions", href: "/admin/promociones", roles: ADMIN_ONLY, enabled: false },
-  { key: "tables", href: "/admin/mesas", roles: ADMIN_ONLY, enabled: false },
+  { key: "tables", href: "/admin/mesas", roles: ADMIN_ONLY, enabled: true },
   { key: "testimonials", href: "/admin/testimonios", roles: ADMIN_ONLY, enabled: false },
   { key: "team", href: "/admin/equipo", roles: ADMIN_ONLY, enabled: true },
   { key: "settings", href: "/admin/configuracion", roles: ADMIN_ONLY, enabled: false },
