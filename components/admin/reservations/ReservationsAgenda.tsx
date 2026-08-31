@@ -5,12 +5,14 @@ import Link from "next/link";
 import type { AgendaReservationDTO, AgendaSummary } from "@/lib/reservations/dto";
 import { RESERVATION_STATUS_LABEL_KEY } from "@/lib/reservations/dto";
 import { CANCELLABLE_RESERVATION_STATUSES } from "@/lib/reservations/state-machine";
+import { BLOCKING_STATUSES } from "@/lib/reservations/availability";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import {
   confirmReservationAction,
   seatReservationAction,
   completeReservationAction,
   markNoShowAction,
+  reassignReservationTableAction,
 } from "@/lib/reservations/staff-actions";
 import { ReservationStatusBadge } from "@/components/reservation/ReservationStatusBadge";
 import { CancelReservationDialog } from "./CancelReservationDialog";
@@ -52,6 +54,19 @@ function ReservationRow({
   const [rowError, setRowError] = useState<string | null>(null);
   const [chosenTableId, setChosenTableId] = useState(reservation.tableId ?? "");
 
+  // Adjusted during render (React's documented pattern for this, not an
+  // effect) whenever the server's own tableId moves out from under the
+  // local selection — after a reassignment revalidates this row's data, or
+  // any other update changes its table. This component stays mounted
+  // across that refresh (same `key`), so without this its local selection
+  // would keep showing whatever was picked right before the request, not
+  // what the server actually confirmed.
+  const [syncedTableId, setSyncedTableId] = useState(reservation.tableId ?? "");
+  if (syncedTableId !== (reservation.tableId ?? "")) {
+    setSyncedTableId(reservation.tableId ?? "");
+    setChosenTableId(reservation.tableId ?? "");
+  }
+
   function run(action: () => Promise<{ error?: string } | undefined>) {
     setRowError(null);
     startTransition(async () => {
@@ -60,6 +75,12 @@ function ReservationRow({
     });
   }
 
+  const canReassignTable = BLOCKING_STATUSES.includes(reservation.status);
+  // The currently assigned table always stays in the list even if it no
+  // longer fits (a party that grew after being seated) — hiding it would
+  // make the dropdown appear to show "no table" for a reservation that
+  // still has one.
+  const tablesThatFit = tables.filter((t) => t.seats >= reservation.partySize || t.id === reservation.tableId);
   const dimmed = DIMMED_STATUSES.has(reservation.status);
 
   return (
@@ -83,15 +104,25 @@ function ReservationRow({
           </div>
         </div>
 
-        {reservation.status === "PENDING" ? (
+        {canReassignTable ? (
           <select
             value={chosenTableId}
-            onChange={(e) => setChosenTableId(e.target.value)}
+            onChange={(e) => {
+              const newTableId = e.target.value;
+              setChosenTableId(newTableId);
+              // PENDING defers to the Confirm click below (there's no table
+              // to "reassign" yet, only to pick); CONFIRMED/SEATED already
+              // hold a table, so picking a different one here is itself the
+              // action.
+              if (reservation.status !== "PENDING" && newTableId) {
+                run(() => reassignReservationTableAction(reservation.id, newTableId));
+              }
+            }}
             disabled={pending}
             className="rounded-sm border border-border/40 bg-surface px-sm py-[6px] text-[12px] text-on-surface"
           >
             <option value="">{dict.tableUnassigned}</option>
-            {tables.map((t) => (
+            {tablesThatFit.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.zone ? `${t.zone} · ${t.code}` : t.code} ({t.seats})
               </option>

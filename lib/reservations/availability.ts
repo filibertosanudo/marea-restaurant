@@ -46,8 +46,8 @@ export type ExistingReservation = {
   status: ReservationStatus;
 };
 
-/** The only statuses that actually hold a table against new bookings — a CANCELLED or NO_SHOW reservation left the calendar. */
-const BLOCKING_STATUSES: ReservationStatus[] = ["PENDING", "CONFIRMED", "SEATED"];
+/** The only statuses that actually hold a table against new bookings — a CANCELLED or NO_SHOW reservation left the calendar. Exported because staff-actions.ts uses this identical rule to decide which reservations can have their table reassigned: one that isn't holding a table has nothing to reassign. */
+export const BLOCKING_STATUSES: ReservationStatus[] = ["PENDING", "CONFIRMED", "SEATED"];
 
 export type AvailabilityInput = {
   /** The calendar day being checked, in the business's own local time. */
