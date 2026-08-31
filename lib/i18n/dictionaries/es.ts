@@ -233,6 +233,8 @@ export const es = {
       errorTableTaken: "Esa mesa ya no está libre en este horario — elige otra.",
       errorTableTooSmall: "Esa mesa no tiene suficientes lugares para este grupo.",
       errorTableNotFound: "No se encontró esa mesa.",
+      errorStale: "Esta reservación cambió — actualiza la página.",
+      errorNotOverdue: "Todavía no pasa la hora de esta reservación.",
     },
     team: {
       title: "Equipo",

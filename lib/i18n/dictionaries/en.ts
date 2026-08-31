@@ -232,6 +232,8 @@ export const en = {
       errorTableTaken: "That table is no longer free for this time — pick another.",
       errorTableTooSmall: "That table doesn't have enough seats for this party.",
       errorTableNotFound: "That table couldn't be found.",
+      errorStale: "This reservation changed — refresh the page.",
+      errorNotOverdue: "This reservation's time hasn't passed yet.",
     },
     team: {
       title: "Team",

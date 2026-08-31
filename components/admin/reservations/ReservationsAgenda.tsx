@@ -32,6 +32,15 @@ function errorMessage(dict: ReservationDict, code: string | undefined): string |
       return dict.errorTableTooSmall;
     case "table_not_found":
       return dict.errorTableNotFound;
+    case "not_overdue":
+      return dict.errorNotOverdue;
+    // Another staff member already changed this reservation (cancelled it,
+    // seated it, reassigned it) between page load and this click — retrying
+    // the same action will just fail the same way again until the page
+    // re-fetches, so this isn't errorGeneric's "try again".
+    case "not_found":
+    case "invalid_transition":
+      return dict.errorStale;
     default:
       return dict.errorGeneric;
   }
@@ -109,19 +118,21 @@ function ReservationRow({
             value={chosenTableId}
             onChange={(e) => {
               const newTableId = e.target.value;
+              if (!newTableId) return; // the empty option only exists for PENDING's "not picked yet"
               setChosenTableId(newTableId);
               // PENDING defers to the Confirm click below (there's no table
               // to "reassign" yet, only to pick); CONFIRMED/SEATED already
               // hold a table, so picking a different one here is itself the
               // action.
-              if (reservation.status !== "PENDING" && newTableId) {
+              if (reservation.status !== "PENDING") {
                 run(() => reassignReservationTableAction(reservation.id, newTableId));
               }
             }}
             disabled={pending}
             className="rounded-sm border border-border/40 bg-surface px-sm py-[6px] text-[12px] text-on-surface"
           >
-            <option value="">{dict.tableUnassigned}</option>
+            {/* Only PENDING can be genuinely unassigned — CONFIRMED/SEATED already hold a table, and there's no "unassign" action for them to fall back to. */}
+            {reservation.status === "PENDING" && <option value="">{dict.tableUnassigned}</option>}
             {tablesThatFit.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.zone ? `${t.zone} · ${t.code}` : t.code} ({t.seats})
