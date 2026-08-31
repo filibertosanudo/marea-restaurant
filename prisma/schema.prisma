@@ -242,6 +242,13 @@ model Business {
   acceptsOnlinePayment      Boolean @default(true)
   acceptsPayAtCounter       Boolean @default(true)
 
+  /// Módulo 6, Fase 3 — antes constantes en lib/reservations/dto.ts con un
+  /// comentario que decía, correctamente, que eran decisión de negocio.
+  /// Mismos nombres, mismos defaults: ningún negocio existente cambia de
+  /// comportamiento al correr esta migración.
+  minBookingLeadMinutes Int @default(30)
+  minCancelLeadMinutes  Int @default(120)
+
   /// Contador del folio de pedidos. Se incrementa con un UPDATE atómico
   /// (`{ increment: 1 }`) DENTRO de la transacción que crea el pedido — es la
   /// única forma de que dos cajas simultáneas no generen el mismo A-0042.

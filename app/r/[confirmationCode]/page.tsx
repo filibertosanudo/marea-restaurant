@@ -31,7 +31,7 @@ export default async function ReservationLookupPage({
   const raw = await getReservationByConfirmationCode(business.id, confirmationCode);
   if (!raw) notFound();
 
-  const reservation = toReservationLookupDTO(raw, business.timezone, lang, new Date());
+  const reservation = toReservationLookupDTO(raw, business.timezone, lang, new Date(), business.minCancelLeadMinutes);
   const partyLabel = (reservation.partySize === 1 ? dict.partySizeOne : dict.partySizeOther).replace(
     "{n}",
     String(reservation.partySize)

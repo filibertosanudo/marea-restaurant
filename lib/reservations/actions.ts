@@ -15,7 +15,7 @@ import {
 } from "./queries";
 import { reservationSlotsQuerySchema, createReservationSchema, parseDateParam, isWithinBookingHorizon } from "./schemas";
 import { isExclusionConstraintError } from "./prisma-errors";
-import { canCancelReservation, MIN_BOOKING_LEAD_MINUTES } from "./dto";
+import { canCancelReservation } from "./dto";
 
 const CANCELLATION_REASON_BY_LOCALE: Record<string, string> = {
   en: "Cancelled by the guest",
@@ -73,7 +73,7 @@ async function loadAvailabilityForDay(business: Business, date: string, partySiz
     tables,
     existingReservations,
     now,
-    minLeadMinutes: MIN_BOOKING_LEAD_MINUTES,
+    minLeadMinutes: business.minBookingLeadMinutes,
   };
 }
 
@@ -238,7 +238,7 @@ export async function cancelReservationByCodeAction(confirmationCode: string): P
   if (!reservation) return { ok: false, error: "not_found" };
 
   const now = new Date();
-  if (!canCancelReservation(reservation, now)) return { ok: false, error: "too_late" };
+  if (!canCancelReservation(reservation, now, business.minCancelLeadMinutes)) return { ok: false, error: "too_late" };
 
   // Guarded by the status this action itself just read: staff could have
   // confirmed/seated/cancelled the same reservation in the gap between that
