@@ -4,13 +4,13 @@ import { prisma } from "@/lib/prisma";
 /**
  * Resolves a table by its QR token — never by id (see docs/DATABASE.md
  * §1.4: the token is rotatable and separate from the row's identity on
- * purpose). Inactive or soft-deleted tables resolve to null so the caller
- * can give an honest 404 instead of seating a guest at a mesa that no
- * longer exists.
+ * purpose). Inactive, soft-deleted, or out-of-service tables resolve to
+ * null so the caller can give an honest 404 instead of seating a guest at
+ * a mesa that no longer exists or is physically out of commission.
  */
 export async function getTableByQrToken(businessId: string, qrToken: string) {
   return prisma.restaurantTable.findFirst({
-    where: { businessId, qrToken, isActive: true, deletedAt: null },
+    where: { businessId, qrToken, isActive: true, deletedAt: null, status: { not: "OUT_OF_SERVICE" } },
   });
 }
 
@@ -28,11 +28,20 @@ export async function getTablesForAdmin(businessId: string) {
   });
 }
 
-/** Existing codes sharing a prefix, for batch-create to pick up numbering where it left off instead of guessing a starting number that collides with what's already there. */
+/** Existing codes sharing a prefix, for batch-create to pick up numbering where it left off instead of guessing a starting number that collides with what's already there. Soft-deleted tables are excluded — their codes get mangled on delete (see deleteTableAction), so they'd never collide anyway, but they also carry no useful numbering signal. */
 export async function getCodesWithPrefix(businessId: string, prefix: string): Promise<string[]> {
   const rows = await prisma.restaurantTable.findMany({
-    where: { businessId, code: { startsWith: prefix } },
+    where: { businessId, deletedAt: null, code: { startsWith: prefix } },
     select: { code: true },
   });
   return rows.map((r) => r.code);
+}
+
+/** The next sortOrder for a newly created table — one past the highest in use among live (non-deleted) tables, shared by both create paths so a fix to this numbering only needs to happen once. */
+export async function getNextSortOrder(businessId: string): Promise<number> {
+  const result = await prisma.restaurantTable.aggregate({
+    where: { businessId, deletedAt: null },
+    _max: { sortOrder: true },
+  });
+  return (result._max.sortOrder ?? 0) + 1;
 }

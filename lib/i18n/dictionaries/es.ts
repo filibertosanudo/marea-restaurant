@@ -283,6 +283,7 @@ export const es = {
       deleteConfirmTitle: "Eliminar mesa",
       deleteConfirmBody: "No se puede deshacer para una mesa sin historial. ¿Eliminarla?",
       deleteBlockedNotice: "Esta mesa tiene reservaciones próximas — cancélalas o reasígnalas primero.",
+      outOfServiceBlockedNotice: "No se puede marcar fuera de servicio — esta mesa tiene reservaciones próximas.",
       deleteConfirmYes: "Eliminar",
       deleteConfirmNo: "Cancelar",
       rotateConfirmTitle: "Rotar código QR",

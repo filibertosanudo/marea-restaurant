@@ -282,6 +282,7 @@ export const en = {
       deleteConfirmTitle: "Delete table",
       deleteConfirmBody: "This can't be undone for a table with no history. Delete it?",
       deleteBlockedNotice: "This table has upcoming reservations — cancel or reassign them first.",
+      outOfServiceBlockedNotice: "Can't mark out of service — this table has upcoming reservations.",
       deleteConfirmYes: "Delete",
       deleteConfirmNo: "Cancel",
       rotateConfirmTitle: "Rotate QR code",

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { startTransition, useMemo, useOptimistic, useState } from "react";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import type { Lang } from "@/lib/i18n/lang";
@@ -44,6 +45,7 @@ type OptimisticUpdate =
  * every render and only layers a pending-request's guess on top of it.
  */
 export function TablesManager({ tables, dict, lang }: { tables: TableRow[]; dict: TableDict; lang: Lang }) {
+  const router = useRouter();
   const [optimisticTables, applyOptimistic] = useOptimistic(tables, (state, update: OptimisticUpdate) => {
     switch (update.type) {
       case "toggleActive":
@@ -65,6 +67,7 @@ export function TablesManager({ tables, dict, lang }: { tables: TableRow[]; dict
   const [deletePending, setDeletePending] = useState(false);
   const [rotateTarget, setRotateTarget] = useState<TableRow | null>(null);
   const [rotatePending, setRotatePending] = useState(false);
+  const [outOfServiceBlockedId, setOutOfServiceBlockedId] = useState<string | null>(null);
 
   const zones = useMemo(() => {
     const set = new Set(optimisticTables.map((t) => t.zone).filter((z): z is string => !!z));
@@ -73,17 +76,21 @@ export function TablesManager({ tables, dict, lang }: { tables: TableRow[]; dict
 
   const visible = zoneFilter === "all" ? optimisticTables : optimisticTables.filter((t) => t.zone === zoneFilter);
 
-  function handleDrop(targetId: string) {
+  async function handleDrop(targetId: string) {
     if (!dragId || dragId === targetId) return;
     const next = [...optimisticTables];
     const fromIndex = next.findIndex((t) => t.id === dragId);
-    const toIndex = next.findIndex((t) => t.id === targetId);
     const [moved] = next.splice(fromIndex, 1);
+    const toIndex = next.findIndex((t) => t.id === targetId);
     next.splice(toIndex, 0, moved);
     const orderedIds = next.map((t) => t.id);
     setDragId(null);
     startTransition(() => applyOptimistic({ type: "reorder", orderedIds }));
-    reorderTablesAction(orderedIds);
+    try {
+      await reorderTablesAction(orderedIds);
+    } catch {
+      router.refresh();
+    }
   }
 
   async function handleToggleActive(table: TableRow) {
@@ -93,8 +100,13 @@ export function TablesManager({ tables, dict, lang }: { tables: TableRow[]; dict
 
   async function handleToggleOutOfService(table: TableRow) {
     const next = table.status === "OUT_OF_SERVICE" ? "AVAILABLE" : "OUT_OF_SERVICE";
+    setOutOfServiceBlockedId(null);
+    const result = await toggleOutOfServiceAction(table.id, next === "OUT_OF_SERVICE");
+    if (result.blocked) {
+      setOutOfServiceBlockedId(table.id);
+      return;
+    }
     startTransition(() => applyOptimistic({ type: "toggleOutOfService", id: table.id, status: next }));
-    await toggleOutOfServiceAction(table.id, next === "OUT_OF_SERVICE");
   }
 
   async function handleConfirmDelete() {
@@ -112,8 +124,13 @@ export function TablesManager({ tables, dict, lang }: { tables: TableRow[]; dict
   async function handleConfirmRotate() {
     if (!rotateTarget) return;
     setRotatePending(true);
-    await rotateTableQrAction(rotateTarget.id);
+    const result = await rotateTableQrAction(rotateTarget.id);
     setRotatePending(false);
+    if (result.error) {
+      setRotateTarget(null);
+      router.refresh();
+      return;
+    }
     startTransition(() =>
       applyOptimistic({ type: "rotateQr", id: rotateTarget.id, qrRotatedAt: new Date().toISOString() })
     );
@@ -218,6 +235,9 @@ export function TablesManager({ tables, dict, lang }: { tables: TableRow[]; dict
                 >
                   {table.status === "OUT_OF_SERVICE" ? dict.statusOutOfService : dict.clearOutOfServiceAction}
                 </button>
+                {outOfServiceBlockedId === table.id && (
+                  <span className="text-[11px] text-error">{dict.outOfServiceBlockedNotice}</span>
+                )}
                 {table.qrRotatedAt && (
                   <span className="text-[11px] text-on-surface-muted">
                     {dict.qrRotatedNote}: {new Date(table.qrRotatedAt).toLocaleString(toIntlLocale(lang))}

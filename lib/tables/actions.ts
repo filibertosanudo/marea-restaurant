@@ -9,7 +9,7 @@ import { getCurrentBusiness } from "@/lib/business";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { BLOCKING_STATUSES } from "@/lib/reservations/availability";
 import { tableSchema, batchTableSchema } from "./schemas";
-import { getCodesWithPrefix } from "./queries";
+import { getCodesWithPrefix, getNextSortOrder } from "./queries";
 import { nextTableCodes } from "./codes";
 
 export type TableFormState =
@@ -42,10 +42,7 @@ export async function createTableAction(
   });
   if (!parsed.success) return { error: "invalid", fieldErrors: flatten(parsed.error) };
 
-  const maxSortOrder = await prisma.restaurantTable.aggregate({
-    where: { businessId: business.id },
-    _max: { sortOrder: true },
-  });
+  const sortOrder = await getNextSortOrder(business.id);
 
   try {
     await prisma.restaurantTable.create({
@@ -54,7 +51,7 @@ export async function createTableAction(
         code: parsed.data.code,
         zone: parsed.data.zone,
         seats: parsed.data.seats,
-        sortOrder: (maxSortOrder._max.sortOrder ?? 0) + 1,
+        sortOrder,
       },
     });
   } catch (err) {
@@ -87,14 +84,11 @@ export async function createTablesBatchAction(
   });
   if (!parsed.success) return { error: "invalid", fieldErrors: flatten(parsed.error) };
 
-  const existingCodes = await getCodesWithPrefix(business.id, parsed.data.codePrefix);
+  const [existingCodes, startingSortOrder] = await Promise.all([
+    getCodesWithPrefix(business.id, parsed.data.codePrefix),
+    getNextSortOrder(business.id),
+  ]);
   const codes = nextTableCodes(existingCodes, parsed.data.codePrefix, parsed.data.quantity);
-
-  const maxSortOrder = await prisma.restaurantTable.aggregate({
-    where: { businessId: business.id },
-    _max: { sortOrder: true },
-  });
-  const startingSortOrder = (maxSortOrder._max.sortOrder ?? 0) + 1;
 
   try {
     await prisma.restaurantTable.createMany({
@@ -142,7 +136,7 @@ export async function updateTableAction(
   try {
     await prisma.restaurantTable.update({
       where: { id },
-      data: { code: parsed.data.code, zone: parsed.data.zone, seats: parsed.data.seats },
+      data: { code: parsed.data.code, zone: parsed.data.zone ?? null, seats: parsed.data.seats },
     });
   } catch (err) {
     if (isCodeTakenError(err)) return { error: "code_taken", fieldErrors: { code: "code_taken" } };
@@ -163,15 +157,32 @@ export async function toggleTableActiveAction(id: string, isActive: boolean): Pr
   revalidatePath("/admin/mesas");
 }
 
-/** The one manually-set half of TableStatus (see the enum's own comment in schema.prisma) — a table that's physically out of commission, not a live occupancy signal. */
-export async function toggleOutOfServiceAction(id: string, outOfService: boolean): Promise<void> {
+/**
+ * The one manually-set half of TableStatus (see the enum's own comment in
+ * schema.prisma) — a table that's physically out of commission, not a live
+ * occupancy signal. Blocked the same way deleteTableAction is when the
+ * table still holds an upcoming reservation: getReservableTablesForAgenda
+ * drops OUT_OF_SERVICE tables entirely, so marking one out of service out
+ * from under a live reservation would strand that reservation's reassign
+ * picker with no way to show its own assigned table.
+ */
+export async function toggleOutOfServiceAction(id: string, outOfService: boolean): Promise<{ blocked: boolean }> {
   await requireRole(...ADMIN_ROLES);
   const business = await getCurrentBusiness();
+
+  if (outOfService) {
+    const blockingCount = await prisma.reservation.count({
+      where: { tableId: id, businessId: business.id, status: { in: BLOCKING_STATUSES } },
+    });
+    if (blockingCount > 0) return { blocked: true };
+  }
+
   await prisma.restaurantTable.update({
     where: { id, businessId: business.id },
     data: { status: outOfService ? "OUT_OF_SERVICE" : "AVAILABLE" },
   });
   revalidatePath("/admin/mesas");
+  return { blocked: false };
 }
 
 export async function reorderTablesAction(orderedIds: string[]): Promise<void> {
@@ -224,21 +235,36 @@ export async function rotateTableQrAction(id: string): Promise<{ error?: string 
  * reservations occupy a table at all). Reservation.tableId has
  * onDelete: SetNull, but a nulled tableId doesn't reserve anything against
  * the EXCLUDE constraint — silently letting the delete through would leave
- * a real upcoming guest with no table at all.
+ * a real upcoming guest with no table at all. The count and the write run
+ * inside one transaction so a reservation created in the gap between them
+ * can't slip through.
+ *
+ * The code gets mangled on delete (businessId+code is a plain unique
+ * constraint with no deletedAt exclusion) so a soft-deleted table's code
+ * doesn't stay permanently unavailable to a future table.
  */
 export async function deleteTableAction(id: string): Promise<{ blocked: boolean }> {
   await requireRole(...ADMIN_ROLES);
   const business = await getCurrentBusiness();
 
-  const blockingCount = await prisma.reservation.count({
-    where: { tableId: id, businessId: business.id, status: { in: BLOCKING_STATUSES } },
-  });
-  if (blockingCount > 0) return { blocked: true };
+  return prisma.$transaction(async (tx) => {
+    const table = await tx.restaurantTable.findFirst({
+      where: { id, businessId: business.id, deletedAt: null },
+    });
+    if (!table) return { blocked: false };
 
-  await prisma.restaurantTable.update({
-    where: { id, businessId: business.id },
-    data: { deletedAt: new Date(), isActive: false },
+    const blockingCount = await tx.reservation.count({
+      where: { tableId: id, businessId: business.id, status: { in: BLOCKING_STATUSES } },
+    });
+    if (blockingCount > 0) return { blocked: true };
+
+    await tx.restaurantTable.update({
+      where: { id, businessId: business.id },
+      data: { deletedAt: new Date(), isActive: false, code: `${table.code}::deleted::${id}` },
+    });
+    return { blocked: false };
+  }).then((result) => {
+    if (!result.blocked) revalidatePath("/admin/mesas");
+    return result;
   });
-  revalidatePath("/admin/mesas");
-  return { blocked: false };
 }
