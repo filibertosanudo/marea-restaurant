@@ -145,6 +145,17 @@ enum ReservationStatus {
   NO_SHOW // no se presentó (métrica importante para el negocio)
 }
 
+/// Decisión de Módulo 6, Fase 2 — este campo llevaba tres módulos sin dueño.
+/// Hoy solo la pantalla de Mesas y QR lo escribe, y solo entre AVAILABLE y
+/// OUT_OF_SERVICE (una mesa rota/en reparación) — el único de los cuatro
+/// valores que un humano puede saber y necesita marcar a mano. OCCUPIED y
+/// RESERVED se dejan sin escribir a propósito: ambos son hechos derivables
+/// (¿hay una Order activa en esta mesa? ¿una Reservation por llegar?), no
+/// estado que alguien deba mantener sincronizado; escribirlos ahora
+/// requeriría que lib/orders o lib/reservations empezaran a escribir en
+/// RestaurantTable, exactamente el acoplamiento entre módulos que Módulo 5
+/// evitó a propósito. Un vista de piso en vivo (si algún día se construye)
+/// debe calcularlos en la consulta, no mantenerlos aquí.
 enum TableStatus {
   AVAILABLE
   OCCUPIED

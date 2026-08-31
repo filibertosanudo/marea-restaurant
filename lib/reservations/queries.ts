@@ -20,10 +20,10 @@ export async function getBusinessClosures(businessId: string): Promise<ClosureWi
   });
 }
 
-/** Tables that can actually be reserved — active and not soft-deleted, same guard every other catalog query in this codebase uses. */
+/** Tables that can actually be reserved — active, not soft-deleted, and not marked out of service (the one TableStatus value Mesas y QR actually maintains; see its comment in schema.prisma). */
 export async function getReservableTables(businessId: string): Promise<ReservableTable[]> {
   return prisma.restaurantTable.findMany({
-    where: { businessId, isActive: true, deletedAt: null },
+    where: { businessId, isActive: true, deletedAt: null, status: { not: "OUT_OF_SERVICE" } },
     select: { id: true, seats: true },
   });
 }
@@ -107,7 +107,7 @@ export async function getAgendaReservationsRaw(
 /** Tables for the agenda's "reassign" picker — richer than getReservableTables (which only carries what availability.ts needs), since the UI has to show a human a code and a zone, not just an id. */
 export async function getReservableTablesForAgenda(businessId: string) {
   return prisma.restaurantTable.findMany({
-    where: { businessId, isActive: true, deletedAt: null },
+    where: { businessId, isActive: true, deletedAt: null, status: { not: "OUT_OF_SERVICE" } },
     orderBy: [{ zone: "asc" }, { sortOrder: "asc" }],
     select: { id: true, code: true, zone: true, seats: true },
   });
