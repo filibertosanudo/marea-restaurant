@@ -138,14 +138,26 @@ function ReservationRow({
 
         <div className="flex flex-wrap items-center gap-[6px]">
           {reservation.status === "PENDING" && (
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => run(() => confirmReservationAction(reservation.id, chosenTableId || undefined))}
-              className="rounded-sm bg-primary px-md py-[7px] text-[12px] font-semibold text-on-primary transition-colors hover:bg-primary-hover disabled:opacity-50"
-            >
-              {dict.confirmAction}
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => run(() => confirmReservationAction(reservation.id, chosenTableId || undefined))}
+                className="rounded-sm bg-primary px-md py-[7px] text-[12px] font-semibold text-on-primary transition-colors hover:bg-primary-hover disabled:opacity-50"
+              >
+                {dict.confirmAction}
+              </button>
+              {reservation.isOverdue && (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => run(() => markNoShowAction(reservation.id))}
+                  className="rounded-sm border border-warning/40 px-md py-[7px] text-[12px] font-semibold text-warning transition-colors hover:bg-warning/8 disabled:opacity-50"
+                >
+                  {dict.noShowAction}
+                </button>
+              )}
+            </>
           )}
           {reservation.status === "CONFIRMED" && (
             <>

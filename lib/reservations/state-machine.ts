@@ -9,9 +9,15 @@ import { ReservationStatus } from "@/lib/generated/prisma/client";
  * is reachable from PENDING or CONFIRMED (the two states a reservation can
  * still be taken away from) but not from SEATED — once someone's at the
  * table, "cancel" isn't the right verb for whatever happens next.
+ *
+ * PENDING -> NO_SHOW exists for the same reason CONFIRMED -> NO_SHOW does:
+ * a guest who reserved and never showed didn't stop being a no-show just
+ * because staff never got around to confirming them first. Without it, an
+ * overdue PENDING row has no action a STAFF member (who can't cancel) can
+ * actually take.
  */
 const LEGAL_TRANSITIONS: Record<ReservationStatus, ReservationStatus[]> = {
-  PENDING: ["CONFIRMED", "CANCELLED"],
+  PENDING: ["CONFIRMED", "CANCELLED", "NO_SHOW"],
   CONFIRMED: ["SEATED", "NO_SHOW", "CANCELLED"],
   SEATED: ["COMPLETED"],
   COMPLETED: [],
