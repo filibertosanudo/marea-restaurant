@@ -5,6 +5,7 @@ import {
   isTableFreeForRange,
   getOpeningWindowsForDate,
   isMinuteWithinWindows,
+  businessLocalDateParts,
   type AvailabilityInput,
 } from "./availability";
 
@@ -317,5 +318,25 @@ describe("getOpeningWindowsForDate / isMinuteWithinWindows", () => {
     const fridayWindows = getOpeningWindowsForDate(BUSINESS_DAY, windows);
     expect(isMinuteWithinWindows(600, fridayWindows)).toBe(false);
     expect(isMinuteWithinWindows(1560, fridayWindows)).toBe(false);
+  });
+});
+
+describe("businessLocalDateParts", () => {
+  it("resolves a UTC instant to its calendar date in the business's timezone", () => {
+    // 19:00 UTC on Feb 27 is 12:00 local (UTC-7) the same date.
+    expect(businessLocalDateParts(new Date("2026-02-27T19:00:00Z"), TIMEZONE)).toEqual({
+      year: 2026,
+      month: 2,
+      day: 27,
+    });
+  });
+
+  it("resolves to the previous calendar day when UTC has already rolled over but local hasn't", () => {
+    // 00:30 UTC on Feb 28 is still 17:30 local (UTC-7) on Feb 27.
+    expect(businessLocalDateParts(new Date("2026-02-28T00:30:00Z"), TIMEZONE)).toEqual({
+      year: 2026,
+      month: 2,
+      day: 27,
+    });
   });
 });

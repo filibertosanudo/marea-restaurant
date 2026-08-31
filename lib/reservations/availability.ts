@@ -144,6 +144,24 @@ export function localWallClockToUtc(
   return new Date(guessUtcMs - offsetMinutes * 60_000);
 }
 
+/**
+ * The inverse of localWallClockToUtc: a UTC instant's calendar date in the
+ * business's own timezone, as {year, month, day} — never the server
+ * process's or a caller's own local date. "en-CA" is just a convenient
+ * source of already-zero-padded, unambiguously-ordered digit groups from
+ * Intl.DateTimeFormat, not a locale choice that affects anything else here.
+ */
+export function businessLocalDateParts(instant: Date, timeZone: string): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(instant);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return { year: get("year"), month: get("month"), day: get("day") };
+}
+
 function rangesOverlap(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
   return aStart < bEnd && bStart < aEnd;
 }

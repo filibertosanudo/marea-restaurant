@@ -13,7 +13,7 @@ import {
   getReservationsOverlapping,
   getReservationByConfirmationCode,
 } from "./queries";
-import { reservationSlotsQuerySchema, createReservationSchema, parseDateParam } from "./schemas";
+import { reservationSlotsQuerySchema, createReservationSchema, parseDateParam, isWithinBookingHorizon } from "./schemas";
 import { isExclusionConstraintError } from "./prisma-errors";
 import { canCancelReservation, MIN_BOOKING_LEAD_MINUTES } from "./dto";
 
@@ -96,7 +96,12 @@ export async function getReservationSlotsAction(date: string, partySize: number)
   if (!parsed.success) return { ok: false, error: "invalid_input" };
 
   const business = await getCurrentBusiness();
-  const input = await loadAvailabilityForDay(business, parsed.data.date, parsed.data.partySize, new Date());
+  const now = new Date();
+  if (!isWithinBookingHorizon(parseDateParam(parsed.data.date), now, business.timezone)) {
+    return { ok: false, error: "invalid_input" };
+  }
+
+  const input = await loadAvailabilityForDay(business, parsed.data.date, parsed.data.partySize, now);
   const slots = getAvailableSlots(input);
 
   return { ok: true, slots: slots.map((s) => s.minutesFromMidnight), maxPartySize: business.maxPartySize };
@@ -143,7 +148,12 @@ export async function createReservationAction(input: {
   }
 
   const business = await getCurrentBusiness();
-  const availabilityInput = await loadAvailabilityForDay(business, parsed.data.date, parsed.data.partySize, new Date());
+  const now = new Date();
+  if (!isWithinBookingHorizon(parseDateParam(parsed.data.date), now, business.timezone)) {
+    return { ok: false, error: "invalid_input", fieldErrors: { date: "too_far_ahead" } };
+  }
+
+  const availabilityInput = await loadAvailabilityForDay(business, parsed.data.date, parsed.data.partySize, now);
   const slot = findSlot(availabilityInput, parsed.data.time);
   if (!slot) return { ok: false, error: "slot_taken" };
 

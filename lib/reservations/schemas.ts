@@ -1,9 +1,20 @@
 import { z } from "zod";
+import { businessLocalDateParts } from "./availability";
 
-/** How far out a guest can even ask about — rejected here, not in the action, so every caller of either schema gets it for free instead of remembering to check separately. 90 days is the common horizon real booking systems use; a business decision, not a derived constant. */
+/** How far out a guest can even ask about — a business decision, not a derived constant. 90 days is the common horizon real booking systems use. */
 export const MAX_BOOKING_HORIZON_DAYS = 90;
 
-const dateParamSchema = z
+/**
+ * Purely structural: a real "YYYY-MM-DD" calendar date, nothing about how
+ * far away it is. That used to live here too as a third `.refine()`, but
+ * `Date.now()` inside a Zod schema is exactly the impurity availability.ts
+ * avoids on purpose elsewhere, and it compared against raw UTC instead of
+ * the business's own timezone — accepting or rejecting a date right on the
+ * horizon by a day depending on where the server process's clock sat
+ * relative to that timezone. See isWithinBookingHorizon below, which a
+ * caller runs once it actually has a `now` and a business to check against.
+ */
+export const dateParamSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "invalid_date")
   .refine((value) => {
@@ -13,13 +24,25 @@ const dateParamSchema = z
     // this round-trips it and checks nothing moved.
     const d = new Date(Date.UTC(year, month - 1, day));
     return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
-  }, "invalid_date")
-  .refine((value) => {
-    const { year, month, day } = parseDateParam(value);
-    const target = Date.UTC(year, month - 1, day);
-    const horizon = Date.now() + MAX_BOOKING_HORIZON_DAYS * 24 * 60 * 60 * 1000;
-    return target <= horizon;
-  }, "too_far_ahead");
+  }, "invalid_date");
+
+/**
+ * Whether a calendar date falls within MAX_BOOKING_HORIZON_DAYS of "today"
+ * — "today" resolved in the business's own timezone via `now` (injected,
+ * never read from the clock in here), not the server process's raw UTC
+ * date, which could be a different calendar day already.
+ */
+export function isWithinBookingHorizon(
+  dateParts: { year: number; month: number; day: number },
+  now: Date,
+  timezone: string
+): boolean {
+  const today = businessLocalDateParts(now, timezone);
+  const targetUtcMidnight = Date.UTC(dateParts.year, dateParts.month - 1, dateParts.day);
+  const todayUtcMidnight = Date.UTC(today.year, today.month - 1, today.day);
+  const horizonMs = MAX_BOOKING_HORIZON_DAYS * 24 * 60 * 60 * 1000;
+  return targetUtcMidnight <= todayUtcMidnight + horizonMs;
+}
 
 // Minutes since the requested day's local midnight, not a "HH:mm" string —
 // a close-after-midnight window can offer two slots that would share the
