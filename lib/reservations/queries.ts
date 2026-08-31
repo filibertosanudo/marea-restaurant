@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { localWallClockToUtc } from "./availability";
 import type { OpeningHourWindow, ClosureWindow, ReservableTable, ExistingReservation } from "./availability";
 
 /** Every opening-hour block the business has, across all seven days — a small table, always fetched whole. */
@@ -62,20 +63,40 @@ export async function getReservationsOverlapping(
  * own night — or jump to a different one — just because the catalog
  * changed. 6am is generous: well past any ordinary dinner service's
  * closes-after-midnight overflow, well before any ordinary opensAt.
+ *
+ * This is a real assumption, not a derived fact: a business whose real
+ * hours cross this boundary (a breakfast service opening before 6am, or a
+ * bar running past 6am the next morning) would have a reservation
+ * misfiled onto the adjacent day. Nothing today validates OpeningHour rows
+ * against this constant — worth doing once Fase 3's hours screen exists.
  */
 export const AGENDA_DAY_BOUNDARY_MINUTES = 360;
 
 /**
  * Every reservation for one business day, in the shape the panel agenda
  * reads — ordered by time, the way the agenda is read, not by status the
- * way a kanban would group it. `dayStart` is this calendar day's own local
- * midnight (in UTC); the actual query window runs from AGENDA_DAY_BOUNDARY_MINUTES
- * past that to the same offset the next day, so a 1am reservation stays on
- * the night it started instead of appearing on tomorrow's agenda.
+ * way a kanban would group it. The query window runs from
+ * AGENDA_DAY_BOUNDARY_MINUTES past this calendar day's local midnight to
+ * the same offset the next day, so a 1am reservation stays on the night it
+ * started instead of appearing on tomorrow's agenda. Both boundaries are
+ * resolved through localWallClockToUtc rather than adding a flat
+ * millisecond offset to an already-resolved instant — a business whose
+ * timezone observes DST would otherwise land an hour off on the days
+ * straddling a transition, since each local day's UTC offset can differ.
  */
-export async function getAgendaReservationsRaw(businessId: string, dayStart: Date) {
-  const windowStart = new Date(dayStart.getTime() + AGENDA_DAY_BOUNDARY_MINUTES * 60_000);
-  const windowEnd = new Date(windowStart.getTime() + 24 * 60 * 60_000);
+export async function getAgendaReservationsRaw(
+  businessId: string,
+  date: { year: number; month: number; day: number },
+  timezone: string
+) {
+  const windowStart = localWallClockToUtc(date.year, date.month, date.day, AGENDA_DAY_BOUNDARY_MINUTES, timezone);
+  const windowEnd = localWallClockToUtc(
+    date.year,
+    date.month,
+    date.day,
+    AGENDA_DAY_BOUNDARY_MINUTES + 1440,
+    timezone
+  );
   return prisma.reservation.findMany({
     where: { businessId, reservedFor: { gte: windowStart, lt: windowEnd } },
     orderBy: { reservedFor: "asc" },

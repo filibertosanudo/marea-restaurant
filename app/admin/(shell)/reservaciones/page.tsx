@@ -50,7 +50,7 @@ export default async function ReservationsAgendaPage({
   const dayStart = localWallClockToUtc(year, month, day, 0, business.timezone);
 
   const [rawReservations, tables] = await Promise.all([
-    getAgendaReservationsRaw(business.id, dayStart),
+    getAgendaReservationsRaw(business.id, { year, month, day }, business.timezone),
     getReservableTablesForAgenda(business.id),
   ]);
 
