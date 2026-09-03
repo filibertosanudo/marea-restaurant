@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npm run test:unit
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: marea
+          POSTGRES_PASSWORD: marea
+          POSTGRES_DB: marea
+        ports:
+          - 5432:5432
+        # Migrate needs the connection to be accepting queries, not just
+        # listening — without this, the earliest steps run against a
+        # database that hasn't finished initdb yet.
+        options: >-
+          --health-cmd "pg_isready -U marea"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://marea:marea@localhost:5432/marea
+      AUTH_SECRET: ci-test-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npx prisma generate
+      # The bootstrap user created by the postgres image is a superuser
+      # regardless of its name, so it can create extensions — the
+      # reservation_no_overlap migration needs btree_gist. A service
+      # account without CREATE privileges would fail here with an error
+      # that doesn't say "extension", it says "permission denied".
+      - run: npx prisma migrate deploy
+      - run: npm run test:integration
+
+  commits:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate commit messages
+        run: |
+          set -e
+          status=0
+          for sha in $(git rev-list "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"); do
+            git log -1 --format=%B "$sha" > /tmp/commit-msg.txt
+            if ! sh scripts/validate-commit-msg.sh /tmp/commit-msg.txt; then
+              echo "Commit $sha failed validation" >&2
+              status=1
+            fi
+          done
+          exit $status
+
+  pr-size:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Warn on large pull request
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          LINES=$(git diff --shortstat "$BASE...$HEAD" | awk '{print $4+$6}')
+          LINES=${LINES:-0}
+          if [ "$LINES" -gt 400 ]; then
+            echo "::warning::This pull request changes $LINES lines, over the ~400-line guideline in docs/CONVENCIONES.md section 6.1. That's fine for a legitimate exception — say why in the description."
+          fi
