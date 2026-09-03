@@ -3,14 +3,16 @@ import { getSession } from "@/lib/auth/session";
 import { STAFF_ROLES } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
 import { prisma } from "@/lib/prisma";
+import { env } from "@/lib/env";
 
 const POLL_INTERVAL_MS = 2000;
-// A kitchen display left open for a shift would otherwise poll forever — 2
-// queries/2s for 12h is ~43k queries a day, and on Vercel it's one
-// continuously-billed invocation per open tab. Closing cleanly here costs
-// nothing: EventSource reconnects on its own, and useEventStream's backoff
-// treats this exactly like any other dropped connection.
-const MAX_LIFETIME_MS = 75_000;
+// A periodic handoff keeps a connection left open for a whole shift from
+// wedging a proxy or load balancer that expects streams to end sometime.
+// EventSource reconnects on its own, and useEventStream's backoff treats
+// this exactly like any other dropped connection — so it costs nothing to
+// close cleanly. SSE_MAX_LIFETIME_MS (env.ts) controls the interval; 0
+// disables it for a long-lived deployment where there's no such proxy.
+const MAX_LIFETIME_MS = env.SSE_MAX_LIFETIME_MS;
 
 type Scope = { kind: "board"; businessId: string } | { kind: "order"; orderId: string };
 
@@ -100,7 +102,7 @@ export async function GET(request: NextRequest) {
         lastSignature = null;
       }
 
-      const deadline = Date.now() + MAX_LIFETIME_MS;
+      const deadline = MAX_LIFETIME_MS > 0 ? Date.now() + MAX_LIFETIME_MS : Infinity;
 
       while (!closed) {
         if (Date.now() >= deadline) {
