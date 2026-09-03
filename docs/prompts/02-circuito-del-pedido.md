@@ -1,5 +1,9 @@
 # Prompt para Claude Code — Módulo 2: el circuito del pedido
 
+> Errata (módulo 7): el descarte de Supabase Realtime y el razonamiento de
+> facturación de Vercel quedaron sin efecto.
+> Ver docs/PLAN-PRODUCCION.md y docs/prompts/07-postgres-y-deploy-portatil.md.
+
 > Pégalo completo en `Desktop/restaurant-page`. Igual que el anterior, se
 > ejecuta con el skill `build-loop-claude-code` y **para al final de la Fase 1**
 > a esperar aprobación del diseño.
