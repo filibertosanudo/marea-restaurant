@@ -1,19 +1,19 @@
 /**
- * Cliente Prisma singleton para la app (Next.js).
+ * Singleton Prisma client for the app (Next.js).
  *
- * Prisma 7 ya no acepta una URL directa en `new PrismaClient()`: hay que
- * construir un "driver adapter" (aquí @prisma/adapter-pg para Postgres
- * directo, sin pooler intermedio) y pasárselo. DATABASE_URL se valida al
- * arrancar en lib/env.ts, no aquí.
+ * Prisma 7 no longer accepts a direct URL in `new PrismaClient()`: it needs
+ * a "driver adapter" (here @prisma/adapter-pg, for Postgres directly, no
+ * pooler in between) passed to it. DATABASE_URL is validated at boot in
+ * lib/env.ts, not here.
  *
- * El patrón globalForPrisma evita crear un PrismaClient nuevo en cada
- * hot-reload de `next dev`, que si no se controla acaba agotando las
- * conexiones en segundos.
+ * The globalForPrisma pattern avoids creating a new PrismaClient on every
+ * `next dev` hot-reload, which left unchecked exhausts connections in
+ * seconds.
  *
- * Construido perezosamente, en el primer uso real — no al importar. Este
- * módulo se importa desde casi todas partes, y crearlo al importar volvería
- * a exponer al arranque en frío del build (Next inspecciona los módulos de
- * ruta durante `next build`) exactamente el riesgo que lib/env.ts ya evita.
+ * Built lazily, on first real use — not at import. This module is imported
+ * from almost everywhere, and creating it at import time would reopen
+ * exactly the cold-build risk lib/env.ts already avoids (Next inspects
+ * route modules during `next build`).
  */
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "./generated/prisma/client";
@@ -26,8 +26,8 @@ const globalForPrisma = globalThis as unknown as {
 function createPrismaClient(): PrismaClient {
   const adapter = new PrismaPg({
     connectionString: env.DATABASE_URL,
-    // Fuera de serverless la app es un proceso largo con su propio pool —
-    // ver el comentario de DATABASE_POOL_MAX en lib/env.ts para la fórmula.
+    // Outside serverless the app is a long-lived process with its own pool
+    // — see the DATABASE_POOL_MAX comment in lib/env.ts for the formula.
     max: env.DATABASE_POOL_MAX,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,

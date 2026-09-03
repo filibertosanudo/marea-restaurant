@@ -18,9 +18,9 @@ export default defineConfig({
   },
 
   datasource: {
-    // DIRECT_URL sólo hace falta si un pooler en modo transacción vive
-    // delante de la app (no soporta los prepared statements de Migrate).
-    // Con Postgres directo, DATABASE_URL sirve para todo.
+    // DIRECT_URL is only needed if a transaction-mode pooler sits in front
+    // of the app (it doesn't support Migrate's prepared statements). With
+    // Postgres directly, DATABASE_URL is enough for everything.
     url: process.env.DIRECT_URL ?? process.env.DATABASE_URL,
   },
 });
