@@ -134,4 +134,11 @@ Brand anchor: navy `#1B367B`, matched to the author's portfolio site so this pro
 
 ## Deployment
 
-Built for [Vercel](https://vercel.com/) or any Next.js-compatible host.
+Portable: `docker compose up --build` runs the whole stack (app, Postgres,
+a one-shot migration step) on any Docker host — not tied to Vercel. Full
+walkthrough in [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+From a clean checkout (volumes removed, no cached image layers), `docker
+compose up --build` through a seeded, responding landing page took **~167s**
+on the machine this was last tested on; with layer caching from a prior
+build, ~25s.
