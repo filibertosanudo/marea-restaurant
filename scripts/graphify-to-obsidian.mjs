@@ -14,11 +14,17 @@
  * Uso:
  *   node scripts/graphify-to-obsidian.mjs \
  *     --graph graphify-out \
- *     --out "C:/ruta/a/tu/vault/04-Proyectos-Verticales/Marea-Codigo"
+ *     --out "C:/ruta/a/tu/vault/04-Proyectos-Verticales/Marea-Codigo" \
+ *     [--dry-run]
  *
  * Es idempotente: reescribe las notas en cada corrida, PERO conserva lo que
  * hayas escrito a mano entre las marcas <!-- notas:inicio --> y
  * <!-- notas:fin -->. Anota con confianza ahí abajo.
+ *
+ * También borra: al final de la corrida, cualquier nota de módulo o índice
+ * que ya exista en OUT_DIR pero que esta corrida no haya vuelto a escribir se
+ * elimina (el código se movió, el módulo desapareció). --dry-run enseña qué
+ * borraría sin tocar el disco.
  */
 
 import fs from "node:fs";
@@ -33,6 +39,7 @@ const arg = (name, fallback) => {
 const GRAPH_DIR = arg("graph", "graphify-out");
 const OUT_DIR = arg("out", path.join(GRAPH_DIR, "obsidian"));
 const PROJECT = arg("project", "Marea");
+const DRY_RUN = args.includes("--dry-run");
 
 // --- entrada ----------------------------------------------------------------
 const readJson = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
@@ -183,7 +190,7 @@ const frontmatter = (extra) =>
 
 const BANNER =
   "> [!info] Nota generada\n" +
-  "> La produce `scripts/graphify-to-obsidian.mjs` a partir de Graphify. Todo lo de arriba de **Notas** se sobrescribe en cada corrida; lo que escribas dentro de Notas se conserva.";
+  "> La produce `scripts/graphify-to-obsidian.mjs` a partir de Graphify. Todo lo de arriba de **Notas** se sobrescribe en cada corrida; lo que escribas dentro de Notas se conserva. Las notas de módulo que esta corrida no volvió a escribir se borran.";
 
 // --- notas por módulo -------------------------------------------------------
 const written = [];
@@ -369,6 +376,29 @@ const indexBody = [
 ].join("\n");
 
 written.push(write("Indice-de-Archivos", indexBody));
+
+// --- podar notas huérfanas ---------------------------------------------------
+/**
+ * Sólo se tocan archivos con nombre reconocible: las notas de módulo y los dos
+ * índices que este script genera. Cualquier otra cosa en OUT_DIR —una nota que
+ * alguien dejó a mano— no se toca, aunque no esté en `written`.
+ */
+const isPrunable = (name) =>
+  name.endsWith(".md") &&
+  (name.startsWith("Modulo-") || name === "00-Mapa-del-Codigo.md" || name === "Indice-de-Archivos.md");
+
+const writtenNames = new Set(written.map((w) => path.basename(w)));
+const toPrune = fs.existsSync(OUT_DIR)
+  ? fs.readdirSync(OUT_DIR).filter((f) => isPrunable(f) && !writtenNames.has(f))
+  : [];
+
+if (toPrune.length) {
+  console.log(`${toPrune.length} nota(s) obsoleta(s)${DRY_RUN ? " (--dry-run, no se borran)" : ", borrando"}:`);
+  for (const f of toPrune) console.log("  " + f);
+  if (!DRY_RUN) for (const f of toPrune) fs.unlinkSync(path.join(OUT_DIR, f));
+} else {
+  console.log("0 notas obsoletas");
+}
 
 console.log(`${written.length} notas escritas en ${OUT_DIR}`);
 for (const w of written) console.log("  " + path.basename(w));
