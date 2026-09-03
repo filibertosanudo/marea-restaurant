@@ -23,6 +23,13 @@
       }
     ],
     "paths": {
+      // More specific than "@/*" below, and must come first: TS tries
+      // path patterns in listed order, so this keeps every existing
+      // "@/components/ui/X" import working unchanged, resolved straight
+      // to the workspace package's source (no build step needed in dev).
+      "@/components/ui/*": [
+        "./packages/ui/src/ui/*"
+      ],
       "@/*": [
         "./*"
       ]
