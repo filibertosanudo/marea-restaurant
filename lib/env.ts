@@ -2,6 +2,17 @@ import "server-only";
 import { z } from "zod";
 import { safeHostname } from "@/lib/url";
 
+// Compose's ${VAR:-}, and more than one PaaS dashboard, produce an empty
+// string for an unset var rather than omitting it — neither z's .optional()
+// nor its .default() treat that as "missing" on their own, only a
+// genuinely absent key, so every optional or defaulted field below is
+// wrapped to normalize "" first.
+const emptyToUndefined = (v: unknown) => (v === "" ? undefined : v);
+const optional = <T extends z.ZodType>(inner: T) => z.preprocess(emptyToUndefined, inner.optional());
+// Takes the already-`.default(...)`-ed schema, not the fallback value
+// separately — keeps the fallback's type inference simple.
+const withDefault = <T extends z.ZodType>(defaulted: T) => z.preprocess(emptyToUndefined, defaulted);
+
 const schema = z
   .object({
     DATABASE_URL: z.string().min(1, "postgresql://user:pass@host:5432/db"),
@@ -10,23 +21,23 @@ const schema = z
     // Postgres defaults to max_connections=100; with a couple of replicas
     // and headroom for a future worker, 25 per process is comfortable.
     // Whoever needs to raise it should know what it's measured against.
-    DATABASE_POOL_MAX: z.coerce.number().int().min(1).default(25),
+    DATABASE_POOL_MAX: withDefault(z.coerce.number().int().min(1).default(25)),
     AUTH_SECRET: z.string().min(1),
-    AUTH_URL: z.string().url().optional(),
-    APP_ORIGIN: z.string().url().optional(),
+    AUTH_URL: optional(z.string().url()),
+    APP_ORIGIN: optional(z.string().url()),
     // Proxies between the client and this app that rewrite (not just append
     // to) x-forwarded-for: Vercel or a properly configured nginx both count
     // as 1. See docs/DEPLOY.md for the nginx directives that make this true.
-    TRUSTED_PROXY_COUNT: z.coerce.number().int().min(0).default(1),
-    SSE_MAX_LIFETIME_MS: z.coerce.number().int().min(0).default(75_000),
-    MEDIA_HOSTNAME: z.string().min(1).optional(),
-    STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
-    STORAGE_LOCAL_DIR: z.string().min(1).default("./data/media"),
-    S3_ENDPOINT: z.string().url().optional(),
-    S3_BUCKET: z.string().min(1).optional(),
-    S3_REGION: z.string().min(1).optional(),
-    S3_ACCESS_KEY_ID: z.string().min(1).optional(),
-    S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    TRUSTED_PROXY_COUNT: withDefault(z.coerce.number().int().min(0).default(1)),
+    SSE_MAX_LIFETIME_MS: withDefault(z.coerce.number().int().min(0).default(75_000)),
+    MEDIA_HOSTNAME: optional(z.string().min(1)),
+    STORAGE_DRIVER: withDefault(z.enum(["local", "s3"]).default("local")),
+    STORAGE_LOCAL_DIR: withDefault(z.string().min(1).default("./data/media")),
+    S3_ENDPOINT: optional(z.string().url()),
+    S3_BUCKET: optional(z.string().min(1)),
+    S3_REGION: optional(z.string().min(1)),
+    S3_ACCESS_KEY_ID: optional(z.string().min(1)),
+    S3_SECRET_ACCESS_KEY: optional(z.string().min(1)),
   })
   .superRefine((value, ctx) => {
     // APP_ORIGIN (or its AUTH_URL fallback) only matters once a URL gets
