@@ -41,6 +41,14 @@ const OUT_DIR = arg("out", path.join(GRAPH_DIR, "obsidian"));
 const PROJECT = arg("project", "Marea");
 const DRY_RUN = args.includes("--dry-run");
 
+/**
+ * Una comunidad con menos archivos de código que esto no gana nota propia:
+ * va listada al pie del mapa bajo "Módulos menores". Evita que comunidades de
+ * dos o tres archivos —que además suelen compartir firma de directorio con
+ * otras y pisarse el nombre— inflen la tabla principal de módulos.
+ */
+const MINOR_MODULE_MAX_FILES = 3;
+
 // --- entrada ----------------------------------------------------------------
 const readJson = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
 const graph = readJson(path.join(GRAPH_DIR, "graph.json"));
@@ -72,6 +80,25 @@ const MODULE_NAMES = {
   "lib/auth+prisma/seed.ts": "Autenticación y datos semilla",
   "lib/orders+components/order": "Seguimiento del pedido",
   "lib/payments+app/api": "Pagos y webhook de Stripe",
+  "app/admin+lib/dto": "Páginas del panel y datos compartidos",
+  "lib/settings+components/admin": "Configuración del negocio",
+  "components/admin+components/ui": "Panel: diálogos y formularios",
+  "lib/menu+components/admin": "Menú: edición en el panel",
+  "lib/menu+lib/cart": "Menú y carrito: reglas de negocio",
+  "lib/reservations+components/admin": "Reservaciones: agenda y acciones del panel",
+  "components/admin+lib/payments": "Panel: cobros y reembolsos",
+  "lib/orders+components/admin": "Pedidos: tablero y máquina de estados",
+  "components/order+components/admin": "Carrito: hoja de artículos y desglose de montos",
+  "components/admin": "Panel: shell y utilidades base",
+  "lib/i18n+app/o": "Seguimiento público del pedido",
+  "lib/auth+components/reservation": "Reservaciones: flujo público y límites de tasa",
+  "lib/tables+components/admin": "Mesas y códigos QR",
+  "components/ui+components/index.ts": "Biblioteca de componentes de UI",
+  "components/order+lib/menu": "Menú público y mesa (QR)",
+  "lib/payments+lib/prisma.ts": "Pagos: webhook de Stripe y persistencia",
+  "lib/reservations": "Reservaciones: núcleo y disponibilidad",
+  "components/marea-landing": "Landing público",
+  "lib/reservations+app/admin": "Reservaciones: páginas del panel",
 };
 
 const RELATION_ES = {
@@ -109,16 +136,21 @@ function topDirs(nodes, k = 2) {
 }
 
 /**
- * Una comunidad cuenta como "módulo" si tiene al menos dos archivos de código.
- * Lo demás son las comunidades que Graphify arma alrededor de package.json o
- * tsconfig.json: reales, pero no son arquitectura. Van juntas al final.
+ * Una comunidad cuenta como "módulo" con nota propia si tiene más archivos de
+ * código que MINOR_MODULE_MAX_FILES. Las comunidades de package.json o
+ * tsconfig.json (menos de dos archivos de código) nunca lo son; las que
+ * quedan entre esas dos cosas son "módulos menores" — reales, pero
+ * demasiado pequeñas para merecer una nota que compita con las grandes.
+ * Ambos grupos se listan al final, cada uno en su sección.
  */
 const modules = [];
 const leftovers = [];
+const minorModules = [];
 for (const [community, nodes] of byCommunity) {
   const files = [...new Set(nodes.map((n) => n.source_file))];
   const codeFiles = files.filter((f) => CODE_EXT.test(f));
-  if (codeFiles.length >= 2) modules.push({ community, nodes, files });
+  if (codeFiles.length > MINOR_MODULE_MAX_FILES) modules.push({ community, nodes, files });
+  else if (codeFiles.length >= 2) minorModules.push({ community, nodes, files, codeFiles });
   else leftovers.push({ community, nodes, files });
 }
 modules.sort((a, b) => b.nodes.length - a.nodes.length);
@@ -139,6 +171,13 @@ modules.forEach((m, i) => {
   m.note = `Modulo-${String(m.index).padStart(2, "0")}-${slugify(m.name)}`;
   m.cohesion = analysis.cohesion?.[String(m.community)];
 });
+
+minorModules.forEach((m) => {
+  const dirs = topDirs(m.nodes);
+  m.dirs = dirs;
+  m.name = MODULE_NAMES[dirs.join("+")] ?? dirs.join(" + ");
+});
+minorModules.sort((a, b) => b.codeFiles.length - a.codeFiles.length);
 
 const moduleOfNode = new Map();
 for (const m of modules) for (const n of m.nodes) moduleOfNode.set(n.id, m);
@@ -308,6 +347,16 @@ const mapBody = [
       `| ${m.index} | [[${m.note}\\|${m.name}]] | ${m.files.filter((f) => CODE_EXT.test(f)).length} | ${m.nodes.length} | ${m.dirs.map((d) => `\`${d}\``).join(", ")} |`
   ),
   "",
+  "## Módulos menores",
+  "",
+  `Comunidades reales pero de ${MINOR_MODULE_MAX_FILES} archivos de código o menos: no ganan nota propia porque suelen compartir firma de directorio con otras y competirían por el mismo nombre. Sus archivos están en [[Indice-de-Archivos]].`,
+  "",
+  "| Nombre | Archivos | Símbolos | Directorios |",
+  "|---|---|---|---|",
+  ...minorModules.map(
+    (m) => `| ${m.name} | ${m.codeFiles.length} | ${m.nodes.length} | ${m.dirs.map((d) => `\`${d}\``).join(", ")} |`
+  ),
+  "",
   "## Funciones que todo el mundo llama",
   "",
   "Si cambias la firma de una de estas, el radio de impacto es el número de la derecha.",
@@ -357,6 +406,20 @@ const indexBody = [
       .map((f) => `- \`${f}\``),
     "",
   ]),
+  ...(minorModules.length
+    ? [
+        "## Módulos menores",
+        "",
+        "Sin nota propia — ver [[00-Mapa-del-Codigo|el mapa]] para el porqué.",
+        "",
+        ...minorModules.flatMap((m) => [
+          `### ${m.name}`,
+          "",
+          ...m.codeFiles.sort().map((f) => `- \`${f}\``),
+          "",
+        ]),
+      ]
+    : []),
   ...(() => {
     // Comunidades de un solo archivo: no son un módulo, pero tampoco son todas
     // basura. Se separan en código suelto (páginas hoja, layouts) y config.
