@@ -45,10 +45,12 @@ const DRY_RUN = args.includes("--dry-run");
 const readJson = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
 const graph = readJson(path.join(GRAPH_DIR, "graph.json"));
 let analysis = { gods: [], surprises: [], cohesion: {} };
+let hasAnalysis = true;
 try {
   analysis = readJson(path.join(GRAPH_DIR, ".graphify_analysis.json"));
 } catch {
-  console.warn("aviso: no encontré .graphify_analysis.json, sigo sin él");
+  hasAnalysis = false;
+  console.warn("aviso: no encontré .graphify_analysis.json, el mapa lo advierte en vez de callarlo");
 }
 
 const CODE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
@@ -192,6 +194,10 @@ const BANNER =
   "> [!info] Nota generada\n" +
   "> La produce `scripts/graphify-to-obsidian.mjs` a partir de Graphify. Todo lo de arriba de **Notas** se sobrescribe en cada corrida; lo que escribas dentro de Notas se conserva. Las notas de módulo que esta corrida no volvió a escribir se borran.";
 
+const ANALYSIS_MISSING_NOTE =
+  "> [!warning] Análisis no disponible\n" +
+  "> No se encontró `.graphify_analysis.json`, así que esta sección está incompleta, no vacía porque no haya nada que mostrar. Corre `graphify` antes de este script para generarlo.";
+
 // --- notas por módulo -------------------------------------------------------
 const written = [];
 for (const m of modules) {
@@ -306,15 +312,15 @@ const mapBody = [
   "",
   "Si cambias la firma de una de estas, el radio de impacto es el número de la derecha.",
   "",
-  "| Símbolo | Módulo | Archivo | Conexiones |",
-  "|---|---|---|---|",
-  ...gods,
+  ...(hasAnalysis
+    ? ["| Símbolo | Módulo | Archivo | Conexiones |", "|---|---|---|---|", ...gods]
+    : [ANALYSIS_MISSING_NOTE]),
   "",
   "## Conexiones que cruzan módulos",
   "",
   "Graphify las marca como inesperadas porque unen comunidades separadas. En una app de Next.js casi todas son lo mismo y es sano: un componente de cliente llamando a su Server Action.",
   "",
-  ...surprises,
+  ...(hasAnalysis ? surprises : [ANALYSIS_MISSING_NOTE]),
   "",
   "## Tipos de relación",
   "",
