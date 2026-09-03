@@ -1,38 +1,51 @@
-## Qué incluye
+## What
 
-Una frase por capacidad nueva. Lenguaje de producto, no de código.
+<!-- Two or three sentences. What this changes, not how. -->
 
-## Qué queda fuera
+## Why
 
-Lo que se pospuso a propósito y a qué módulo.
+<!-- The reason: link the issue, the plan phase, or the finding this closes.
+     For a fix, state the root cause, not the symptom. -->
 
-## Cómo probarlo
+## How to review
 
-Pasos ejecutables por alguien que no escribió el código.
+<!-- Guide the reviewer. Where to start, which file is the real change,
+     what can be skimmed (file moves, formatting, generated output). -->
 
-1.
-2.
+## Testing
 
-## Riesgos
+- [ ] Unit tests added or updated
+- [ ] Integration tests added or updated
+- [ ] Manually verified locally
+- [ ] CI is green
 
-Marca lo que aplique y explícalo en un renglón.
+<!-- Paste the relevant test output below. -->
 
-- [ ] Toca dinero (pedidos, pagos, reembolsos, promociones, inventario)
-- [ ] Toca autenticación, roles o permisos
-- [ ] Cambia el esquema (migración incluida y reversible)
-- [ ] Cambia configuración de despliegue o variables de entorno
-- [ ] Ninguno de los anteriores
+## Risk
 
-## Antes de pedir revisión
+- [ ] Touches money (orders, payments, refunds, promotions, inventory)
+- [ ] Touches authentication, roles, or permissions
+- [ ] Changes the schema (migration included and reversible)
+- [ ] Changes deployment configuration or environment variables
+- [ ] None of the above
 
-- [ ] `npm run lint` y `npx tsc --noEmit` limpios
-- [ ] `npm test` pasa, con la salida pegada abajo
-- [ ] Commits en formato semántico, ninguno pasa de 50 caracteres
-- [ ] Autor y committer correctos, sin trailers de coautoría
-- [ ] Sin emojis y sin menciones de herramientas en código, commits ni documentación
-- [ ] Documentación al día: `docs/` y la nota del módulo en Obsidian
+<!-- If anything is checked, explain it in one line each. -->
 
-## Salida de las pruebas
+## Deployment notes
 
-```
-```
+<!-- New environment variables, migrations, ordering constraints.
+     Say "none" if there are none. -->
+
+## Screenshots
+
+<!-- Before and after, for anything visible. Delete this section otherwise. -->
+
+## Checklist
+
+- [ ] Diff is under ~400 lines, or the description explains why it cannot be split
+- [ ] Self-reviewed the diff on GitHub before requesting review
+- [ ] Commits follow the semantic format, none over 50 characters
+- [ ] Everything in English: code, comments, commit messages, this description
+- [ ] Author and committer are correct, no co-authorship trailers
+- [ ] No emoji, no tooling mentions, no debug output, no secrets in the diff
+- [ ] Docs updated: repository docs and the module note in the vault

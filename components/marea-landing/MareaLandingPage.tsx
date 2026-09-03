@@ -34,8 +34,12 @@ export function MareaLandingPage({
   const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
+    // One-time read of browser-only storage — there's no SSR-safe way to
+    // know these values during the initial render, so this can't be a lazy
+    // useState initializer without breaking hydration instead.
     const storedLang = localStorage.getItem("marea-lang") as Lang | null;
     const storedTheme = localStorage.getItem("marea-theme") as Theme | null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (storedLang) setLang(storedLang);
     if (storedTheme) setTheme(storedTheme);
   }, []);

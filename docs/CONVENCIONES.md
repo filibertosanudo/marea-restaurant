@@ -9,6 +9,29 @@ No reescribe historia: los 266 commits anteriores se quedan como están.
 
 ---
 
+## 0. Idioma
+
+**Todo lo que entra al historial de git o lo lee un revisor va en inglés:**
+código, nombres de símbolos, comentarios, mensajes de commit, títulos y
+descripciones de pull request, nombres de rama, y los documentos operativos del
+repositorio que leería alguien ajeno (`README.md`, `AGENTS.md`,
+`docs/DEPLOY.md`).
+
+**Los documentos de trabajo propios siguen en español:** este archivo,
+`docs/PLAN-PRODUCCION.md`, `docs/prompts/`, `docs/DATABASE.md`,
+`docs/product/` y las notas del vault. Son material de planeación, no
+entregables del repositorio.
+
+No se retraducen los documentos en español que ya existen. Si algún día se
+quieren en inglés, es un módulo aparte con su propia rama, no un cambio que se
+cuela dentro de otro trabajo.
+
+Esto coincide con el hábito que ya está escrito en el vault (`06-Ingles.md`):
+README y comentarios en inglés, commits y pull requests en inglés. Un
+repositorio que se enseña a un reclutador se lee entero en inglés o no se lee.
+
+---
+
 ## 1. Autoría
 
 **El autor y el committer de todo commit son siempre Filiberto Sañudo
@@ -63,9 +86,13 @@ git switch main && git pull
 git log --oneline main..feature/<rama-anterior> | wc -l   # tiene que dar 0
 ```
 
-Si `gh pr list` devuelve algo, **no se empieza**. Trabajar sobre una base que
-todavía está en revisión produce conflictos que se resuelven a ciegas y
-mezcla en un mismo diff cosas que se pidieron por separado.
+Si `gh pr list` devuelve algo, **no se empieza un módulo nuevo**. Trabajar sobre
+una base que todavía está en revisión produce conflictos que se resuelven a
+ciegas y mezcla en un mismo diff cosas que se pidieron por separado.
+
+La excepción, y la única, es la fase siguiente **del mismo módulo**: esa parte de
+la rama de la fase anterior y su pull request apunta ahí, no a `main`. Ver la
+sección 6.1.
 
 Apertura, ya con las dos comprobaciones en verde:
 
@@ -207,27 +234,132 @@ hacen lo mismo sin tres dependencias y sin un paso de instalación.
 
 ## 6. Pull request
 
-**Al terminar el módulo se abre un pull request a `main` y ahí se detiene el
-trabajo.** No se fusiona: lo revisa Filiberto.
+Referencia: [The Perfect Pull Request](https://www.deployhq.com/blog/the-perfect-pull-request-best-practices-for-collaborative-development).
+
+### 6.1 Tamaño: es la regla que decide todas las demás
+
+La eficacia de una revisión se desploma pasadas las 200-400 líneas de cambio.
+No es opinión, es lo que mide la industria:
+
+| Tamaño del cambio | Calidad de la revisión | Tiempo real de revisión |
+|---|---|---|
+| 1-100 líneas | Alta | 15-30 min |
+| 100-300 líneas | Buena | 30-60 min |
+| 300-500 líneas | Cae en picada | 1-3 h |
+| 500+ líneas | Nula en la práctica | Días, y suele quedarse sin revisar |
+
+**Techo: 400 líneas por pull request.**
+
+Eso choca de frente con "un pull request por módulo": el módulo 7 fueron 52
+commits y varios miles de líneas. Un pull request así no se revisa, se aprueba
+por cansancio. Así que la regla real es:
+
+> **Un pull request por fase, no por módulo.**
+
+Las fases de cada prompt ya están cortadas por tema —hallazgos, decisiones,
+almacenamiento, empaquetado, documentación— que es exactamente el corte que
+hace revisable un diff.
+
+**Fases encadenadas (stacked).** Cada fase parte de la rama de la anterior, no
+de `main`, y su pull request apunta a esa misma rama. Cuando la primera se
+fusiona, GitHub reapunta la siguiente a `main` sola:
 
 ```bash
-git push -u origin feature/<nombre>
-gh pr create --base main --title "<título>" --body-file .github/pr-body.md
+git switch -c feature/ci-fase-0 main
+# fase 0, pull request contra main
+
+git switch -c feature/ci-fase-1 feature/ci-fase-0
+# fase 1, pull request contra feature/ci-fase-0
 ```
 
-- **Título:** una frase en inglés, imperativa, sin prefijo semántico
-  obligatorio y sin punto final. Describe el módulo, no el último commit.
-- **Descripción:** la plantilla de `.github/pull_request_template.md`. Concisa:
-  qué queda encendible, qué queda explícitamente fuera, cómo probarlo, qué
-  riesgos tiene.
-- Sin emojis. Sin menciones de herramientas. Sin capturas decorativas.
-- Si el módulo tocó dinero, seguridad o esquema, se dice en la descripción, en
-  su propio renglón.
+**Matiz a la regla de la sección 2.** "No se empieza con un pull request
+abierto" aplica a **empezar un módulo nuevo**, no a la fase siguiente del mismo
+módulo: para eso están las ramas encadenadas. Un módulo no arranca hasta que el
+anterior está fusionado entero.
 
-Mientras el pull request está abierto **no se empieza el módulo siguiente**
-(sección 2).
+Si una fase se pasa de 400 líneas y no se puede partir sin dejar el sistema a
+medias, dilo en la descripción y explica por qué. Una excepción argumentada está
+bien; que sea la norma, no.
 
----
+### 6.2 Título
+
+Una línea que diga **qué cambió y por qué**, en inglés, imperativo, sin punto
+final. Sin prefijo semántico obligatorio: describe la fase, no el último commit.
+
+```
+Correcto:   Add integration test harness with an ephemeral Postgres schema
+Correcto:   Fix race condition in session cleanup that caused 502s under load
+Incorrecto: Fase 1
+Incorrecto: Fix bug
+Incorrecto: Update code
+```
+
+### 6.3 Descripción
+
+Responde tres preguntas antes de que el revisor abra un solo archivo: **qué
+cambió**, **por qué**, y **por dónde empezar a leer**. La plantilla de
+`.github/pull_request_template.md` ya tiene esa forma; se llena entera.
+
+Lo que no puede faltar:
+
+- **La causa raíz**, si es un arreglo. "Arregla el login" no dice nada; "el
+  token no se revalidaba porque el callback salía antes de tiempo" sí.
+- **Cómo revisar**: por dónde empezar, qué archivo es el cambio de verdad, qué
+  se puede saltar (movimientos de archivos, reformateos).
+- **Capturas o video** si hay cambio visible, con antes y después.
+- **Notas de despliegue**: variables nuevas, migraciones, si es seguro
+  desplegarlo en horario de servicio.
+- **Renglón propio** si la fase tocó dinero, seguridad o esquema.
+
+### 6.4 Antes de pedir revisión
+
+Revísate a ti mismo primero, leyendo el diff en GitHub y no en el editor: el
+cambio se ve distinto ahí y la mitad de los descuidos saltan solos.
+
+- CI en verde. Un pull request rojo no se manda a revisar.
+- Sin `console.log` de depuración, sin código comentado, sin archivos sueltos.
+- Sin secretos, claves ni `.env` en el diff.
+- Los comentarios que anticipan la pregunta obvia, escritos **en el código**, no
+  en el hilo del pull request. Lo que se explica en un comentario de GitHub se
+  pierde; lo que se explica en el código se queda.
+- Si aún no está listo pero quieres enseñarlo, **draft**. Un borrador marcado
+  como borrador no gasta el tiempo de nadie.
+
+### 6.5 Responder comentarios
+
+Prefijos para que la intención no se malinterprete, en cualquier dirección:
+
+| Prefijo | Significa |
+|---|---|
+| `blocking:` | Hay que arreglarlo antes de fusionar |
+| `question:` | Quiero entender, no pido cambio |
+| `suggestion:` | Tómalo o déjalo |
+| `nit:` | Detalle menor, opcional |
+
+Todo comentario se responde: se aplica, o se explica por qué no. Un hilo sin
+respuesta bloquea la fusión igual que un `blocking:`. Cuando se aplica un
+cambio, se contesta con el enlace al commit, no con "listo".
+
+### 6.6 Fusión
+
+**No se fusiona solo.** El pull request se abre y ahí termina el trabajo del
+módulo o la fase: lo revisa Filiberto.
+
+```bash
+git push -u origin feature/<rama>
+gh pr create --base <rama-base> --title "<título>" --body-file <archivo>
+```
+
+### 6.7 Anti-patrones
+
+- **Mega pull request:** miles de líneas y tres temas distintos. Se parte.
+- **Aprobación de trámite:** "LGTM" a los dos minutos de un diff de 900 líneas.
+- **Revisión de detalles:** cuarenta comentarios sobre nombres y ninguno sobre
+  la lógica. El estilo lo arregla el linter.
+- **Pull request fantasma:** abierto tres semanas, cuarenta comentarios, sin
+  fusionar. Si se atoró, se cierra y se replantea.
+- **Refactor mezclado con funcionalidad:** ya es regla de commits (sección 4);
+  a nivel de pull request es lo mismo y se nota más.
 
 ## 7. Comentarios en el código
 
@@ -239,8 +371,8 @@ Cortos y concisos, como los commits.
   sobra: se arregla el nombre, no se añade el comentario.
 - Se comenta lo que sorprende: la decisión no obvia, la alternativa descartada,
   la restricción externa, la trampa que costó una tarde.
-- **Idioma**, siguiendo lo que el repositorio ya hace: inglés en el código
-  TypeScript, español en `prisma/schema.prisma` y en `docs/`.
+- **Idioma: inglés**, sin excepciones, incluidos los comentarios de
+  `prisma/schema.prisma`. Ver la sección 0.
 - Nada de comentarios de sección decorativos, ni `// TODO` sin fecha ni dueño.
   Hoy el repositorio tiene cero `TODO`; que siga así.
 
