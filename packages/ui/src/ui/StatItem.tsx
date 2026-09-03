@@ -29,6 +29,10 @@ export function StatItem({ value, label }: { value: string; label: string }) {
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ) {
+      // One-time read of a browser-only API (matchMedia) — this can't be
+      // decided during the initial render without risking a mismatch with
+      // the server-rendered animated-start value.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDisplay(value);
       return;
     }
