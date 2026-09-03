@@ -59,12 +59,11 @@ datasource db {
   provider = "postgresql"
   // Prisma 7: las URLs YA NO van aquí. Viven en prisma.config.ts
   // (migraciones) y en el adapter que le pasas a `new PrismaClient()`.
-  // Supabase: usa el pooler (pgbouncer, :6543) para la app y la conexión
-  // directa (:5432) para `prisma migrate`.
+  // Postgres estándar, sin pooler intermedio: una sola URL (DATABASE_URL)
+  // sirve tanto para la app como para `prisma migrate`.
   //
   // Si te quedas en Prisma 6, borra este comentario y agrega aquí:
   //   url       = env("DATABASE_URL")
-  //   directUrl = env("DIRECT_URL")
 }
 
 // ============================================================================
@@ -1364,7 +1363,8 @@ model NewsletterSubscriber {
 //     es una señal para el menú).
 //
 //  2) AiKnowledgeChunk — fragmentos del menú, horarios y políticas ya
-//     embebidos, para RAG. Requiere la extensión pgvector de Supabase:
+//     embebidos, para RAG. Requiere pgvector, una extensión de Postgres
+//     estándar (no es de Supabase):
 //        CREATE EXTENSION IF NOT EXISTS vector;
 //     Prisma no tiene tipo `vector` nativo, así que la columna se declara con
 //     Unsupported("vector(1536)") y se consulta con $queryRaw.
