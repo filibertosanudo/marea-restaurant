@@ -1,5 +1,9 @@
 # Prompt para Claude Code — Módulo 3: cobros, correcciones y Stripe
 
+> Errata (módulo 7): el tope de vida del SSE justificado por la facturación
+> de Vercel quedó sin efecto.
+> Ver docs/PLAN-PRODUCCION.md y docs/prompts/07-postgres-y-deploy-portatil.md.
+
 > Pégalo completo en `Desktop/restaurant-page`. Igual que los anteriores, se
 > ejecuta con el skill `build-loop-claude-code` y **para al final de la Fase 2**
 > a esperar aprobación del diseño.

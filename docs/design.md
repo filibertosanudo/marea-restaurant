@@ -416,19 +416,19 @@ Los cuatro patrones del módulo de cobros (`components/order/PaymentMethodChoice
 
 ## Do's and Don'ts
 
-✓ Usar `primary` (#1B367B) como único azul de marca en todo el sitio — es el punto de anclaje visual con el portafolio.
-✓ Reservar `accent-warm` para momentos puntuales de calidez (ofertas, badges), no como color de fondo extendido.
-✓ Mantener el radio píldora en todos los CTAs para que la marca se reconozca de un vistazo, incluso en thumbnail.
-✓ Dejar que la fotografía real de comida/mariscos sea la protagonista visual; el sistema de color es deliberadamente comedido para no competir con ella.
-✓ Cumplir AA en todos los pares texto/fondo, sobre todo con `body-lg` en Poppins Light.
-✓ En el panel de administración, usar `rounded.md`/`sm` y el padding corto (`button-primary-admin`, `input-admin`) en vez del padding y radio del landing — la densidad es la única variante permitida.
-✓ Construir `StatusBadge` y demás estados con tinte de opacidad (`bg-{semantic}/12`) sobre los colores semánticos existentes, nunca con un hex nuevo.
+Hacer: Usar `primary` (#1B367B) como único azul de marca en todo el sitio — es el punto de anclaje visual con el portafolio.
+Hacer: Reservar `accent-warm` para momentos puntuales de calidez (ofertas, badges), no como color de fondo extendido.
+Hacer: Mantener el radio píldora en todos los CTAs para que la marca se reconozca de un vistazo, incluso en thumbnail.
+Hacer: Dejar que la fotografía real de comida/mariscos sea la protagonista visual; el sistema de color es deliberadamente comedido para no competir con ella.
+Hacer: Cumplir AA en todos los pares texto/fondo, sobre todo con `body-lg` en Poppins Light.
+Hacer: En el panel de administración, usar `rounded.md`/`sm` y el padding corto (`button-primary-admin`, `input-admin`) en vez del padding y radio del landing — la densidad es la única variante permitida.
+Hacer: Construir `StatusBadge` y demás estados con tinte de opacidad (`bg-{semantic}/12`) sobre los colores semánticos existentes, nunca con un hex nuevo.
 
-✗ No introducir un segundo azul (p. ej. el `1C3F6C`/`003093` literal de la referencia) — rompe el ancla compartida con el portafolio.
-✗ No usar Poppins Light por debajo de 18px para texto de lectura — cae el contraste de trazo y la legibilidad.
-✗ No aplanar las sombras a "flat design" total — el sistema depende de la sensación de profundidad tipo agua/vidrio para su carácter.
-✗ No mezclar esquinas rectas de golpe en un componente puntual (p. ej. un botón cuadrado) — rompe el lenguaje de forma suave.
-✗ No usar `rounded.full` dentro de tablas o formularios del panel (excepto controles ya redondos por naturaleza, como el switch de disponibilidad) — el pill es firma del landing, no del panel.
-✗ No crear un sistema de diseño "admin" aparte. Todo componente nuevo de `components/admin/` referencia los mismos tokens de `colors`/`typography` de este documento; solo cambian `rounded` y `padding`.
+Evitar: No introducir un segundo azul (p. ej. el `1C3F6C`/`003093` literal de la referencia) — rompe el ancla compartida con el portafolio.
+Evitar: No usar Poppins Light por debajo de 18px para texto de lectura — cae el contraste de trazo y la legibilidad.
+Evitar: No aplanar las sombras a "flat design" total — el sistema depende de la sensación de profundidad tipo agua/vidrio para su carácter.
+Evitar: No mezclar esquinas rectas de golpe en un componente puntual (p. ej. un botón cuadrado) — rompe el lenguaje de forma suave.
+Evitar: No usar `rounded.full` dentro de tablas o formularios del panel (excepto controles ya redondos por naturaleza, como el switch de disponibilidad) — el pill es firma del landing, no del panel.
+Evitar: No crear un sistema de diseño "admin" aparte. Todo componente nuevo de `components/admin/` referencia los mismos tokens de `colors`/`typography` de este documento; solo cambian `rounded` y `padding`.
 
 **Resuelto:** los tokens de borde en modo claro (`border`, `surface-ocean-border`, `accent-warm-border`) ya cumplen el mínimo WCAG de 3:1 para límites de componentes de UI (ver sección Dark Mode) — se oscurecieron conservando el matiz de cada uno.

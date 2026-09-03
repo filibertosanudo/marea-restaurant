@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { env } from "@/lib/env";
 
 /**
  * Sliding-window login rate limit backed by Postgres (LoginAttempt), so it
@@ -67,29 +68,31 @@ export async function recordLoginAttempt(
 }
 
 /**
- * Best-effort client IP from standard proxy headers (Vercel and most
- * reverse proxies set x-forwarded-for). Falls back to a fixed key so the
- * per-IP limit still applies (conservatively, shared by everyone behind an
- * unknown proxy) instead of silently no-op'ing.
+ * Client IP from x-forwarded-for (x-real-ip as fallback), trusting exactly
+ * `trustedProxyCount` hops counted from the *end* of the chain — never a
+ * fixed position — because each trusted proxy appends its own peer, so
+ * anything the client injected stays to the left of them.
  *
- * Takes anything with a `.get(name)` reader rather than a full `Request` —
- * a Route Handler has `request.headers`, but a Server Action or Server
- * Component only has next/headers()'s return value, which has no `request`
- * wrapping it. Both satisfy this shape.
- *
- * Trust boundary: this only resolves the real client IP when the
- * reverse proxy in front of the app sets (and doesn't just append to)
- * x-forwarded-for — true on Vercel. If this app is ever exposed directly
- * or behind a proxy that forwards the header as-is, a caller can spoof it
- * and evade the per-IP limit; the per-email limit above is unaffected by
- * that and remains the primary defense there.
+ * Only defends the per-IP limit; the per-email limit doesn't depend on it.
  */
-export function getClientIp(headers: { get(name: string): string | null }): string {
-  const forwardedFor = headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    const first = forwardedFor.split(",")[0]?.trim();
-    if (first) return first;
+export function getClientIp(
+  headers: { get(name: string): string | null },
+  trustedProxyCount: number = env.TRUSTED_PROXY_COUNT
+): string {
+  if (trustedProxyCount > 0) {
+    const chain = (headers.get("x-forwarded-for") ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    // Fewer entries than trusted hops means a hop failed to append (or the
+    // count is wrong) — nothing in the chain is provably trustworthy then,
+    // so this falls through instead of guessing which entry is real.
+    if (chain.length >= trustedProxyCount) {
+      return chain[chain.length - trustedProxyCount];
+    }
   }
+
   const realIp = headers.get("x-real-ip");
   if (realIp) return realIp.trim();
   return "unknown";

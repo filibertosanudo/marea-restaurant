@@ -32,30 +32,48 @@ npm run lint    # eslint
 app/               → pages (Next.js App Router)
   admin/(auth)/     → login, forced password change
   admin/(shell)/    → sidebar+topbar shell, menu/categorías/modificadores, equipo
-components/ui/      → published design system components (Button, Input, Select,
+packages/ui/        → published design system components (Button, Input, Select,
                        Modal, Table, Tabs, Toast, Nav, MenuCard, StatItem,
-                       TestimonialCard, OfferBadge) — synced to Claude Design
+                       TestimonialCard, OfferBadge) — its own workspace
+                       package (`@marea/ui`), synced to Claude Design;
+                       `@/components/ui/*` imports resolve straight to its
+                       source via a tsconfig path, no build step in dev
 components/admin/   → admin-only components (denser variant of the same tokens)
 lib/auth/           → Auth.js config, password hashing, role/permission helpers
 lib/menu/, lib/team/→ Server Actions, Zod schemas, and centralized queries
 lib/dto/            → Prisma.Decimal → string conversion at the client boundary
-docs/               → design system spec + database rationale
+lib/env.ts          → the only module that reads process.env — every other
+                       file gets config through it, validated at boot
+lib/storage/         → image storage behind a driver interface (local disk,
+                       s3-compatible) — see docs/DEPLOY.md
+docs/               → design system spec + database rationale + deploy guide
                        design.md/.html — tokens (source of truth + visual guide)
                        DATABASE.md — schema rationale
-styles/             → shared stylesheet for the component library build
+                       DEPLOY.md — how to run this in production
+styles/             → shared design tokens + stylesheet, used by both the
+                       app (`app/globals.css`) and the `packages/ui` build
 ```
 
 ## Database
 
-Prisma 7 + Postgres. See [`docs/DATABASE.md`](docs/DATABASE.md) for the schema rationale.
+Prisma 7 + plain Postgres — no managed-provider dependency. See
+[`docs/DATABASE.md`](docs/DATABASE.md) for the schema rationale.
 
 ```bash
 npm run db:migrate    # apply migrations
-npm run db:seed       # seed dev data (menu, business, users, orders...)
+npm run db:seed       # seed dev data (menu, business, users, orders...) — local only, see below
 npm run db:studio     # visual inspector
 ```
 
-Needs `DATABASE_URL` and `DIRECT_URL` in `.env` (see `.env.example`). For local dev without Supabase, any Postgres works — point both vars at the same instance.
+Needs `DATABASE_URL` in `.env` (see `.env.example`); any Postgres 17+ works,
+local or hosted. `DIRECT_URL` is optional — only needed if a
+transaction-mode pooler sits in front of the app.
+
+`npm run db:seed` refuses to run against anything that doesn't look
+unmistakably local: the seeded accounts below have publicly-documented
+passwords, so seeding a real deployment by accident would hand out
+`SUPER_ADMIN` to anyone who reads this file. See `prisma/seed.ts` for the
+guard and its explicit opt-out.
 
 ## Payments (Stripe)
 
@@ -134,4 +152,11 @@ Brand anchor: navy `#1B367B`, matched to the author's portfolio site so this pro
 
 ## Deployment
 
-Built for [Vercel](https://vercel.com/) or any Next.js-compatible host.
+Portable: `docker compose up --build` runs the whole stack (app, Postgres,
+a one-shot migration step) on any Docker host — not tied to Vercel. Full
+walkthrough in [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+From a clean checkout (volumes removed, no cached image layers), `docker
+compose up --build` through a seeded, responding landing page took **~167s**
+on the machine this was last tested on; with layer caching from a prior
+build, ~25s.

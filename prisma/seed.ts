@@ -16,6 +16,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, Prisma } from "../lib/generated/prisma/client";
 // Prisma 6:  import { PrismaClient, Prisma } from "@prisma/client";
 import { hashPassword } from "../lib/auth/password";
+import { safeHostname } from "../lib/url";
 
 // Contraseñas de desarrollo para el personal sembrado — documentadas en el
 // README. Nunca uses estos valores fuera de un entorno local.
@@ -25,11 +26,70 @@ const DEV_PASSWORDS: Record<string, string> = {
   "mesero@marea.test": "MareaTemp123!", // mustChangePassword: true — ver abajo
 };
 
-// Prisma 7: PrismaClient ya no acepta la URL directa, necesita un driver
-// adapter. Aquí sí usamos DIRECT_URL (no el pooler) porque el seed corre
-// una sola vez desde tu máquina, no en runtime de la app — igual que las
-// migraciones. Ver lib/prisma.ts para el cliente que sí usa el pooler.
-const adapter = new PrismaPg({ connectionString: process.env.DIRECT_URL });
+// Deliberately just loopback addresses, not a Docker Compose service name
+// like "db" — that hostname means exactly the same thing inside this
+// project's own recommended production Compose file, so it's no signal of
+// "not production" at all and would defeat this guard for the one topology
+// it most needs to catch.
+const LOCAL_HOSTNAMES = ["localhost", "127.0.0.1", "[::1]", "::1"];
+
+// The same DIRECT_URL ?? DATABASE_URL resolution prisma.config.ts uses —
+// DIRECT_URL is only set at all if a transaction-mode pooler sits in front
+// of the app, which most deployments (this project's own docker-compose.yml
+// included) don't have.
+function connectionUrl(): string | undefined {
+  return process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+}
+
+// pg's own connection-string parser (pg-connection-string, underneath
+// @prisma/adapter-pg) treats a "host" or "hostaddr" query parameter as an
+// override that wins over the URL's own authority — safeHostname() below
+// doesn't know that, so "postgresql://localhost/db?host=some-real-deploy"
+// would read as local here while pg actually connects somewhere else
+// entirely. Either param makes the parsed hostname untrustworthy for this
+// check, so its presence is treated as "not local" rather than trusted.
+function hasConnectionOverride(rawUrl: string): boolean {
+  try {
+    const params = new URL(rawUrl).searchParams;
+    return params.has("host") || params.has("hostaddr");
+  } catch {
+    return false;
+  }
+}
+
+// DEV_PASSWORDS above are public (they're in the README): seeding a real
+// deployment by accident — the exact mistake a first deploy invites — hands
+// out SUPER_ADMIN to anyone who reads it. Refuses unless the target is
+// unmistakably local, or the escape hatch is typed on purpose. Checks the
+// same URL the PrismaPg adapter below actually connects with.
+function assertLocalTarget(): void {
+  if (process.env.I_KNOW_WHAT_IM_DOING === "1") return;
+
+  const rawUrl = connectionUrl();
+  const host = rawUrl ? safeHostname(rawUrl) : null;
+  const isProduction = process.env.NODE_ENV === "production";
+  const isLocal =
+    rawUrl !== undefined &&
+    host !== null &&
+    LOCAL_HOSTNAMES.includes(host) &&
+    !hasConnectionOverride(rawUrl);
+
+  if (isProduction || !isLocal) {
+    console.error(
+      `Refusing to seed: target host "${host ?? "unknown"}" doesn't look local ` +
+        `(NODE_ENV=${process.env.NODE_ENV ?? "unset"}).\n` +
+        "Seeded accounts have passwords published in the README.\n" +
+        "Set I_KNOW_WHAT_IM_DOING=1 to seed anyway."
+    );
+    process.exit(1);
+  }
+}
+
+assertLocalTarget();
+
+// Prisma 7: PrismaClient no longer accepts a direct URL, it needs a driver
+// adapter.
+const adapter = new PrismaPg({ connectionString: connectionUrl() });
 const prisma = new PrismaClient({ adapter });
 
 const BUSINESS_SLUG = "marea";

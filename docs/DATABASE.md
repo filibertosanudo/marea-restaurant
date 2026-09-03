@@ -374,7 +374,7 @@ const amountInCents = order.total.mul(100).toNumber();
 
 ---
 
-## 4. Puesta en marcha
+## 4. Puesta en marcha con Postgres
 
 ```bash
 npm i prisma @prisma/client
@@ -384,18 +384,26 @@ npx prisma db seed
 npx prisma studio            # inspector visual, muy útil viniendo de phpMyAdmin
 ```
 
-Detalles de Supabase que muerden:
+Postgres a secas, sin proveedor administrado de por medio:
 
-- **Dos URLs.** `DATABASE_URL` apunta al pooler (`:6543`, con
-  `?pgbouncer=true`) para la app; `DIRECT_URL` apunta a la conexión directa
-  (`:5432`) para migraciones y seed. `prisma migrate` **no** funciona a través
-  de pgbouncer en modo transaction.
-- **RLS.** Supabase la trae encendida por defecto en tablas creadas desde su
-  UI, pero **no** en tablas creadas por Prisma Migrate. Si vas a exponer la
-  base al cliente con la anon key, tienes que escribir las políticas a mano.
-  Mientras todo pase por route handlers de Next.js con la service key, no es
-  urgente — pero es exactamente el momento en que `businessId` deja de ser
-  decorativo.
+- **Una sola URL.** `DATABASE_URL` sirve tanto para la app en runtime como
+  para `prisma migrate` y el seed. `DIRECT_URL` existe pero es opcional: solo
+  hace falta si algún día pones un pooler en modo transacción (pgbouncer y
+  similares) delante de la app, porque ese modo no soporta los prepared
+  statements que usa Migrate. Ver `docs/DEPLOY.md` para el despliegue de
+  referencia.
+- **`btree_gist` y la `EXCLUDE` constraint de reservaciones son Postgres
+  estándar**, no de ningún proveedor — vienen en `contrib`, incluido en la
+  imagen `postgres:17-alpine` que usa el `docker-compose.yml` de este
+  proyecto.
+- **RLS.** Row-Level Security es de Postgres desde la versión 9.5, no de
+  Supabase — cualquier Postgres la soporta igual. Hoy no está en uso: todo
+  pasa por Server Actions y route handlers de Next.js con una sola conexión
+  de aplicación, así que `businessId` es el único aislamiento entre negocios
+  y basta mientras el acceso a la base nunca se exponga directo al cliente.
+  Activar RLS (políticas por tabla, atadas a `businessId`) es el plan del
+  módulo 16, cuando el proyecto pase a multi-tenant real — no una
+  limitación de haber dejado Supabase.
 
 ---
 
@@ -463,7 +471,7 @@ valida el requisito central del snapshot:
 ```bash
 # 1. mira el ticket del pedido A-0004  → Garlic Butter Crab Legs a $48
 # 2. sube el precio del platillo en el catálogo a $60
-# 3. vuelve a abrir el ticket          → sigue diciendo $48  ✅
+# 3. vuelve a abrir el ticket          → sigue diciendo $48 (correcto)
 ```
 
 Si el paso 3 dice $60, algo está leyendo el catálogo en vez del snapshot.

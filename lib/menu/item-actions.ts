@@ -8,6 +8,7 @@ import { buildMenuItemSchema } from "@/lib/menu/schemas";
 import { UserRole } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
 import { slugify } from "@/lib/menu/slugify";
+import { getStorageDriver } from "@/lib/storage";
 
 const ADMIN_ROLES = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
 const STAFF_UP_ROLES = [UserRole.STAFF, UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
@@ -126,8 +127,19 @@ export async function updateMenuItemAction(
   });
   if (!existing) return { error: "not_found" };
 
-  await prisma.$transaction([
-    prisma.menuItem.update({
+  // FOR UPDATE, not a plain read, because the old imageUrl decides what
+  // gets deleted after commit: two overlapping saves of the same item (a
+  // double-tap, two open tabs) could otherwise both read the same stale
+  // "current" image, and the second one to finish would delete a key the
+  // first one just made current. Locking makes the second transaction
+  // block until the first commits, so it reads what the first one actually
+  // left behind.
+  const oldImageUrl = await prisma.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ imageUrl: string | null }[]>`
+      SELECT "imageUrl" FROM "MenuItem" WHERE id = ${id} FOR UPDATE
+    `;
+
+    await tx.menuItem.update({
       where: { id },
       data: {
         categoryId: data.categoryId,
@@ -137,35 +149,62 @@ export async function updateMenuItemAction(
         isAvailable: data.isAvailable,
         isFeatured: data.isFeatured,
       },
-    }),
-    ...(["en", "es"] as const)
-      .filter((l) => data.translations[l]?.name)
-      .map((l) =>
-        prisma.menuItemTranslation.upsert({
-          where: { menuItemId_locale: { menuItemId: id, locale: l } },
-          update: {
-            name: data.translations[l]!.name,
-            description: data.translations[l]!.description || null,
-            imageAlt: data.translations[l]!.imageAlt || null,
-          },
-          create: {
-            menuItemId: id,
-            locale: l,
-            name: data.translations[l]!.name,
-            description: data.translations[l]!.description || null,
-            imageAlt: data.translations[l]!.imageAlt || null,
-          },
-        })
-      ),
-    prisma.menuItemTag.deleteMany({ where: { menuItemId: id } }),
-    prisma.menuItemTag.createMany({
+    });
+    await Promise.all(
+      (["en", "es"] as const)
+        .filter((l) => data.translations[l]?.name)
+        .map((l) =>
+          tx.menuItemTranslation.upsert({
+            where: { menuItemId_locale: { menuItemId: id, locale: l } },
+            update: {
+              name: data.translations[l]!.name,
+              description: data.translations[l]!.description || null,
+              imageAlt: data.translations[l]!.imageAlt || null,
+            },
+            create: {
+              menuItemId: id,
+              locale: l,
+              name: data.translations[l]!.name,
+              description: data.translations[l]!.description || null,
+              imageAlt: data.translations[l]!.imageAlt || null,
+            },
+          })
+        )
+    );
+    await tx.menuItemTag.deleteMany({ where: { menuItemId: id } });
+    await tx.menuItemTag.createMany({
       data: data.tagIds.map((tagId) => ({ menuItemId: id, tagId })),
-    }),
-    prisma.menuItemModifierGroup.deleteMany({ where: { menuItemId: id } }),
-    prisma.menuItemModifierGroup.createMany({
+    });
+    await tx.menuItemModifierGroup.deleteMany({ where: { menuItemId: id } });
+    await tx.menuItemModifierGroup.createMany({
       data: data.modifierGroupIds.map((groupId) => ({ menuItemId: id, groupId })),
-    }),
-  ]);
+    });
+
+    return locked[0]?.imageUrl ?? null;
+  });
+
+  // Only after the row is safely pointing at the new image: deleting the
+  // old key first (or inside the transaction above) risks a 404'ing row if
+  // anything after that point failed. Best-effort and after the fact — a
+  // failure here just leaves an orphaned key for the sweep script to catch,
+  // never a row pointing at something that's already gone.
+  if (oldImageUrl && oldImageUrl !== data.imageUrl) {
+    const oldKey = getStorageDriver().keyFromUrl(oldImageUrl);
+    if (oldKey) {
+      // The URL field also accepts a pasted link, so two rows can end up
+      // pointing at the same key (copy-pasted, not just uploaded) — never
+      // delete a key another item still uses.
+      const stillReferenced = await prisma.menuItem.findFirst({
+        where: { id: { not: id }, imageUrl: oldImageUrl },
+        select: { id: true },
+      });
+      if (!stillReferenced) {
+        await getStorageDriver()
+          .delete(oldKey)
+          .catch((err) => console.error(`Failed to delete old menu item image ${oldKey}:`, err));
+      }
+    }
+  }
 
   revalidatePath("/admin/menu");
   revalidatePath("/");

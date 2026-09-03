@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: marea
+      POSTGRES_USER: marea
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marea"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: applies migrations, then exits. `app` won't start until this
+  # succeeds. Never runs the seed — that stays a command someone types.
+  migrate:
+    build:
+      context: .
+      target: migrate
+    environment:
+      DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      target: runner
+    environment:
+      DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_URL: ${AUTH_URL}
+      APP_ORIGIN: ${APP_ORIGIN:-}
+      STORAGE_DRIVER: local
+      STORAGE_LOCAL_DIR: /data/media
+      TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-1}
+    volumes:
+      - media:/data/media
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # Module 10. The notification queue (NotificationJob) already exists and
+  # is written to today — nothing reads it yet. Left visible on purpose.
+  # worker:
+  #   build: .
+  #   command: ["node", "worker.js"]
+  #   environment:
+  #     DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+
+volumes:
+  pgdata:
+  media:

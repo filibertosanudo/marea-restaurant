@@ -3,14 +3,14 @@ import { getSession } from "@/lib/auth/session";
 import { STAFF_ROLES } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
 import { prisma } from "@/lib/prisma";
+import { env } from "@/lib/env";
 
 const POLL_INTERVAL_MS = 2000;
-// A kitchen display left open for a shift would otherwise poll forever — 2
-// queries/2s for 12h is ~43k queries a day, and on Vercel it's one
-// continuously-billed invocation per open tab. Closing cleanly here costs
-// nothing: EventSource reconnects on its own, and useEventStream's backoff
-// treats this exactly like any other dropped connection.
-const MAX_LIFETIME_MS = 75_000;
+// A periodic handoff (env.SSE_MAX_LIFETIME_MS, 0 to disable) keeps a
+// connection left open for a whole shift from wedging a proxy or load
+// balancer that expects streams to end sometime. EventSource reconnects on
+// its own, and useEventStream's backoff treats this exactly like any other
+// dropped connection — so it costs nothing to close cleanly.
 
 type Scope = { kind: "board"; businessId: string } | { kind: "order"; orderId: string };
 
@@ -52,9 +52,9 @@ async function getSignature(scope: Scope): Promise<string | null> {
  * Server-side polling dressed up as a push: no LISTEN/NOTIFY (doesn't
  * survive Supabase's transaction-mode pooler in production) and no
  * Supabase Realtime (unavailable against the local Postgres dev runs
- * against — see lib/storage/config.ts). Polls every 2s and only emits when
- * the signature actually changed, so the client isn't refetching the page
- * on every tick, just when there's something new to show.
+ * against). Polls every 2s and only emits when the signature actually
+ * changed, so the client isn't refetching the page on every tick, just
+ * when there's something new to show.
  */
 export async function GET(request: NextRequest) {
   const publicToken = request.nextUrl.searchParams.get("token");
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
         lastSignature = null;
       }
 
-      const deadline = Date.now() + MAX_LIFETIME_MS;
+      const deadline = env.SSE_MAX_LIFETIME_MS > 0 ? Date.now() + env.SSE_MAX_LIFETIME_MS : Infinity;
 
       while (!closed) {
         if (Date.now() >= deadline) {

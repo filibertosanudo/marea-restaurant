@@ -1,5 +1,8 @@
 # Prompt para Claude Code — Módulo 1: panel de administración + gestión de menú
 
+> Errata (módulo 7): la subida de imágenes a Supabase Storage quedó sin efecto.
+> Ver docs/PLAN-PRODUCCION.md y docs/prompts/07-postgres-y-deploy-portatil.md.
+
 > Cópialo completo en Claude Code, dentro de `Desktop/restaurant-page`.
 > Arráncalo con el skill de build loop que ya tienes: escribe
 > `usa el skill build-loop-claude-code` antes de pegar esto, o pégalo tal cual
