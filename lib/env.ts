@@ -20,6 +20,13 @@ const schema = z
     TRUSTED_PROXY_COUNT: z.coerce.number().int().min(0).default(1),
     SSE_MAX_LIFETIME_MS: z.coerce.number().int().min(0).default(75_000),
     MEDIA_HOSTNAME: z.string().min(1).optional(),
+    STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
+    STORAGE_LOCAL_DIR: z.string().min(1).default("./data/media"),
+    S3_ENDPOINT: z.string().url().optional(),
+    S3_BUCKET: z.string().min(1).optional(),
+    S3_REGION: z.string().min(1).optional(),
+    S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+    S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   })
   .superRefine((value, ctx) => {
     // APP_ORIGIN (or its AUTH_URL fallback) only matters once a URL gets
@@ -33,6 +40,23 @@ const schema = z
         path: ["APP_ORIGIN"],
         message: "required in production (AUTH_URL also accepted as a fallback)",
       });
+    }
+
+    // Same shape of conditional requirement as APP_ORIGIN above, but keyed
+    // off a driver choice instead of NODE_ENV: fail at boot, not mid-upload.
+    if (value.STORAGE_DRIVER === "s3") {
+      const required = [
+        "S3_ENDPOINT",
+        "S3_BUCKET",
+        "S3_REGION",
+        "S3_ACCESS_KEY_ID",
+        "S3_SECRET_ACCESS_KEY",
+      ] as const;
+      for (const key of required) {
+        if (!value[key]) {
+          ctx.addIssue({ code: "custom", path: [key], message: "required when STORAGE_DRIVER=s3" });
+        }
+      }
     }
   });
 
