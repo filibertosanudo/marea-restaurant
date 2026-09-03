@@ -20,6 +20,14 @@ export const metadata: Metadata = {
     "Marea: mariscos frescos, servidos con el oceano como inspiracion.",
 };
 
+// Root-level, so it covers every route: without an explicit dynamic API
+// (cookies/headers), Next tries to statically prerender any page at build
+// time, including ones that read the database with no caching — a menu
+// change in the admin panel would never reach a page baked in at build
+// time, and `next build` would need a live database reachable from inside
+// an isolated Docker build stage, which a portable build can't assume.
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: Readonly<{
