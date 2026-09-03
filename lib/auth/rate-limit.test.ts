@@ -9,7 +9,8 @@ function headersWith(xForwardedFor: string | null, xRealIp: string | null = null
 }
 
 describe("getClientIp", () => {
-  // Default TRUSTED_PROXY_COUNT is 1 (set in test/setup.ts's minimal env).
+  // TRUSTED_PROXY_COUNT isn't set in test/setup.ts's minimal env, so these
+  // rely on the zod schema's own default of 1.
 
   it("trusts the single hop a direct proxy appends", () => {
     expect(getClientIp(headersWith("203.0.113.9"))).toBe("203.0.113.9");
@@ -37,5 +38,20 @@ describe("getClientIp", () => {
 
   it("falls back to a fixed key when neither header is present", () => {
     expect(getClientIp(headersWith(null))).toBe("unknown");
+  });
+
+  it("never trusts x-forwarded-for at all when trustedProxyCount is 0", () => {
+    // A client can set x-forwarded-for itself; with zero trusted proxies
+    // (no reverse proxy in front) nothing in it is provably real.
+    expect(getClientIp(headersWith("6.6.6.6"), 0)).toBe("unknown");
+    expect(getClientIp(headersWith("6.6.6.6", "203.0.113.9"), 0)).toBe("203.0.113.9");
+  });
+
+  it("does not trust the leftmost entry when the chain is shorter than trustedProxyCount", () => {
+    // Only one hop actually appended — a misconfigured count, or one of
+    // two expected proxies failed to append. The single remaining entry
+    // could be the client's own spoofed value, so it must not be trusted.
+    expect(getClientIp(headersWith("6.6.6.6"), 2)).toBe("unknown");
+    expect(getClientIp(headersWith("6.6.6.6", "203.0.113.9"), 2)).toBe("203.0.113.9");
   });
 });

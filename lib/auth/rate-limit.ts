@@ -68,37 +68,29 @@ export async function recordLoginAttempt(
 }
 
 /**
- * Client IP from standard proxy headers (x-forwarded-for, with x-real-ip as
- * a fallback), resolved by counting trusted proxies rather than trusting a
- * fixed position in the chain. TRUSTED_PROXY_COUNT (env.ts) is how many
- * proxies between the client and this app are known to append their own
- * hop rather than let the client dictate it — with N trusted proxies, the
- * real client is the Nth value from the *end* of the chain, because
- * anything the client injected up front only pushes the trusted hops
- * further right, never off the end.
+ * Client IP from x-forwarded-for (x-real-ip as fallback), trusting exactly
+ * `trustedProxyCount` hops counted from the *end* of the chain — never a
+ * fixed position — because each trusted proxy appends its own peer, so
+ * anything the client injected stays to the left of them.
  *
- * Takes anything with a `.get(name)` reader rather than a full `Request` —
- * a Route Handler has `request.headers`, but a Server Action or Server
- * Component only has next/headers()'s return value, which has no `request`
- * wrapping it. Both satisfy this shape.
- *
- * This only defends the per-IP limit; the per-email limit above doesn't
- * depend on it and remains the primary defense regardless of proxy setup.
+ * Only defends the per-IP limit; the per-email limit doesn't depend on it.
  */
-export function getClientIp(headers: { get(name: string): string | null }): string {
-  const chain = (headers.get("x-forwarded-for") ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+export function getClientIp(
+  headers: { get(name: string): string | null },
+  trustedProxyCount: number = env.TRUSTED_PROXY_COUNT
+): string {
+  if (trustedProxyCount > 0) {
+    const chain = (headers.get("x-forwarded-for") ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-  if (chain.length > 0) {
-    // Each trusted hop appends the IP of whoever it received the request
-    // from, so the last N entries are proxy-recorded hand-offs and the
-    // client sits right before them — the Nth entry counting from the end,
-    // i.e. index (length - N). Anything the client injected up front just
-    // shifts left of that and is never reached.
-    const index = Math.max(0, chain.length - env.TRUSTED_PROXY_COUNT);
-    return chain[index] ?? "unknown";
+    // Fewer entries than trusted hops means a hop failed to append (or the
+    // count is wrong) — nothing in the chain is provably trustworthy then,
+    // so this falls through instead of guessing which entry is real.
+    if (chain.length >= trustedProxyCount) {
+      return chain[chain.length - trustedProxyCount];
+    }
   }
 
   const realIp = headers.get("x-real-ip");
