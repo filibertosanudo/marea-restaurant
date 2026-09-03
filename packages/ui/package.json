@@ -14,5 +14,8 @@
   },
   "scripts": {
     "build:lib": "tsup src/index.ts --format esm,cjs --dts --out-dir dist --tsconfig tsconfig.json"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5"
   }
 }
