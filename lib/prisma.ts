@@ -9,6 +9,11 @@
  * El patrón globalForPrisma evita crear un PrismaClient nuevo en cada
  * hot-reload de `next dev`, que si no se controla acaba agotando las
  * conexiones en segundos.
+ *
+ * Construido perezosamente, en el primer uso real — no al importar. Este
+ * módulo se importa desde casi todas partes, y crearlo al importar volvería
+ * a exponer al arranque en frío del build (Next inspecciona los módulos de
+ * ruta durante `next build`) exactamente el riesgo que lib/env.ts ya evita.
  */
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "./generated/prisma/client";
@@ -18,7 +23,7 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
-function createPrismaClient() {
+function createPrismaClient(): PrismaClient {
   const adapter = new PrismaPg({
     connectionString: env.DATABASE_URL,
     // Fuera de serverless la app es un proceso largo con su propio pool —
@@ -30,8 +35,17 @@ function createPrismaClient() {
   return new PrismaClient({ adapter });
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+function getPrismaClient(): PrismaClient {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createPrismaClient();
+  }
+  return globalForPrisma.prisma;
 }
+
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    const client = getPrismaClient();
+    const value = Reflect.get(client as object, prop, client);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
