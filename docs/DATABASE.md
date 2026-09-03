@@ -463,7 +463,7 @@ valida el requisito central del snapshot:
 ```bash
 # 1. mira el ticket del pedido A-0004  → Garlic Butter Crab Legs a $48
 # 2. sube el precio del platillo en el catálogo a $60
-# 3. vuelve a abrir el ticket          → sigue diciendo $48  ✅
+# 3. vuelve a abrir el ticket          → sigue diciendo $48 (correcto)
 ```
 
 Si el paso 3 dice $60, algo está leyendo el catálogo en vez del snapshot.
