@@ -2,16 +2,12 @@ import QRCode from "qrcode";
 import { UserRole } from "@/lib/generated/prisma/client";
 import { requirePageRole } from "@/lib/auth/permissions";
 import { getCurrentBusiness } from "@/lib/business";
+import { appOrigin } from "@/lib/env";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getTablesForAdmin } from "@/lib/tables/queries";
 import { QrSheet } from "@/components/admin/tables/QrSheet";
 import "@/components/admin/tables/qr-sheet.css";
-
-/** Same origin Auth.js itself trusts as this deployment's canonical URL — reused here rather than inventing a second "what's our own domain" env var. */
-function appOrigin(): string {
-  return process.env.AUTH_URL ?? "http://localhost:3000";
-}
 
 export default async function TablesPrintPage() {
   await requirePageRole("/admin/menu", UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN);
