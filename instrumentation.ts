@@ -1,8 +1,11 @@
 // Next.js calls register() once, when the server process starts — not per
-// request. Importing lib/env here turns a misconfigured deploy into a crash
-// at boot instead of a 500 on the first real visitor.
+// request and not during `next build`. lib/env validates lazily on first
+// property access (see its own comment), so touching one here is what
+// turns a misconfigured deploy into a crash at boot instead of a 500 on
+// the first real visitor.
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    await import("@/lib/env");
+    const { env } = await import("@/lib/env");
+    void env.DATABASE_URL;
   }
 }
