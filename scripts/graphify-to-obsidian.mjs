@@ -291,7 +291,7 @@ const surprises = (analysis.surprises || []).slice(0, 8).map(
 
 const mapBody = [
   frontmatter(["tipo: mapa-codigo"]),
-  `# 🗺️ Mapa del código — ${PROJECT}`,
+  `# Mapa del código — ${PROJECT}`,
   "",
   BANNER,
   "",
