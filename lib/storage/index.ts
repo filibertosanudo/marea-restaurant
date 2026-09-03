@@ -1,10 +1,8 @@
 import "server-only";
-import { env } from "@/lib/env";
+import { appOrigin, env } from "@/lib/env";
 import type { StorageDriver } from "@/lib/storage/driver";
 import { createLocalDriver } from "@/lib/storage/drivers/local";
 import { createS3Driver } from "@/lib/storage/drivers/s3";
-
-let cached: StorageDriver | undefined;
 
 function resolveDriver(): StorageDriver {
   if (env.STORAGE_DRIVER === "s3") {
@@ -20,11 +18,19 @@ function resolveDriver(): StorageDriver {
       publicHostname: env.MEDIA_HOSTNAME,
     });
   }
-  return createLocalDriver(env.STORAGE_LOCAL_DIR);
+  return createLocalDriver(env.STORAGE_LOCAL_DIR, appOrigin());
 }
+
+// Cached on globalThis, not a plain module variable — same reason as
+// lib/prisma.ts's globalForPrisma: `next dev`'s Fast Refresh re-evaluates
+// this module on every save, and a plain variable would rebuild the S3
+// client (with a fresh HTTP connection pool) on every hot reload.
+const globalForStorage = globalThis as unknown as { storageDriver?: StorageDriver };
 
 /** Resolved once per process, lazily — first real use, same as lib/prisma's client, not at import. */
 export function getStorageDriver(): StorageDriver {
-  if (!cached) cached = resolveDriver();
-  return cached;
+  if (!globalForStorage.storageDriver) {
+    globalForStorage.storageDriver = resolveDriver();
+  }
+  return globalForStorage.storageDriver;
 }

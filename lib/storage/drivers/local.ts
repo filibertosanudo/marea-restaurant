@@ -22,24 +22,22 @@ function safeJoin(dir: string, key: string): string {
 async function walk(dir: string, base: string): Promise<string[]> {
   let entries;
   try {
-    entries = await readdir(dir, { withFileTypes: true });
+    entries = await readdir(dir, { recursive: true, withFileTypes: true });
   } catch {
     return [];
   }
-  const keys: string[] = [];
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      keys.push(...(await walk(full, base)));
-    } else {
-      keys.push(path.relative(base, full).split(path.sep).join("/"));
-    }
-  }
-  return keys;
+  return entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => path.relative(base, path.join(entry.parentPath, entry.name)).split(path.sep).join("/"));
 }
 
-export function createLocalDriver(rootDir: string): StorageDriver {
+export function createLocalDriver(rootDir: string, origin: string): StorageDriver {
   const root = path.resolve(rootDir);
+  // Absolute, not "/api/media/<key>" — the URL is stored as MenuItem.imageUrl
+  // and re-validated by buildMenuItemSchema's isAllowedImageUrl on every
+  // save, which requires a well-formed absolute URL (z.string().url()
+  // rejects a bare path outright).
+  const baseUrl = `${origin.replace(/\/$/, "")}/api/media/`;
 
   return {
     async put({ body, key }): Promise<StoredFile> {
@@ -71,12 +69,11 @@ export function createLocalDriver(rootDir: string): StorageDriver {
     },
 
     publicUrl(key: string): string {
-      return `/api/media/${key}`;
+      return `${baseUrl}${key}`;
     },
 
     keyFromUrl(url: string): string | null {
-      const prefix = "/api/media/";
-      return url.startsWith(prefix) ? url.slice(prefix.length) : null;
+      return url.startsWith(baseUrl) ? url.slice(baseUrl.length) : null;
     },
 
     async list(prefix: string): Promise<string[]> {
