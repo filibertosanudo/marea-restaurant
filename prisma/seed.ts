@@ -16,6 +16,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, Prisma } from "../lib/generated/prisma/client";
 // Prisma 6:  import { PrismaClient, Prisma } from "@prisma/client";
 import { hashPassword } from "../lib/auth/password";
+import { safeHostname } from "../lib/url";
 
 // Contraseñas de desarrollo para el personal sembrado — documentadas en el
 // README. Nunca uses estos valores fuera de un entorno local.
@@ -25,26 +26,24 @@ const DEV_PASSWORDS: Record<string, string> = {
   "mesero@marea.test": "MareaTemp123!", // mustChangePassword: true — ver abajo
 };
 
-const LOCAL_HOSTNAMES = ["localhost", "127.0.0.1", "::1", "db"];
-
-function targetHostname(): string | null {
-  const rawUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
-  if (!rawUrl) return null;
-  try {
-    return new URL(rawUrl).hostname;
-  } catch {
-    return null;
-  }
-}
+// Deliberately just loopback addresses, not a Docker Compose service name
+// like "db" — that hostname means exactly the same thing inside this
+// project's own recommended production Compose file, so it's no signal of
+// "not production" at all and would defeat this guard for the one topology
+// it most needs to catch.
+const LOCAL_HOSTNAMES = ["localhost", "127.0.0.1", "[::1]", "::1"];
 
 // DEV_PASSWORDS above are public (they're in the README): seeding a real
 // deployment by accident — the exact mistake a first deploy invites — hands
 // out SUPER_ADMIN to anyone who reads it. Refuses unless the target is
-// unmistakably local, or the escape hatch is typed on purpose.
+// unmistakably local, or the escape hatch is typed on purpose. Checks
+// DIRECT_URL alone, with no DATABASE_URL fallback, because that's the only
+// value the PrismaPg adapter below actually connects with.
 function assertLocalTarget(): void {
   if (process.env.I_KNOW_WHAT_IM_DOING === "1") return;
 
-  const host = targetHostname();
+  const rawUrl = process.env.DIRECT_URL;
+  const host = rawUrl ? safeHostname(rawUrl) : null;
   const isProduction = process.env.NODE_ENV === "production";
   const isLocal = host !== null && LOCAL_HOSTNAMES.includes(host);
 
