@@ -8,6 +8,7 @@ import { buildMenuItemSchema } from "@/lib/menu/schemas";
 import { UserRole } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
 import { slugify } from "@/lib/menu/slugify";
+import { getStorageDriver } from "@/lib/storage";
 
 const ADMIN_ROLES = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
 const STAFF_UP_ROLES = [UserRole.STAFF, UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
@@ -166,6 +167,20 @@ export async function updateMenuItemAction(
       data: data.modifierGroupIds.map((groupId) => ({ menuItemId: id, groupId })),
     }),
   ]);
+
+  // Only after the row is safely pointing at the new image: deleting the
+  // old key first (or inside the transaction above) risks a 404'ing row if
+  // anything after that point failed. Best-effort and after the fact — a
+  // failure here just leaves an orphaned key for the sweep script to catch,
+  // never a row pointing at something that's already gone.
+  if (existing.imageUrl && existing.imageUrl !== data.imageUrl) {
+    const oldKey = getStorageDriver().keyFromUrl(existing.imageUrl);
+    if (oldKey) {
+      await getStorageDriver()
+        .delete(oldKey)
+        .catch((err) => console.error(`Failed to delete old menu item image ${oldKey}:`, err));
+    }
+  }
 
   revalidatePath("/admin/menu");
   revalidatePath("/");
