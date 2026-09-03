@@ -57,3 +57,19 @@ export function allowedImageHosts(): string[] {
   if (env.MEDIA_HOSTNAME) hosts.add(env.MEDIA_HOSTNAME);
   return [...hosts];
 }
+
+/**
+ * `z.string().url()` alone lets `javascript:` and plain `http:` through —
+ * inert inside an `<img src>`, but it allows mixed content and lets a
+ * third-party host track whoever opens the admin panel. Restricted to
+ * https and to this deployment's own known hosts.
+ */
+export function isAllowedImageUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  return url.protocol === "https:" && allowedImageHosts().includes(url.hostname);
+}

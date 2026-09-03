@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Lang } from "@/lib/i18n/lang";
+import { isAllowedImageUrl } from "@/lib/env";
 
 // The business's default locale is the only one that's required; the rest
 // are optional but the UI flags them as incomplete. Schemas take the
@@ -60,7 +61,12 @@ export function buildMenuItemSchema(defaultLocale: Lang) {
       .regex(/^\d+(\.\d{1,2})?$/, "Invalid price")
       .optional()
       .or(z.literal("")),
-    imageUrl: z.string().url().optional().or(z.literal("")),
+    imageUrl: z
+      .string()
+      .url()
+      .refine(isAllowedImageUrl, "Must be an https url on an allowed host")
+      .optional()
+      .or(z.literal("")),
     isAvailable: z.boolean().default(true),
     isFeatured: z.boolean().default(false),
     translations: localizedTextWithImageAlt(defaultLocale),
