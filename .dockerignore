@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+dist
+ds-bundle
+graphify-out
+.agents
+.claude
+.design-sync
+.ds-sync
+*.tsbuildinfo
+.env*
