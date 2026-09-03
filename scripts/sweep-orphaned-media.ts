@@ -1,17 +1,11 @@
 /**
- * Marea — orphaned media sweep
- * ---------------------------------------------------------------------------
- * uploadMenuItemImageAction/updateMenuItemAction delete an image's old key
- * right after committing the new one — best-effort, outside the transaction
- * (see the comment in lib/menu/item-actions.ts for why). A crash between
- * those two steps leaves the old key orphaned: no row references it, and
- * nothing cleans it up on its own. This script finds and removes those.
+ * Removes orphaned media: uploadMenuItemImageAction/updateMenuItemAction
+ * delete an old image key right after committing the new one, best-effort
+ * and outside the transaction — a crash between those two steps leaves the
+ * key orphaned. Run by hand or on a schedule; never touches a key any
+ * MenuItem row (deleted or not) still points at.
  *
- * Run by hand or on a schedule (e.g. a weekly cron): it never touches a key
- * that any MenuItem row — deleted or not — still points at.
- *
- *   npm run storage:sweep
- *   npm run storage:sweep -- --dry-run
+ *   npm run storage:sweep [-- --dry-run]
  */
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
