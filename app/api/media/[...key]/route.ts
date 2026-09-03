@@ -6,7 +6,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ key
 
   const file = await getStorageDriver()
     .get(objectKey)
-    .catch(() => null);
+    .catch((err) => {
+      // A missing key returns null, not a rejection (see the driver's own
+      // get()) — anything that reaches this catch is a real storage-layer
+      // failure (disk permissions, a rejected traversal attempt), not a
+      // routine 404, and would otherwise degrade to "not found" with zero
+      // trace of what actually happened.
+      console.error(`Failed to serve media key "${objectKey}":`, err);
+      return null;
+    });
   if (!file) return new Response("Not found", { status: 404 });
 
   return new Response(new Uint8Array(file.body), {
