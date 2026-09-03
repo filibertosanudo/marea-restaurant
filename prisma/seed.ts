@@ -25,6 +25,42 @@ const DEV_PASSWORDS: Record<string, string> = {
   "mesero@marea.test": "MareaTemp123!", // mustChangePassword: true — ver abajo
 };
 
+const LOCAL_HOSTNAMES = ["localhost", "127.0.0.1", "::1", "db"];
+
+function targetHostname(): string | null {
+  const rawUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+  if (!rawUrl) return null;
+  try {
+    return new URL(rawUrl).hostname;
+  } catch {
+    return null;
+  }
+}
+
+// DEV_PASSWORDS above are public (they're in the README): seeding a real
+// deployment by accident — the exact mistake a first deploy invites — hands
+// out SUPER_ADMIN to anyone who reads it. Refuses unless the target is
+// unmistakably local, or the escape hatch is typed on purpose.
+function assertLocalTarget(): void {
+  if (process.env.I_KNOW_WHAT_IM_DOING === "1") return;
+
+  const host = targetHostname();
+  const isProduction = process.env.NODE_ENV === "production";
+  const isLocal = host !== null && LOCAL_HOSTNAMES.includes(host);
+
+  if (isProduction || !isLocal) {
+    console.error(
+      `Refusing to seed: target host "${host ?? "unknown"}" doesn't look local ` +
+        `(NODE_ENV=${process.env.NODE_ENV ?? "unset"}).\n` +
+        "Seeded accounts have passwords published in the README.\n" +
+        "Set I_KNOW_WHAT_IM_DOING=1 to seed anyway."
+    );
+    process.exit(1);
+  }
+}
+
+assertLocalTarget();
+
 // Prisma 7: PrismaClient ya no acepta la URL directa, necesita un driver
 // adapter. Aquí sí usamos DIRECT_URL (no el pooler) porque el seed corre
 // una sola vez desde tu máquina, no en runtime de la app — igual que las
