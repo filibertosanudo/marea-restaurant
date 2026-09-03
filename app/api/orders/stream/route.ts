@@ -52,9 +52,9 @@ async function getSignature(scope: Scope): Promise<string | null> {
  * Server-side polling dressed up as a push: no LISTEN/NOTIFY (doesn't
  * survive Supabase's transaction-mode pooler in production) and no
  * Supabase Realtime (unavailable against the local Postgres dev runs
- * against — see lib/storage/config.ts). Polls every 2s and only emits when
- * the signature actually changed, so the client isn't refetching the page
- * on every tick, just when there's something new to show.
+ * against). Polls every 2s and only emits when the signature actually
+ * changed, so the client isn't refetching the page on every tick, just
+ * when there's something new to show.
  */
 export async function GET(request: NextRequest) {
   const publicToken = request.nextUrl.searchParams.get("token");
