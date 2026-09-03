@@ -5,6 +5,12 @@ import { safeHostname } from "@/lib/url";
 const schema = z
   .object({
     DATABASE_URL: z.string().min(1, "postgresql://user:pass@host:5432/db"),
+    // Outside serverless, the app is a long-lived process with its own
+    // pool: (Postgres max_connections - reserved) / (replicas + workers).
+    // Postgres defaults to max_connections=100; with a couple of replicas
+    // and headroom for a future worker, 25 per process is comfortable.
+    // Whoever needs to raise it should know what it's measured against.
+    DATABASE_POOL_MAX: z.coerce.number().int().min(1).default(25),
     AUTH_SECRET: z.string().min(1),
     AUTH_URL: z.string().url().optional(),
     APP_ORIGIN: z.string().url().optional(),
