@@ -334,7 +334,7 @@ const mapBody = [
   "",
   BANNER,
   "",
-  `Proyecto: [[Grupo-1-Comida-Bebida]] · Índice completo: [[Indice-de-Archivos]]`,
+  `Proyecto: [[Grupo-1-Comida-Bebida]] · Índice completo: [[Indice-de-Archivos]] · Bitácora funcional: [[00-Indice|Bitácora]]`,
   "",
   `**${totalFiles} archivos de código · ${graph.nodes.length} símbolos · ${graph.links.length} relaciones · commit \`${commit}\`**`,
   "",
