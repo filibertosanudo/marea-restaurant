@@ -10,6 +10,9 @@ const schema = z.object({
   AUTH_SECRET: z.string().min(1),
   AUTH_URL: z.string().url().optional(),
   APP_ORIGIN: z.string().url().optional(),
+  // Proxies between the client and this app that rewrite (not just append
+  // to) x-forwarded-for: Vercel or a properly configured nginx both count
+  // as 1. See docs/DEPLOY.md for the nginx directives that make this true.
   TRUSTED_PROXY_COUNT: z.coerce.number().int().min(0).default(1),
   SSE_MAX_LIFETIME_MS: z.coerce.number().int().min(0).default(75_000),
   MEDIA_HOSTNAME: z.string().min(1).optional(),

@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { env } from "@/lib/env";
 
 /**
  * Sliding-window login rate limit backed by Postgres (LoginAttempt), so it
@@ -67,29 +68,39 @@ export async function recordLoginAttempt(
 }
 
 /**
- * Best-effort client IP from standard proxy headers (Vercel and most
- * reverse proxies set x-forwarded-for). Falls back to a fixed key so the
- * per-IP limit still applies (conservatively, shared by everyone behind an
- * unknown proxy) instead of silently no-op'ing.
+ * Client IP from standard proxy headers (x-forwarded-for, with x-real-ip as
+ * a fallback), resolved by counting trusted proxies rather than trusting a
+ * fixed position in the chain. TRUSTED_PROXY_COUNT (env.ts) is how many
+ * proxies between the client and this app are known to append their own
+ * hop rather than let the client dictate it — with N trusted proxies, the
+ * real client is the Nth value from the *end* of the chain, because
+ * anything the client injected up front only pushes the trusted hops
+ * further right, never off the end.
  *
  * Takes anything with a `.get(name)` reader rather than a full `Request` —
  * a Route Handler has `request.headers`, but a Server Action or Server
  * Component only has next/headers()'s return value, which has no `request`
  * wrapping it. Both satisfy this shape.
  *
- * Trust boundary: this only resolves the real client IP when the
- * reverse proxy in front of the app sets (and doesn't just append to)
- * x-forwarded-for — true on Vercel. If this app is ever exposed directly
- * or behind a proxy that forwards the header as-is, a caller can spoof it
- * and evade the per-IP limit; the per-email limit above is unaffected by
- * that and remains the primary defense there.
+ * This only defends the per-IP limit; the per-email limit above doesn't
+ * depend on it and remains the primary defense regardless of proxy setup.
  */
 export function getClientIp(headers: { get(name: string): string | null }): string {
-  const forwardedFor = headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    const first = forwardedFor.split(",")[0]?.trim();
-    if (first) return first;
+  const chain = (headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (chain.length > 0) {
+    // Each trusted hop appends the IP of whoever it received the request
+    // from, so the last N entries are proxy-recorded hand-offs and the
+    // client sits right before them — the Nth entry counting from the end,
+    // i.e. index (length - N). Anything the client injected up front just
+    // shifts left of that and is never reached.
+    const index = Math.max(0, chain.length - env.TRUSTED_PROXY_COUNT);
+    return chain[index] ?? "unknown";
   }
+
   const realIp = headers.get("x-real-ip");
   if (realIp) return realIp.trim();
   return "unknown";
