@@ -7,19 +7,20 @@
  *   "prisma": { "seed": "tsx prisma/seed.ts" }
  */
 import "dotenv/config";
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
 
   migrations: {
     path: "prisma/migrations",
-    // Supabase: usa la conexión DIRECTA (:5432), no el pooler,
-    // porque pgbouncer no soporta los prepared statements de Migrate.
     seed: "tsx prisma/seed.ts",
   },
 
   datasource: {
-    url: env("DIRECT_URL"),
+    // DIRECT_URL sólo hace falta si un pooler en modo transacción vive
+    // delante de la app (no soporta los prepared statements de Migrate).
+    // Con Postgres directo, DATABASE_URL sirve para todo.
+    url: process.env.DIRECT_URL ?? process.env.DATABASE_URL,
   },
 });
