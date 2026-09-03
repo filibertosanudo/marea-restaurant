@@ -31,6 +31,18 @@
 //     En TypeScript esto llega como Prisma.Decimal — usa .toString() para
 //     mostrar y conviértelo a centavos enteros justo antes de hablar con
 //     Stripe (Stripe siempre trabaja en la unidad mínima).
+//
+//  7) Ningún token público de capacidad usa cuid() — Order.publicToken,
+//     Reservation.confirmationCode y RestaurantTable.qrToken usan cuid(2).
+//     cuid() es CUID v1: estructurado y con un prefijo de timestamp, así que
+//     dos filas creadas en el mismo lote (los doce QR de una apertura, un
+//     lote de reservaciones) tienen ids que difieren solo en unos pocos
+//     bits — exactamente el caso donde es más débil como token de acceso.
+//     cuid(2) no tiene esa estructura. Cart.sessionToken usa en cambio un
+//     CSPRNG explícito (ver su propio comentario) porque además necesita
+//     rotar sin colisionar con el id del carrito; para un campo que solo
+//     necesita "impredecible", cuid(2) ya alcanza y no agrega una tabla ni
+//     una dependencia nueva.
 // ============================================================================
 
 generator client {
@@ -133,6 +145,17 @@ enum ReservationStatus {
   NO_SHOW // no se presentó (métrica importante para el negocio)
 }
 
+/// Decisión de Módulo 6, Fase 2 — este campo llevaba tres módulos sin dueño.
+/// Hoy solo la pantalla de Mesas y QR lo escribe, y solo entre AVAILABLE y
+/// OUT_OF_SERVICE (una mesa rota/en reparación) — el único de los cuatro
+/// valores que un humano puede saber y necesita marcar a mano. OCCUPIED y
+/// RESERVED se dejan sin escribir a propósito: ambos son hechos derivables
+/// (¿hay una Order activa en esta mesa? ¿una Reservation por llegar?), no
+/// estado que alguien deba mantener sincronizado; escribirlos ahora
+/// requeriría que lib/orders o lib/reservations empezaran a escribir en
+/// RestaurantTable, exactamente el acoplamiento entre módulos que Módulo 5
+/// evitó a propósito. Un vista de piso en vivo (si algún día se construye)
+/// debe calcularlos en la consulta, no mantenerlos aquí.
 enum TableStatus {
   AVAILABLE
   OCCUPIED
@@ -218,6 +241,13 @@ model Business {
   maxPartySize              Int @default(12)
   acceptsOnlinePayment      Boolean @default(true)
   acceptsPayAtCounter       Boolean @default(true)
+
+  /// Módulo 6, Fase 3 — antes constantes en lib/reservations/dto.ts con un
+  /// comentario que decía, correctamente, que eran decisión de negocio.
+  /// Mismos nombres, mismos defaults: ningún negocio existente cambia de
+  /// comportamiento al correr esta migración.
+  minBookingLeadMinutes Int @default(30)
+  minCancelLeadMinutes  Int @default(120)
 
   /// Contador del folio de pedidos. Se incrementa con un UPDATE atómico
   /// (`{ increment: 1 }`) DENTRO de la transacción que crea el pedido — es la
@@ -691,7 +721,7 @@ model RestaurantTable {
   code       String // etiqueta visible: "M-04", "Terraza 2"
   zone       String? // "Terraza", "Barra", "Salón principal"
   seats      Int         @default(2)
-  qrToken    String      @unique @default(cuid())
+  qrToken    String      @unique @default(cuid(2))
   qrRotatedAt DateTime?
   status     TableStatus @default(AVAILABLE)
   isActive   Boolean     @default(true)

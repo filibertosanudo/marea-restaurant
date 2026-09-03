@@ -46,8 +46,8 @@ export type ExistingReservation = {
   status: ReservationStatus;
 };
 
-/** The only statuses that actually hold a table against new bookings — a CANCELLED or NO_SHOW reservation left the calendar. */
-const BLOCKING_STATUSES: ReservationStatus[] = ["PENDING", "CONFIRMED", "SEATED"];
+/** The only statuses that actually hold a table against new bookings — a CANCELLED or NO_SHOW reservation left the calendar. Exported because staff-actions.ts uses this identical rule to decide which reservations can have their table reassigned: one that isn't holding a table has nothing to reassign. */
+export const BLOCKING_STATUSES: ReservationStatus[] = ["PENDING", "CONFIRMED", "SEATED"];
 
 export type AvailabilityInput = {
   /** The calendar day being checked, in the business's own local time. */
@@ -144,6 +144,24 @@ export function localWallClockToUtc(
   return new Date(guessUtcMs - offsetMinutes * 60_000);
 }
 
+/**
+ * The inverse of localWallClockToUtc: a UTC instant's calendar date in the
+ * business's own timezone, as {year, month, day} — never the server
+ * process's or a caller's own local date. "en-CA" is just a convenient
+ * source of already-zero-padded, unambiguously-ordered digit groups from
+ * Intl.DateTimeFormat, not a locale choice that affects anything else here.
+ */
+export function businessLocalDateParts(instant: Date, timeZone: string): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(instant);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return { year: get("year"), month: get("month"), day: get("day") };
+}
+
 function rangesOverlap(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
   return aStart < bEnd && bStart < aEnd;
 }
@@ -209,18 +227,13 @@ function dayOfWeekFor(date: { year: number; month: number; day: number }): numbe
   return new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay();
 }
 
-/** This calendar day's own OpeningHour windows — the same definition of "belongs to this day" that getAvailableSlots books against, so anything deciding whether a given reservation belongs to a business day (the panel agenda, for one) uses the identical rule instead of a re-guessed one. */
+/** This calendar day's own OpeningHour windows — the definition getAvailableSlots books slots against. */
 export function getOpeningWindowsForDate(
   date: { year: number; month: number; day: number },
   openingHours: OpeningHourWindow[]
 ): OpeningHourWindow[] {
   const dayOfWeek = dayOfWeekFor(date);
   return openingHours.filter((h) => h.dayOfWeek === dayOfWeek && !h.isClosed);
-}
-
-/** Whether a slot identity (possibly past 1440, for a close-after-midnight window) falls inside any of this day's own windows. */
-export function isMinuteWithinWindows(minutesFromMidnight: number, windows: OpeningHourWindow[]): boolean {
-  return windows.some((w) => minutesFromMidnight >= w.opensAt && minutesFromMidnight < w.closesAt);
 }
 
 /**

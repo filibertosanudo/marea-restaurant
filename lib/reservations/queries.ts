@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { localWallClockToUtc } from "./availability";
 import type { OpeningHourWindow, ClosureWindow, ReservableTable, ExistingReservation } from "./availability";
 
 /** Every opening-hour block the business has, across all seven days — a small table, always fetched whole. */
@@ -19,10 +20,10 @@ export async function getBusinessClosures(businessId: string): Promise<ClosureWi
   });
 }
 
-/** Tables that can actually be reserved — active and not soft-deleted, same guard every other catalog query in this codebase uses. */
+/** Tables that can actually be reserved — active, not soft-deleted, and not marked out of service (the one TableStatus value Mesas y QR actually maintains; see its comment in schema.prisma). */
 export async function getReservableTables(businessId: string): Promise<ReservableTable[]> {
   return prisma.restaurantTable.findMany({
-    where: { businessId, isActive: true, deletedAt: null },
+    where: { businessId, isActive: true, deletedAt: null, status: { not: "OUT_OF_SERVICE" } },
     select: { id: true, seats: true },
   });
 }
@@ -53,10 +54,51 @@ export async function getReservationsOverlapping(
   });
 }
 
-/** Every reservation for one calendar day, in the shape the panel agenda reads — ordered by time, the way the agenda is read, not by status the way a kanban would group it. */
-export async function getAgendaReservationsRaw(businessId: string, dayStart: Date, dayEnd: Date) {
+/**
+ * The panel agenda's own definition of "business day": a fixed local
+ * clock-time cutover, not a function of any OpeningHour row. A restaurant's
+ * hours can be edited or deleted after a reservation was already booked
+ * against them (this module's Fase 3 adds a screen for exactly that), and
+ * a reservation that's already on the books must not disappear from its
+ * own night — or jump to a different one — just because the catalog
+ * changed. 6am is generous: well past any ordinary dinner service's
+ * closes-after-midnight overflow, well before any ordinary opensAt.
+ *
+ * This is a real assumption, not a derived fact: a business whose real
+ * hours cross this boundary (a breakfast service opening before 6am, or a
+ * bar running past 6am the next morning) would have a reservation
+ * misfiled onto the adjacent day. Nothing today validates OpeningHour rows
+ * against this constant — worth doing once Fase 3's hours screen exists.
+ */
+export const AGENDA_DAY_BOUNDARY_MINUTES = 360;
+
+/**
+ * Every reservation for one business day, in the shape the panel agenda
+ * reads — ordered by time, the way the agenda is read, not by status the
+ * way a kanban would group it. The query window runs from
+ * AGENDA_DAY_BOUNDARY_MINUTES past this calendar day's local midnight to
+ * the same offset the next day, so a 1am reservation stays on the night it
+ * started instead of appearing on tomorrow's agenda. Both boundaries are
+ * resolved through localWallClockToUtc rather than adding a flat
+ * millisecond offset to an already-resolved instant — a business whose
+ * timezone observes DST would otherwise land an hour off on the days
+ * straddling a transition, since each local day's UTC offset can differ.
+ */
+export async function getAgendaReservationsRaw(
+  businessId: string,
+  date: { year: number; month: number; day: number },
+  timezone: string
+) {
+  const windowStart = localWallClockToUtc(date.year, date.month, date.day, AGENDA_DAY_BOUNDARY_MINUTES, timezone);
+  const windowEnd = localWallClockToUtc(
+    date.year,
+    date.month,
+    date.day,
+    AGENDA_DAY_BOUNDARY_MINUTES + 1440,
+    timezone
+  );
   return prisma.reservation.findMany({
-    where: { businessId, reservedFor: { gte: dayStart, lt: dayEnd } },
+    where: { businessId, reservedFor: { gte: windowStart, lt: windowEnd } },
     orderBy: { reservedFor: "asc" },
     include: { table: { select: { id: true, code: true, zone: true } } },
   });
@@ -65,7 +107,7 @@ export async function getAgendaReservationsRaw(businessId: string, dayStart: Dat
 /** Tables for the agenda's "reassign" picker — richer than getReservableTables (which only carries what availability.ts needs), since the UI has to show a human a code and a zone, not just an id. */
 export async function getReservableTablesForAgenda(businessId: string) {
   return prisma.restaurantTable.findMany({
-    where: { businessId, isActive: true, deletedAt: null },
+    where: { businessId, isActive: true, deletedAt: null, status: { not: "OUT_OF_SERVICE" } },
     orderBy: [{ zone: "asc" }, { sortOrder: "asc" }],
     select: { id: true, code: true, zone: true, seats: true },
   });

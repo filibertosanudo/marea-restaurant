@@ -2,36 +2,15 @@ import { toIntlLocale } from "@/lib/dto/money";
 import { CANCELLABLE_RESERVATION_STATUSES } from "./state-machine";
 import type { Reservation, ReservationStatus, RestaurantTable } from "@/lib/generated/prisma/client";
 
-/**
- * A reservation can only be cancelled by the guest while there's still
- * enough lead time for the business to actually do something with the
- * freed table — otherwise "cancel" just means "no-show, but announced two
- * minutes ahead". No rule in the module prompt pins an exact number, so
- * this is a business decision, not a derived constant; two hours is the
- * common floor real reservation systems use.
- */
-export const MIN_CANCEL_LEAD_MINUTES = 120;
-
-/**
- * The other half of the same lead-time question, at the opposite end of a
- * reservation's life: a slot that starts in the next few minutes isn't
- * bookable online either — the kitchen and the host stand need some
- * runway, and a restaurant that lets a guest book for "ten minutes from
- * now" while requiring two hours' notice to cancel has the asymmetry
- * backwards. Same caveat as MIN_CANCEL_LEAD_MINUTES: a business decision,
- * not a derived constant — thirty minutes is a reasonable default for
- * booking specifically, unrelated to cancellation's own two-hour figure.
- */
-export const MIN_BOOKING_LEAD_MINUTES = 30;
-
-/** Pure so it's trivial to reason about from the definition of done ("cancelarla si todavía falta tiempo suficiente") without spinning up a request. */
+/** Pure so it's trivial to reason about from the definition of done ("cancelarla si todavía falta tiempo suficiente") without spinning up a request. `minCancelLeadMinutes` comes from Business (Módulo 6, Fase 3) — a business decision, not something this function pins on its own. */
 export function canCancelReservation(
   reservation: Pick<Reservation, "status" | "reservedFor">,
-  now: Date
+  now: Date,
+  minCancelLeadMinutes: number
 ): boolean {
   if (!CANCELLABLE_RESERVATION_STATUSES.includes(reservation.status)) return false;
   const minutesUntil = (reservation.reservedFor.getTime() - now.getTime()) / 60_000;
-  return minutesUntil >= MIN_CANCEL_LEAD_MINUTES;
+  return minutesUntil >= minCancelLeadMinutes;
 }
 
 /** The six status labels every reservation-status dictionary carries — ReservationDictionary (guest-facing) and AdminDictionary["reservations"] (panel) each define these same key names, so one map serves both instead of each screen re-listing the same six pairs. */
@@ -71,7 +50,8 @@ export function toReservationLookupDTO(
   reservation: RawReservation,
   timezone: string,
   lang: string,
-  now: Date
+  now: Date,
+  minCancelLeadMinutes: number
 ): ReservationLookupDTO {
   const reservedForLabel = new Intl.DateTimeFormat(toIntlLocale(lang), {
     timeZone: timezone,
@@ -90,7 +70,7 @@ export function toReservationLookupDTO(
     status: reservation.status,
     tableLabel: formatTableLabel(reservation.table),
     notes: reservation.notes,
-    canCancel: canCancelReservation(reservation, now),
+    canCancel: canCancelReservation(reservation, now, minCancelLeadMinutes),
     cancellationReason: reservation.cancellationReason,
   };
 }

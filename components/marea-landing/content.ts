@@ -38,7 +38,6 @@ export const STR = {
       eyebrow: "Our Menu",
       title: "Signature plates of the season",
       lead: "Browse by course — each dish is built around the day's freshest catch.",
-      preorder: "Preorder",
       book: "Book a Table",
     },
     offers: {
@@ -146,19 +145,6 @@ export const STR = {
       codeCopied: "Copied!",
       viewReservationLink: "View my reservation",
     },
-    preorder: {
-      name: "Name",
-      namePh: "Enter your name",
-      phone: "Phone number",
-      phonePh: "+1 555 000 0000",
-      guests: "Number of guests",
-      guestsPh: "e.g. 2",
-      date: "Date",
-      time: "Time",
-      comments: "Additional comments",
-      commentsPh: "Allergies, special occasion, seating preference…",
-      submit: "Preorder",
-    },
     footer: {
       connect: "Let's connect with us",
       emailPh: "Your email address",
@@ -212,7 +198,6 @@ export const STR = {
       eyebrow: "Nuestro Menú",
       title: "Platillos insignia de la temporada",
       lead: "Explora por tiempo — cada platillo se prepara con la pesca más fresca del día.",
-      preorder: "Ordenar",
       book: "Reservar Mesa",
     },
     offers: {
@@ -320,19 +305,6 @@ export const STR = {
       codeCopied: "¡Copiado!",
       viewReservationLink: "Ver mi reserva",
     },
-    preorder: {
-      name: "Nombre",
-      namePh: "Escribe tu nombre",
-      phone: "Teléfono",
-      phonePh: "+52 55 0000 0000",
-      guests: "Número de personas",
-      guestsPh: "ej. 2",
-      date: "Fecha",
-      time: "Hora",
-      comments: "Comentarios adicionales",
-      commentsPh: "Alergias, ocasión especial, preferencia de mesa…",
-      submit: "Ordenar",
-    },
     footer: {
       connect: "Conéctate con nosotros",
       emailPh: "Tu correo electrónico",
@@ -354,8 +326,8 @@ export const STR = {
 // Categories and dishes used to live here (STR.en/es.categories/dishes) —
 // they're now served from the database (lib/menu/public-menu.ts,
 // fetched in app/page.tsx) so the admin panel's menu editor is the real
-// source of truth. The Dish shape stays here since Dish.tsx and
-// PreorderModal still type against it.
+// source of truth. The Dish shape stays here since Dish.tsx still types
+// against it.
 export type Dish = {
   category: string;
   price: string;
@@ -363,19 +335,3 @@ export type Dish = {
   name: string;
   desc: string;
 };
-
-export const TIME_SLOTS = (() => {
-  const out: { value: string; label: string }[] = [];
-  for (let m = 12 * 60; m <= 22 * 60; m += 30) {
-    const h = Math.floor(m / 60);
-    const mm = m % 60;
-    const ap = h >= 12 ? "PM" : "AM";
-    let h12 = h % 12;
-    if (h12 === 0) h12 = 12;
-    out.push({
-      value: `${h < 10 ? "0" : ""}${h}:${mm === 0 ? "00" : mm}`,
-      label: `${h12}:${mm === 0 ? "00" : mm} ${ap}`,
-    });
-  }
-  return out;
-})();

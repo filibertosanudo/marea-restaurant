@@ -13,9 +13,9 @@ import {
   getReservationsOverlapping,
   getReservationByConfirmationCode,
 } from "./queries";
-import { reservationSlotsQuerySchema, createReservationSchema, parseDateParam } from "./schemas";
+import { reservationSlotsQuerySchema, createReservationSchema, parseDateParam, isWithinBookingHorizon } from "./schemas";
 import { isExclusionConstraintError } from "./prisma-errors";
-import { canCancelReservation, MIN_BOOKING_LEAD_MINUTES } from "./dto";
+import { canCancelReservation } from "./dto";
 
 const CANCELLATION_REASON_BY_LOCALE: Record<string, string> = {
   en: "Cancelled by the guest",
@@ -73,7 +73,7 @@ async function loadAvailabilityForDay(business: Business, date: string, partySiz
     tables,
     existingReservations,
     now,
-    minLeadMinutes: MIN_BOOKING_LEAD_MINUTES,
+    minLeadMinutes: business.minBookingLeadMinutes,
   };
 }
 
@@ -96,7 +96,12 @@ export async function getReservationSlotsAction(date: string, partySize: number)
   if (!parsed.success) return { ok: false, error: "invalid_input" };
 
   const business = await getCurrentBusiness();
-  const input = await loadAvailabilityForDay(business, parsed.data.date, parsed.data.partySize, new Date());
+  const now = new Date();
+  if (!isWithinBookingHorizon(parseDateParam(parsed.data.date), now, business.timezone)) {
+    return { ok: false, error: "invalid_input" };
+  }
+
+  const input = await loadAvailabilityForDay(business, parsed.data.date, parsed.data.partySize, now);
   const slots = getAvailableSlots(input);
 
   return { ok: true, slots: slots.map((s) => s.minutesFromMidnight), maxPartySize: business.maxPartySize };
@@ -141,15 +146,20 @@ export async function createReservationAction(input: {
   if (await isScopeRateLimited(CREATE_SCOPE, ip, CREATE_MAX_ATTEMPTS, CREATE_WINDOW_MS)) {
     return { ok: false, error: "rate_limited" };
   }
-  await recordScopeAttempt(CREATE_SCOPE, ip);
 
   const business = await getCurrentBusiness();
-  const availabilityInput = await loadAvailabilityForDay(business, parsed.data.date, parsed.data.partySize, new Date());
+  const now = new Date();
+  if (!isWithinBookingHorizon(parseDateParam(parsed.data.date), now, business.timezone)) {
+    return { ok: false, error: "invalid_input", fieldErrors: { date: "too_far_ahead" } };
+  }
+
+  const availabilityInput = await loadAvailabilityForDay(business, parsed.data.date, parsed.data.partySize, now);
   const slot = findSlot(availabilityInput, parsed.data.time);
   if (!slot) return { ok: false, error: "slot_taken" };
 
+  let reservation;
   try {
-    const reservation = await prisma.$transaction(async (tx) => {
+    reservation = await prisma.$transaction(async (tx) => {
       const created = await tx.reservation.create({
         data: {
           businessId: business.id,
@@ -186,12 +196,23 @@ export async function createReservationAction(input: {
 
       return created;
     });
-
-    return { ok: true, confirmationCode: reservation.confirmationCode };
   } catch (err) {
     if (isExclusionConstraintError(err)) return { ok: false, error: "slot_taken" };
     throw err;
   }
+
+  // Recorded only once a reservation is actually created, not on every
+  // attempt — a slot that turns out taken shouldn't spend the same budget
+  // a real booking does. Best-effort and outside the block above on
+  // purpose: the reservation already committed, so a hiccup in this
+  // bookkeeping write must never turn an actually-successful booking into
+  // an error the guest sees with no confirmation code.
+  try {
+    await recordScopeAttempt(CREATE_SCOPE, ip);
+  } catch {
+    // swallowed — see comment above
+  }
+  return { ok: true, confirmationCode: reservation.confirmationCode };
 }
 
 export type CancelReservationResult = { ok: true } | { ok: false; error: "not_found" | "too_late" };
@@ -217,7 +238,7 @@ export async function cancelReservationByCodeAction(confirmationCode: string): P
   if (!reservation) return { ok: false, error: "not_found" };
 
   const now = new Date();
-  if (!canCancelReservation(reservation, now)) return { ok: false, error: "too_late" };
+  if (!canCancelReservation(reservation, now, business.minCancelLeadMinutes)) return { ok: false, error: "too_late" };
 
   // Guarded by the status this action itself just read: staff could have
   // confirmed/seated/cancelled the same reservation in the gap between that

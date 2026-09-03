@@ -4,7 +4,7 @@ import {
   findSlot,
   isTableFreeForRange,
   getOpeningWindowsForDate,
-  isMinuteWithinWindows,
+  businessLocalDateParts,
   type AvailabilityInput,
 } from "./availability";
 
@@ -289,10 +289,7 @@ describe("isTableFreeForRange", () => {
   });
 });
 
-describe("getOpeningWindowsForDate / isMinuteWithinWindows", () => {
-  // Same source of truth the panel agenda uses to decide which reservations
-  // belong to a business day — this is what closes the gap a close-after-
-  // midnight window would otherwise open in a naive midnight-to-midnight query.
+describe("getOpeningWindowsForDate", () => {
   const windows = [
     { dayOfWeek: 5, opensAt: 720, closesAt: 1560, isClosed: false }, // Fri 12:00–2:00am next day
     { dayOfWeek: 6, opensAt: 600, closesAt: 900, isClosed: false }, // Sat, irrelevant to Friday
@@ -306,16 +303,24 @@ describe("getOpeningWindowsForDate / isMinuteWithinWindows", () => {
     const closed = [{ dayOfWeek: 5, opensAt: 720, closesAt: 1380, isClosed: true }];
     expect(getOpeningWindowsForDate(BUSINESS_DAY, closed)).toEqual([]);
   });
+});
 
-  it("treats a minute past 1440 as belonging to the day whose window runs that late", () => {
-    const fridayWindows = getOpeningWindowsForDate(BUSINESS_DAY, windows);
-    expect(isMinuteWithinWindows(1500, fridayWindows)).toBe(true); // 1:00am, still Friday's late service
-    expect(isMinuteWithinWindows(1620, fridayWindows)).toBe(false); // past closing, belongs to no window
+describe("businessLocalDateParts", () => {
+  it("resolves a UTC instant to its calendar date in the business's timezone", () => {
+    // 19:00 UTC on Feb 27 is 12:00 local (UTC-7) the same date.
+    expect(businessLocalDateParts(new Date("2026-02-27T19:00:00Z"), TIMEZONE)).toEqual({
+      year: 2026,
+      month: 2,
+      day: 27,
+    });
   });
 
-  it("rejects a minute before opening or exactly at closing", () => {
-    const fridayWindows = getOpeningWindowsForDate(BUSINESS_DAY, windows);
-    expect(isMinuteWithinWindows(600, fridayWindows)).toBe(false);
-    expect(isMinuteWithinWindows(1560, fridayWindows)).toBe(false);
+  it("resolves to the previous calendar day when UTC has already rolled over but local hasn't", () => {
+    // 00:30 UTC on Feb 28 is still 17:30 local (UTC-7) on Feb 27.
+    expect(businessLocalDateParts(new Date("2026-02-28T00:30:00Z"), TIMEZONE)).toEqual({
+      year: 2026,
+      month: 2,
+      day: 27,
+    });
   });
 });

@@ -1,16 +1,7 @@
-import { Button } from "@/components/ui/Button";
 import { Placeholder } from "./Placeholder";
 import type { Dish as DishData } from "./content";
 
-export function Dish({
-  dish,
-  cta,
-  onPreorder,
-}: {
-  dish: DishData;
-  cta: string;
-  onPreorder: () => void;
-}) {
+export function Dish({ dish }: { dish: DishData }) {
   return (
     <article className="ml-dish">
       <div className="ml-dish-img">
@@ -21,9 +12,6 @@ export function Dish({
         <p>{dish.desc}</p>
         <div className="ml-dish-foot">
           <span className="ml-price">{dish.price}</span>
-          <Button variant="primary" type="button" onClick={onPreorder}>
-            {cta}
-          </Button>
         </div>
       </div>
     </article>
