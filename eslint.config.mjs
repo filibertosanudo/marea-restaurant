@@ -6,7 +6,7 @@ const config = [
     ignores: [
       "lib/generated/**",
       ".next/**",
-      "dist/**",
+      "**/dist/**",
       "node_modules/**",
       ".ds-sync/**",
       "ds-bundle/**",
