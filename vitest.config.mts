@@ -9,7 +9,28 @@ export default defineConfig({
     },
   },
   test: {
-    environment: "node",
-    setupFiles: ["./test/setup.ts"],
+    // Unit tests are pure-function tests with no external state — fast,
+    // parallel, no database. Integration tests need a real Postgres and
+    // are named *.integration.test.ts to stay out of the unit project.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          environment: "node",
+          setupFiles: ["./test/setup.ts"],
+          exclude: ["**/node_modules/**", "**/*.integration.test.ts"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "integration",
+          environment: "node",
+          include: ["**/*.integration.test.ts"],
+          setupFiles: ["./test/setup.integration.ts"],
+        },
+      },
+    ],
   },
 });

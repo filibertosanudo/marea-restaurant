@@ -11,6 +11,8 @@
   "scripts": {
     "dev": "next dev",
     "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration --passWithNoTests",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
