@@ -6,13 +6,11 @@ import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
 
 const POLL_INTERVAL_MS = 2000;
-// A periodic handoff keeps a connection left open for a whole shift from
-// wedging a proxy or load balancer that expects streams to end sometime.
-// EventSource reconnects on its own, and useEventStream's backoff treats
-// this exactly like any other dropped connection — so it costs nothing to
-// close cleanly. SSE_MAX_LIFETIME_MS (env.ts) controls the interval; 0
-// disables it for a long-lived deployment where there's no such proxy.
-const MAX_LIFETIME_MS = env.SSE_MAX_LIFETIME_MS;
+// A periodic handoff (env.SSE_MAX_LIFETIME_MS, 0 to disable) keeps a
+// connection left open for a whole shift from wedging a proxy or load
+// balancer that expects streams to end sometime. EventSource reconnects on
+// its own, and useEventStream's backoff treats this exactly like any other
+// dropped connection — so it costs nothing to close cleanly.
 
 type Scope = { kind: "board"; businessId: string } | { kind: "order"; orderId: string };
 
@@ -102,7 +100,7 @@ export async function GET(request: NextRequest) {
         lastSignature = null;
       }
 
-      const deadline = MAX_LIFETIME_MS > 0 ? Date.now() + MAX_LIFETIME_MS : Infinity;
+      const deadline = env.SSE_MAX_LIFETIME_MS > 0 ? Date.now() + env.SSE_MAX_LIFETIME_MS : Infinity;
 
       while (!closed) {
         if (Date.now() >= deadline) {
