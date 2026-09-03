@@ -99,25 +99,34 @@ export function appOrigin(): string {
   return origin.replace(/\/$/, "");
 }
 
-let originHostname: string | null | undefined;
+let cachedImageHosts: Set<string> | undefined;
 
-/** Hosts a stored image URL is allowed to point at: this deployment's own origin, plus the storage host once one is configured. */
+/** Hosts a stored image URL is allowed to point at: this deployment's own origin, the storage host once one is configured, and — for the s3 driver with no custom MEDIA_HOSTNAME — the S3 endpoint's own host, since that's what publicUrl() falls back to. */
 export function allowedImageHosts(): Set<string> {
-  if (originHostname === undefined) {
+  if (!cachedImageHosts) {
+    const hosts = new Set<string>();
     const origin = resolvedOrigin();
-    originHostname = origin ? safeHostname(origin) : null;
+    const originHostname = origin ? safeHostname(origin) : null;
+    if (originHostname) hosts.add(originHostname);
+    if (env.MEDIA_HOSTNAME) hosts.add(env.MEDIA_HOSTNAME);
+    if (env.STORAGE_DRIVER === "s3" && env.S3_ENDPOINT) {
+      const s3Hostname = safeHostname(env.S3_ENDPOINT);
+      if (s3Hostname) hosts.add(s3Hostname);
+    }
+    cachedImageHosts = hosts;
   }
-  const hosts = new Set<string>();
-  if (originHostname) hosts.add(originHostname);
-  if (env.MEDIA_HOSTNAME) hosts.add(env.MEDIA_HOSTNAME);
-  return hosts;
+  return cachedImageHosts;
 }
 
 /**
  * `z.string().url()` alone lets `javascript:` and plain `http:` through —
  * inert inside an `<img src>`, but it allows mixed content and lets a
  * third-party host track whoever opens the admin panel. Restricted to
- * https and to this deployment's own known hosts.
+ * https and to this deployment's own known hosts — with one carve-out:
+ * plain http on localhost/127.0.0.1 outside production, since that's this
+ * app's own local-driver URL in every local dev environment, and a
+ * loopback address carries none of the mixed-content/tracking risk this
+ * check exists for.
  */
 export function isAllowedImageUrl(value: string): boolean {
   let url: URL;
@@ -126,5 +135,10 @@ export function isAllowedImageUrl(value: string): boolean {
   } catch {
     return false;
   }
-  return url.protocol === "https:" && allowedImageHosts().has(url.hostname);
+  const isSecure = url.protocol === "https:";
+  const isLocalHttp =
+    url.protocol === "http:" &&
+    process.env.NODE_ENV !== "production" &&
+    (url.hostname === "localhost" || url.hostname === "127.0.0.1");
+  return (isSecure || isLocalHttp) && allowedImageHosts().has(url.hostname);
 }
