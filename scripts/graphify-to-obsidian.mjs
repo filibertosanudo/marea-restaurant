@@ -14,11 +14,17 @@
  * Uso:
  *   node scripts/graphify-to-obsidian.mjs \
  *     --graph graphify-out \
- *     --out "C:/ruta/a/tu/vault/04-Proyectos-Verticales/Marea-Codigo"
+ *     --out "C:/ruta/a/tu/vault/04-Proyectos-Verticales/Marea-Codigo" \
+ *     [--dry-run]
  *
  * Es idempotente: reescribe las notas en cada corrida, PERO conserva lo que
  * hayas escrito a mano entre las marcas <!-- notas:inicio --> y
  * <!-- notas:fin -->. Anota con confianza ahí abajo.
+ *
+ * También borra: al final de la corrida, cualquier nota de módulo o índice
+ * que ya exista en OUT_DIR pero que esta corrida no haya vuelto a escribir se
+ * elimina (el código se movió, el módulo desapareció). --dry-run enseña qué
+ * borraría sin tocar el disco.
  */
 
 import fs from "node:fs";
@@ -33,15 +39,26 @@ const arg = (name, fallback) => {
 const GRAPH_DIR = arg("graph", "graphify-out");
 const OUT_DIR = arg("out", path.join(GRAPH_DIR, "obsidian"));
 const PROJECT = arg("project", "Marea");
+const DRY_RUN = args.includes("--dry-run");
+
+/**
+ * Una comunidad con menos archivos de código que esto no gana nota propia:
+ * va listada al pie del mapa bajo "Módulos menores". Evita que comunidades de
+ * dos o tres archivos —que además suelen compartir firma de directorio con
+ * otras y pisarse el nombre— inflen la tabla principal de módulos.
+ */
+const MINOR_MODULE_MAX_FILES = 3;
 
 // --- entrada ----------------------------------------------------------------
 const readJson = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
 const graph = readJson(path.join(GRAPH_DIR, "graph.json"));
 let analysis = { gods: [], surprises: [], cohesion: {} };
+let hasAnalysis = true;
 try {
   analysis = readJson(path.join(GRAPH_DIR, ".graphify_analysis.json"));
 } catch {
-  console.warn("aviso: no encontré .graphify_analysis.json, sigo sin él");
+  hasAnalysis = false;
+  console.warn("aviso: no encontré .graphify_analysis.json, el mapa lo advierte en vez de callarlo");
 }
 
 const CODE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
@@ -63,6 +80,25 @@ const MODULE_NAMES = {
   "lib/auth+prisma/seed.ts": "Autenticación y datos semilla",
   "lib/orders+components/order": "Seguimiento del pedido",
   "lib/payments+app/api": "Pagos y webhook de Stripe",
+  "app/admin+lib/dto": "Páginas del panel y datos compartidos",
+  "lib/settings+components/admin": "Configuración del negocio",
+  "components/admin+components/ui": "Panel: diálogos y formularios",
+  "lib/menu+components/admin": "Menú: edición en el panel",
+  "lib/menu+lib/cart": "Menú y carrito: reglas de negocio",
+  "lib/reservations+components/admin": "Reservaciones: agenda y acciones del panel",
+  "components/admin+lib/payments": "Panel: cobros y reembolsos",
+  "lib/orders+components/admin": "Pedidos: tablero y máquina de estados",
+  "components/order+components/admin": "Carrito: hoja de artículos y desglose de montos",
+  "components/admin": "Panel: shell y utilidades base",
+  "lib/i18n+app/o": "Seguimiento público del pedido",
+  "lib/auth+components/reservation": "Reservaciones: flujo público y límites de tasa",
+  "lib/tables+components/admin": "Mesas y códigos QR",
+  "components/ui+components/index.ts": "Biblioteca de componentes de UI",
+  "components/order+lib/menu": "Menú público y mesa (QR)",
+  "lib/payments+lib/prisma.ts": "Pagos: webhook de Stripe y persistencia",
+  "lib/reservations": "Reservaciones: núcleo y disponibilidad",
+  "components/marea-landing": "Landing público",
+  "lib/reservations+app/admin": "Reservaciones: páginas del panel",
 };
 
 const RELATION_ES = {
@@ -100,16 +136,21 @@ function topDirs(nodes, k = 2) {
 }
 
 /**
- * Una comunidad cuenta como "módulo" si tiene al menos dos archivos de código.
- * Lo demás son las comunidades que Graphify arma alrededor de package.json o
- * tsconfig.json: reales, pero no son arquitectura. Van juntas al final.
+ * Una comunidad cuenta como "módulo" con nota propia si tiene más archivos de
+ * código que MINOR_MODULE_MAX_FILES. Las comunidades de package.json o
+ * tsconfig.json (menos de dos archivos de código) nunca lo son; las que
+ * quedan entre esas dos cosas son "módulos menores" — reales, pero
+ * demasiado pequeñas para merecer una nota que compita con las grandes.
+ * Ambos grupos se listan al final, cada uno en su sección.
  */
 const modules = [];
 const leftovers = [];
+const minorModules = [];
 for (const [community, nodes] of byCommunity) {
   const files = [...new Set(nodes.map((n) => n.source_file))];
   const codeFiles = files.filter((f) => CODE_EXT.test(f));
-  if (codeFiles.length >= 2) modules.push({ community, nodes, files });
+  if (codeFiles.length > MINOR_MODULE_MAX_FILES) modules.push({ community, nodes, files });
+  else if (codeFiles.length >= 2) minorModules.push({ community, nodes, files, codeFiles });
   else leftovers.push({ community, nodes, files });
 }
 modules.sort((a, b) => b.nodes.length - a.nodes.length);
@@ -130,6 +171,13 @@ modules.forEach((m, i) => {
   m.note = `Modulo-${String(m.index).padStart(2, "0")}-${slugify(m.name)}`;
   m.cohesion = analysis.cohesion?.[String(m.community)];
 });
+
+minorModules.forEach((m) => {
+  const dirs = topDirs(m.nodes);
+  m.dirs = dirs;
+  m.name = MODULE_NAMES[dirs.join("+")] ?? dirs.join(" + ");
+});
+minorModules.sort((a, b) => b.codeFiles.length - a.codeFiles.length);
 
 const moduleOfNode = new Map();
 for (const m of modules) for (const n of m.nodes) moduleOfNode.set(n.id, m);
@@ -183,7 +231,11 @@ const frontmatter = (extra) =>
 
 const BANNER =
   "> [!info] Nota generada\n" +
-  "> La produce `scripts/graphify-to-obsidian.mjs` a partir de Graphify. Todo lo de arriba de **Notas** se sobrescribe en cada corrida; lo que escribas dentro de Notas se conserva.";
+  "> La produce `scripts/graphify-to-obsidian.mjs` a partir de Graphify. Todo lo de arriba de **Notas** se sobrescribe en cada corrida; lo que escribas dentro de Notas se conserva. Las notas de módulo que esta corrida no volvió a escribir se borran.";
+
+const ANALYSIS_MISSING_NOTE =
+  "> [!warning] Análisis no disponible\n" +
+  "> No se encontró `.graphify_analysis.json`, así que esta sección está incompleta, no vacía porque no haya nada que mostrar. Corre `graphify` antes de este script para generarlo.";
 
 // --- notas por módulo -------------------------------------------------------
 const written = [];
@@ -278,11 +330,11 @@ const surprises = (analysis.surprises || []).slice(0, 8).map(
 
 const mapBody = [
   frontmatter(["tipo: mapa-codigo"]),
-  `# 🗺️ Mapa del código — ${PROJECT}`,
+  `# Mapa del código — ${PROJECT}`,
   "",
   BANNER,
   "",
-  `Proyecto: [[Grupo-1-Comida-Bebida]] · Índice completo: [[Indice-de-Archivos]]`,
+  `Proyecto: [[Grupo-1-Comida-Bebida]] · Índice completo: [[Indice-de-Archivos]] · Bitácora funcional: [[00-Indice|Bitácora]]`,
   "",
   `**${totalFiles} archivos de código · ${graph.nodes.length} símbolos · ${graph.links.length} relaciones · commit \`${commit}\`**`,
   "",
@@ -295,19 +347,29 @@ const mapBody = [
       `| ${m.index} | [[${m.note}\\|${m.name}]] | ${m.files.filter((f) => CODE_EXT.test(f)).length} | ${m.nodes.length} | ${m.dirs.map((d) => `\`${d}\``).join(", ")} |`
   ),
   "",
+  "## Módulos menores",
+  "",
+  `Comunidades reales pero de ${MINOR_MODULE_MAX_FILES} archivos de código o menos: no ganan nota propia porque suelen compartir firma de directorio con otras y competirían por el mismo nombre. Sus archivos están en [[Indice-de-Archivos]].`,
+  "",
+  "| Nombre | Archivos | Símbolos | Directorios |",
+  "|---|---|---|---|",
+  ...minorModules.map(
+    (m) => `| ${m.name} | ${m.codeFiles.length} | ${m.nodes.length} | ${m.dirs.map((d) => `\`${d}\``).join(", ")} |`
+  ),
+  "",
   "## Funciones que todo el mundo llama",
   "",
   "Si cambias la firma de una de estas, el radio de impacto es el número de la derecha.",
   "",
-  "| Símbolo | Módulo | Archivo | Conexiones |",
-  "|---|---|---|---|",
-  ...gods,
+  ...(hasAnalysis
+    ? ["| Símbolo | Módulo | Archivo | Conexiones |", "|---|---|---|---|", ...gods]
+    : [ANALYSIS_MISSING_NOTE]),
   "",
   "## Conexiones que cruzan módulos",
   "",
   "Graphify las marca como inesperadas porque unen comunidades separadas. En una app de Next.js casi todas son lo mismo y es sano: un componente de cliente llamando a su Server Action.",
   "",
-  ...surprises,
+  ...(hasAnalysis ? surprises : [ANALYSIS_MISSING_NOTE]),
   "",
   "## Tipos de relación",
   "",
@@ -344,6 +406,20 @@ const indexBody = [
       .map((f) => `- \`${f}\``),
     "",
   ]),
+  ...(minorModules.length
+    ? [
+        "## Módulos menores",
+        "",
+        "Sin nota propia — ver [[00-Mapa-del-Codigo|el mapa]] para el porqué.",
+        "",
+        ...minorModules.flatMap((m) => [
+          `### ${m.name}`,
+          "",
+          ...m.codeFiles.sort().map((f) => `- \`${f}\``),
+          "",
+        ]),
+      ]
+    : []),
   ...(() => {
     // Comunidades de un solo archivo: no son un módulo, pero tampoco son todas
     // basura. Se separan en código suelto (páginas hoja, layouts) y config.
@@ -369,6 +445,29 @@ const indexBody = [
 ].join("\n");
 
 written.push(write("Indice-de-Archivos", indexBody));
+
+// --- podar notas huérfanas ---------------------------------------------------
+/**
+ * Sólo se tocan archivos con nombre reconocible: las notas de módulo y los dos
+ * índices que este script genera. Cualquier otra cosa en OUT_DIR —una nota que
+ * alguien dejó a mano— no se toca, aunque no esté en `written`.
+ */
+const isPrunable = (name) =>
+  name.endsWith(".md") &&
+  (name.startsWith("Modulo-") || name === "00-Mapa-del-Codigo.md" || name === "Indice-de-Archivos.md");
+
+const writtenNames = new Set(written.map((w) => path.basename(w)));
+const toPrune = fs.existsSync(OUT_DIR)
+  ? fs.readdirSync(OUT_DIR).filter((f) => isPrunable(f) && !writtenNames.has(f))
+  : [];
+
+if (toPrune.length) {
+  console.log(`${toPrune.length} nota(s) obsoleta(s)${DRY_RUN ? " (--dry-run, no se borran)" : ", borrando"}:`);
+  for (const f of toPrune) console.log("  " + f);
+  if (!DRY_RUN) for (const f of toPrune) fs.unlinkSync(path.join(OUT_DIR, f));
+} else {
+  console.log("0 notas obsoletas");
+}
 
 console.log(`${written.length} notas escritas en ${OUT_DIR}`);
 for (const w of written) console.log("  " + path.basename(w));
