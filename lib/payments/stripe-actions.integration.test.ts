@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe/client";
 import { createPaymentIntentAction } from "./stripe-actions";
 import { makeBusiness, makeOrder } from "@/test/factories";
+import { runConcurrently, partitionSettled } from "@/test/concurrency";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -87,5 +88,27 @@ describe("createPaymentIntentAction", () => {
 
     expect(result).toEqual({ ok: true, clientSecret: "secret_existing" });
     expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it("two concurrent calls sharing Stripe's idempotent response both succeed, only one Payment row is created", async () => {
+    const business = await makeBusiness({ slug: "marea" });
+    const order = await makeOrder(business.id, { total: "23.19" });
+    // Simulates Stripe's own idempotency key behavior: two concurrent
+    // requests under the same key get back the same intent.
+    vi.spyOn(stripe.paymentIntents, "create").mockResolvedValue({
+      id: "pi_shared",
+      client_secret: "secret_shared",
+    } as never);
+
+    const results = await runConcurrently([
+      () => createPaymentIntentAction(order.publicToken),
+      () => createPaymentIntentAction(order.publicToken),
+    ]);
+    const { fulfilled } = partitionSettled(results);
+
+    expect(fulfilled).toHaveLength(2);
+    expect(fulfilled.every((r) => r.ok)).toBe(true);
+    const paymentCount = await prisma.payment.count({ where: { stripePaymentIntentId: "pi_shared" } });
+    expect(paymentCount).toBe(1);
   });
 });
