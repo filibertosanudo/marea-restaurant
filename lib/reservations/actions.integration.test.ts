@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { createReservationAction, getReservationSlotsAction } from "./actions";
+import { createReservationAction, getReservationSlotsAction, cancelReservationByCodeAction } from "./actions";
 import { makeBusiness } from "@/test/factories";
 import { runConcurrently, partitionSettled } from "@/test/concurrency";
 
@@ -64,5 +64,73 @@ describe("createReservationAction", () => {
     // runs first — is what could have rejected the second one.
     const reservationCount = await prisma.reservation.count({ where: { businessId: business.id } });
     expect(reservationCount).toBe(1);
+  });
+});
+
+describe("getReservationSlotsAction", () => {
+  it("rejects a malformed date instead of throwing", async () => {
+    await makeAlwaysOpenBusiness();
+
+    const result = await getReservationSlotsAction("not-a-date", 2);
+
+    expect(result).toEqual({ ok: false, error: "invalid_input" });
+  });
+});
+
+describe("cancelReservationByCodeAction", () => {
+  it("cancels a reservation with enough lead time", async () => {
+    const business = await makeAlwaysOpenBusiness();
+    const table = await prisma.restaurantTable.findFirstOrThrow({ where: { businessId: business.id } });
+    const reservedFor = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const reservation = await prisma.reservation.create({
+      data: {
+        businessId: business.id,
+        tableId: table.id,
+        guestName: "Ana",
+        partySize: 2,
+        reservedFor,
+        endsAt: new Date(reservedFor.getTime() + 60 * 60 * 1000),
+        status: "PENDING",
+      },
+    });
+
+    const result = await cancelReservationByCodeAction(reservation.confirmationCode);
+
+    expect(result).toEqual({ ok: true });
+    const updated = await prisma.reservation.findUniqueOrThrow({ where: { id: reservation.id } });
+    expect(updated.status).toBe("CANCELLED");
+  });
+
+  it("reports not_found for an unknown code, not a distinguishable error", async () => {
+    await makeAlwaysOpenBusiness();
+
+    const result = await cancelReservationByCodeAction("does-not-exist");
+
+    expect(result).toEqual({ ok: false, error: "not_found" });
+  });
+
+  it("refuses to cancel once inside the minimum cancel lead time", async () => {
+    const business = await makeBusiness({
+      slug: "marea",
+      timezone: "UTC",
+      minCancelLeadMinutes: 1440,
+    });
+    const table = await prisma.restaurantTable.create({ data: { businessId: business.id, code: "T1", seats: 2 } });
+    const reservedFor = new Date(Date.now() + 60 * 60 * 1000);
+    const reservation = await prisma.reservation.create({
+      data: {
+        businessId: business.id,
+        tableId: table.id,
+        guestName: "Ana",
+        partySize: 2,
+        reservedFor,
+        endsAt: new Date(reservedFor.getTime() + 60 * 60 * 1000),
+        status: "PENDING",
+      },
+    });
+
+    const result = await cancelReservationByCodeAction(reservation.confirmationCode);
+
+    expect(result).toEqual({ ok: false, error: "too_late" });
   });
 });
