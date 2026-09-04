@@ -9,6 +9,7 @@ next-env.d.ts
 # build output
 dist
 build
+coverage
 
 # generated Prisma client (regenerated via `npm run db:generate`)
 lib/generated/
