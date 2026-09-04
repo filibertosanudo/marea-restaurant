@@ -1,9 +1,9 @@
 // Stand-in for lib/auth/session.ts's getSession() in integration tests —
 // requireRole/requirePageRole call this to resolve who's calling, and
 // there's no live next-auth JWT to back it outside of a real request.
-// Aliased in vitest.config.mts for the integration project only; the
-// actual authorization logic in lib/auth/permissions.ts stays real, only
-// this one boundary is faked.
+// Wired in via vi.mock in test/setup.integration.ts; the actual
+// authorization logic in lib/auth/permissions.ts stays real, only this
+// one boundary is faked.
 import type { Session } from "next-auth";
 import type { User } from "@/lib/generated/prisma/client";
 
