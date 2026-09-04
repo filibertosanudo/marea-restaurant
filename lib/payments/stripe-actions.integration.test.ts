@@ -90,6 +90,58 @@ describe("createPaymentIntentAction", () => {
     expect(createSpy).not.toHaveBeenCalled();
   });
 
+  it("updates the existing intent's amount when the order's total changed since it was created", async () => {
+    const business = await makeBusiness({ slug: "marea" });
+    const order = await makeOrder(business.id, { total: "30.00" });
+    const payment = await prisma.payment.create({
+      data: {
+        businessId: business.id,
+        orderId: order.id,
+        provider: "STRIPE",
+        status: "PENDING",
+        amount: "23.19",
+        stripePaymentIntentId: "pi_stale_amount",
+      },
+    });
+    vi.spyOn(stripe.paymentIntents, "retrieve").mockResolvedValue({
+      status: "requires_payment_method",
+      amount: 2319, // the stale amount — order.total is now 30.00
+      client_secret: "secret_existing",
+    } as never);
+    vi.spyOn(stripe.paymentIntents, "update").mockResolvedValue({ client_secret: "secret_updated" } as never);
+
+    const result = await createPaymentIntentAction(order.publicToken);
+
+    expect(result).toEqual({ ok: true, clientSecret: "secret_updated" });
+    const updated = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+    expect(updated.amount.toString()).toBe("30");
+  });
+
+  it("reports try_again when updating the stale intent's amount fails", async () => {
+    const business = await makeBusiness({ slug: "marea" });
+    const order = await makeOrder(business.id, { total: "30.00" });
+    await prisma.payment.create({
+      data: {
+        businessId: business.id,
+        orderId: order.id,
+        provider: "STRIPE",
+        status: "PENDING",
+        amount: "23.19",
+        stripePaymentIntentId: "pi_stale_amount_fails",
+      },
+    });
+    vi.spyOn(stripe.paymentIntents, "retrieve").mockResolvedValue({
+      status: "requires_payment_method",
+      amount: 2319,
+      client_secret: "secret_existing",
+    } as never);
+    vi.spyOn(stripe.paymentIntents, "update").mockRejectedValue(new Error("stripe is down"));
+
+    const result = await createPaymentIntentAction(order.publicToken);
+
+    expect(result).toEqual({ ok: false, error: "try_again" });
+  });
+
   it("two concurrent calls sharing Stripe's idempotent response both succeed, only one Payment row is created", async () => {
     const business = await makeBusiness({ slug: "marea" });
     const order = await makeOrder(business.id, { total: "23.19" });
