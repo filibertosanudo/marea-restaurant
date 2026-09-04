@@ -1,3 +1,6 @@
+import { beforeEach } from "vitest";
+import { ensureSchemaReady, resetDb } from "./db";
+
 // Integration tests run against a real Postgres instance — unlike the unit
 // project's setup.ts, there is no placeholder fallback here. A missing
 // DATABASE_URL must fail loudly as a misconfigured test run, not silently
@@ -8,3 +11,14 @@ if (!process.env.DATABASE_URL) {
     "DATABASE_URL is required to run integration tests — point it at a real Postgres instance."
   );
 }
+
+// Each vitest worker's pool opens its own connections; a lower cap here
+// keeps several parallel workers from adding up past Postgres's default
+// max_connections. Real values (set by the app or CI) always win.
+process.env.DATABASE_POOL_MAX ??= "5";
+
+ensureSchemaReady();
+
+beforeEach(async () => {
+  await resetDb();
+});
