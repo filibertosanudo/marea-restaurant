@@ -47,7 +47,8 @@ describe("businessSettingsSchema", () => {
   });
 
   it("rejects a missing minutes field rather than silently coercing it to 0", () => {
-    const { minBookingLeadMinutes: _omit, ...rest } = validSettings;
+    const rest: Partial<typeof validSettings> = { ...validSettings };
+    delete rest.minBookingLeadMinutes;
     expect(businessSettingsSchema.safeParse(rest).success).toBe(false);
   });
 });

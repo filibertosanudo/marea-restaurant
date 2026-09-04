@@ -9,6 +9,20 @@ import { clearTestSession } from "./stubs/auth-session";
 // way to guarantee this one does.
 vi.mock("next/headers", async () => import("./stubs/next-headers"));
 vi.mock("@/lib/auth/session", async () => import("./stubs/auth-session"));
+// Same reasoning, for the root NextAuth config: lib/auth/actions.ts
+// imports signIn/signOut/auth straight from it, and the real file pulls
+// in next-auth's own next/server dependency.
+vi.mock("@/auth", async () => import("./stubs/auth-config").then((m) => m.authMock));
+// lib/auth/actions.ts also imports AuthError from the "next-auth" package
+// root directly (not @/auth) — that package's own entry point is what
+// actually pulls in next/server, regardless of the mock above. Re-exports
+// the real class from @auth/core (the framework-agnostic package
+// next-auth wraps), so `instanceof AuthError` in the code under test still
+// works against errors this suite throws.
+vi.mock("next-auth", async () => {
+  const { AuthError } = await import("@auth/core/errors");
+  return { AuthError };
+});
 // Every Server Action in lib/**/*-actions.ts calls this after its mutation
 // to invalidate the admin panel's cache — irrelevant to what these tests
 // assert, and there's no cache to invalidate outside a real request either.
