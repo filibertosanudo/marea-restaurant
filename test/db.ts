@@ -6,10 +6,17 @@
 // can't reproduce two connections racing for the same lock, which is
 // exactly what several of this module's tests need to prove.
 import { execFileSync } from "node:child_process";
+import { createId } from "@paralleldrive/cuid2";
 import { prisma } from "@/lib/prisma";
 
-const workerId = process.env.VITEST_POOL_ID ?? "0";
-export const testSchema = `test_worker_${workerId}`;
+// Random, not derived from VITEST_POOL_ID: a worker slot freeing up and a
+// new one spinning up to reuse the same pool id, while the previous
+// holder's Prisma pool hadn't finished disconnecting yet, was enough to
+// let two files' queries land on the same "test_worker_N" schema at once
+// — this schema name is unique per test file's own module evaluation
+// (fresh every time thanks to vitest's per-file isolation) regardless of
+// which worker or pool id ends up running it.
+export const testSchema = `test_${createId()}`;
 
 // Two independent things need to agree on the schema, for two different
 // reasons:
