@@ -107,7 +107,17 @@ jobs:
             if curl -sf http://localhost:3000/ > /dev/null; then exit 0; fi
             sleep 2
           done
-          echo "::error::App never became reachable" && exit 1
+          echo "::error::App never became reachable"
+          echo "::group::docker compose ps"
+          docker compose ps
+          echo "::endgroup::"
+          echo "::group::app logs"
+          docker compose logs app
+          echo "::endgroup::"
+          echo "::group::migrate logs"
+          docker compose logs migrate
+          echo "::endgroup::"
+          exit 1
 
       - run: docker compose run --rm seed
 
