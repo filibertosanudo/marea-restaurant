@@ -71,6 +71,19 @@ export function ensureSchemaReady(): void {
 }
 
 /**
+ * Drops this file's own throwaway schema once its tests are done — the
+ * one thing the per-file random name (see `testSchema` above) needs that
+ * the old `test_worker_N` scheme didn't: without this, every integration
+ * test file leaves an orphaned schema behind on whatever Postgres the
+ * suite ran against, unbounded run over run. Called from a single
+ * `afterAll` in test/setup.integration.ts, not per-test — this schema is
+ * shared by every test in the file.
+ */
+export async function dropSchema(): Promise<void> {
+  await prisma.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${testSchema}" CASCADE`);
+}
+
+/**
  * Empties every table in this worker's schema. Call between tests, not
  * between files — tests within a file share the schema and must not share
  * rows.

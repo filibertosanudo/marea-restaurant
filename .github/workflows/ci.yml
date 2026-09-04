@@ -56,7 +56,13 @@ jobs:
       # account without CREATE privileges would fail here with an error
       # that doesn't say "extension", it says "permission denied".
       - run: npx prisma migrate deploy
-      - run: npm run test:integration
+      # Runs both projects (unit + integration) with coverage in one pass —
+      # the coverage thresholds in vitest.config.mts (90% for the money
+      # directories, 70% for the rest of lib/**) only mean anything if a CI
+      # step actually enforces them; `npm run test:integration` alone never
+      # invokes `--coverage`, so a regression below either floor would pass
+      # CI silently without this.
+      - run: npm run test:coverage
 
   # Against the actual docker-compose.yml stack (built images, not `next
   # dev`) — the one suite that would catch a `standalone` output-tracing

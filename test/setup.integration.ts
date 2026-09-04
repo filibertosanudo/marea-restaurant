@@ -1,5 +1,5 @@
-import { beforeEach, vi } from "vitest";
-import { ensureSchemaReady, resetDb } from "./db";
+import { afterAll, beforeEach, vi } from "vitest";
+import { ensureSchemaReady, resetDb, dropSchema } from "./db";
 import { clearTestSession } from "./stubs/auth-session";
 
 // There's no live Next.js request to back either of these outside one —
@@ -69,4 +69,8 @@ ensureSchemaReady();
 beforeEach(async () => {
   await resetDb();
   clearTestSession();
+});
+
+afterAll(async () => {
+  await dropSchema();
 });
