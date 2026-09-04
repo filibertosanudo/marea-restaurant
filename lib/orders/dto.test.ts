@@ -46,6 +46,11 @@ describe("toTrackedOrderDTO", () => {
     const dto = toTrackedOrderDTO({ ...baseOrder(), table: { code: "M-04" }, payments: [] } as never);
     expect(dto.tableLabel).toBe("M-04");
   });
+
+  it("falls back to 0.00 when total is missing", () => {
+    const dto = toTrackedOrderDTO({ ...baseOrder(), total: null, payments: [] } as never);
+    expect(dto.total).toBe("0.00");
+  });
 });
 
 describe("toBoardOrderDTO", () => {
@@ -92,6 +97,11 @@ describe("toBoardOrderDTO", () => {
     const dto = toBoardOrderDTO(boardOrder([]));
     expect(dto.paymentReading).toBe("DUE");
   });
+
+  it("uses the table's own code as the label for a dine-in board order", () => {
+    const dto = toBoardOrderDTO({ ...baseOrder(), table: { code: "M-04" }, payments: [] } as never);
+    expect(dto.tableLabel).toBe("M-04");
+  });
 });
 
 describe("toOrderPaymentDetailDTO", () => {
@@ -130,5 +140,40 @@ describe("toOrderPaymentDetailDTO", () => {
     expect(dto.refundableTotal).toBe("18.19");
     expect(dto.isSettled).toBe(false);
     expect(dto.payments[0].refunds[0].reason).toBe("guest request");
+  });
+
+  it("handles a not-yet-paid payment with no paidAt and a still-pending refund with no amount recorded yet", () => {
+    const dto = toOrderPaymentDetailDTO({
+      id: "order_1",
+      orderNumber: "A-0001",
+      total: amount("23.19"),
+      currency: "MXN",
+      payments: [
+        {
+          id: "pay_1",
+          provider: "STRIPE",
+          status: "PENDING",
+          amount: null,
+          paidAt: null,
+          createdAt: NOW,
+          paymentMethodBrand: null,
+          paymentMethodLast4: null,
+          receiptUrl: null,
+          refunds: [
+            {
+              id: "refund_1",
+              amount: null,
+              status: "PENDING",
+              reason: null,
+              createdAt: NOW,
+            },
+          ],
+        },
+      ],
+    } as never);
+
+    expect(dto.payments[0].paidAt).toBeNull();
+    expect(dto.payments[0].amount).toBe("0.00");
+    expect(dto.payments[0].refunds[0].amount).toBe("0.00");
   });
 });

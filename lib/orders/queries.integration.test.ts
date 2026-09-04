@@ -15,6 +15,17 @@ describe("listBoardOrdersRaw", () => {
     expect(orders).toHaveLength(1);
     expect(orders[0].tableId).toBe(table.id);
   });
+
+  it("filters by order type", async () => {
+    const business = await makeBusiness();
+    await makeOrder(business.id, { status: "PENDING", type: "DINE_IN" });
+    await makeOrder(business.id, { status: "PENDING", type: "TAKEAWAY" });
+
+    const orders = await listBoardOrdersRaw(business.id, { orderType: "TAKEAWAY" });
+
+    expect(orders).toHaveLength(1);
+    expect(orders[0].type).toBe("TAKEAWAY");
+  });
 });
 
 describe("listCancelledOrdersRaw", () => {
@@ -27,6 +38,23 @@ describe("listCancelledOrdersRaw", () => {
 
     expect(orders).toHaveLength(1);
     expect(orders[0].status).toBe("CANCELLED");
+  });
+
+  it("filters by order type and table", async () => {
+    const business = await makeBusiness();
+    const table = await prisma.restaurantTable.create({ data: { businessId: business.id, code: "T-01", seats: 2 } });
+    await makeOrder(business.id, { status: "CANCELLED", cancelledAt: new Date(), type: "TAKEAWAY" });
+    await makeOrder(business.id, {
+      status: "CANCELLED",
+      cancelledAt: new Date(),
+      type: "DINE_IN",
+      tableId: table.id,
+    });
+
+    const orders = await listCancelledOrdersRaw(business.id, { orderType: "DINE_IN", tableId: table.id });
+
+    expect(orders).toHaveLength(1);
+    expect(orders[0].tableId).toBe(table.id);
   });
 });
 
