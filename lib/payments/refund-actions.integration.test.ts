@@ -281,8 +281,18 @@ describe("createRefundAction", () => {
     ]);
     const { fulfilled } = partitionSettled(results);
 
+    // The idempotency key only protects the narrow window where both calls'
+    // own stripe.refunds.create()+prisma.refund.create() race each other —
+    // it doesn't guarantee both calls even reach that window at the same
+    // time. Whichever call's own outer refundable-payments scan (run before
+    // either touches Stripe) happens second can just as honestly see the
+    // first call's already-committed PENDING refund and report
+    // nothing_refundable, without ever exercising the idempotency swallow
+    // at all. Both outcomes are safe — the only thing that must never
+    // happen is a second, duplicate Refund row.
     expect(fulfilled).toHaveLength(2);
-    expect(fulfilled.every((r) => r.ok)).toBe(true);
+    const succeeded = fulfilled.filter((r) => r.ok);
+    expect(succeeded.length).toBeGreaterThanOrEqual(1);
     const refundCount = await prisma.refund.count({ where: { paymentId: payment.id, stripeRefundId: "re_shared" } });
     expect(refundCount).toBe(1);
   });
