@@ -15,7 +15,7 @@
     "start": "next start",
     "lint": "eslint .",
     "build:lib": "npm run build:lib -w @marea/ui",
-    "build:css": "tailwindcss -i ./styles/lib.css -o ./dist/styles.css --minify",
+    "build:css": "tailwindcss -i ./packages/ui/styles/lib.css -o ./packages/ui/dist/styles.css --minify",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
@@ -54,7 +54,6 @@
     "postcss": "^8.4.49",
     "prisma": "^7.9.1",
     "tailwindcss": "^3.4.17",
-    "tsup": "^8.3.5",
     "tsx": "^4.23.12",
     "typescript": "^5.7.0",
     "vitest": "^4.1.11"
