@@ -70,6 +70,45 @@ describe("createRefundAction", () => {
     expect(result).toEqual({ ok: false, error: "amount_exceeds_refundable" });
   });
 
+  it("refunds a partial amount within what's refundable", async () => {
+    const business = await makeBusiness({ slug: "marea" });
+    await loginAsAdmin();
+    const order = await makeOrder(business.id, { total: "23.19" });
+    const payment = await prisma.payment.create({
+      data: { businessId: business.id, orderId: order.id, provider: "CASH_REGISTER", status: "SUCCEEDED", amount: "23.19" },
+    });
+
+    const result = await createRefundAction(order.id, { mode: "PARTIAL", amount: "5.00", reason: "one item missing" });
+
+    expect(result.ok).toBe(true);
+    const refunds = await prisma.refund.findMany({ where: { paymentId: payment.id } });
+    expect(refunds).toHaveLength(1);
+    expect(refunds[0].amount.toString()).toBe("5");
+    const updated = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+    expect(updated.status).toBe("PARTIALLY_REFUNDED");
+  });
+
+  it("reports try_again when Stripe itself rejects the refund", async () => {
+    const business = await makeBusiness({ slug: "marea" });
+    await loginAsAdmin();
+    const order = await makeOrder(business.id, { total: "23.19" });
+    await prisma.payment.create({
+      data: {
+        businessId: business.id,
+        orderId: order.id,
+        provider: "STRIPE",
+        status: "SUCCEEDED",
+        amount: "23.19",
+        stripePaymentIntentId: "pi_refund_fails",
+      },
+    });
+    vi.spyOn(stripe.refunds, "create").mockRejectedValue(new Error("stripe is down"));
+
+    const result = await createRefundAction(order.id, { mode: "FULL", amount: "0", reason: "guest request" });
+
+    expect(result).toEqual({ ok: false, error: "try_again" });
+  });
+
   it("refunds a card payment through Stripe, recording the returned refund id", async () => {
     const business = await makeBusiness({ slug: "marea" });
     await loginAsAdmin();
