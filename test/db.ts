@@ -35,17 +35,13 @@ function withSchema(baseUrl: string, schema: string): string {
 
 /**
  * Migrates this worker's schema and points DATABASE_URL/DIRECT_URL/
- * DATABASE_SCHEMA at it for the rest of the process. Idempotent and safe
- * to call from every integration test file's setup — `prisma migrate
- * deploy` no-ops once the schema is already up to date, and the env-var
- * flag below (not a module variable, since vitest resets the module
- * registry per file) skips the child process entirely after the first
- * file in this worker.
+ * DATABASE_SCHEMA at it for the rest of the process. Runs once per
+ * integration test file (vitest's default pool gives each file its own
+ * process, so a flag can't skip this across files the way it could
+ * across tests within one) — cheap either way, since `prisma migrate
+ * deploy` no-ops once the schema is already up to date.
  */
 export function ensureSchemaReady(): void {
-  const flag = `__SCHEMA_READY_${testSchema}__`;
-  if (process.env[flag]) return;
-
   const baseUrl = process.env.DATABASE_URL;
   if (!baseUrl) {
     throw new Error("DATABASE_URL must be set before ensureSchemaReady() runs.");
@@ -65,7 +61,6 @@ export function ensureSchemaReady(): void {
   process.env.DATABASE_URL = scopedUrl;
   process.env.DIRECT_URL = scopedUrl;
   process.env.DATABASE_SCHEMA = testSchema;
-  process.env[flag] = "1";
 }
 
 /**
