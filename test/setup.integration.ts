@@ -9,6 +9,10 @@ import { clearTestSession } from "./stubs/auth-session";
 // way to guarantee this one does.
 vi.mock("next/headers", async () => import("./stubs/next-headers"));
 vi.mock("@/lib/auth/session", async () => import("./stubs/auth-session"));
+// Every Server Action in lib/**/*-actions.ts calls this after its mutation
+// to invalidate the admin panel's cache — irrelevant to what these tests
+// assert, and there's no cache to invalidate outside a real request either.
+vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
 // Integration tests run against a real Postgres instance — unlike the unit
 // project's setup.ts, there is no placeholder fallback here. A missing
