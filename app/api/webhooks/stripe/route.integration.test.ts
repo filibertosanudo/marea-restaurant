@@ -222,4 +222,60 @@ describe("POST /api/webhooks/stripe", () => {
     const refundCount = await prisma.refund.count({ where: { paymentId: payment.id } });
     expect(refundCount).toBe(13);
   });
+
+  it("payment_intent.processing marks a bank-debit-style payment PROCESSING", async () => {
+    const business = await makeBusiness();
+    const payment = await makePendingCardPayment(business.id, "pi_processing");
+
+    const response = await POST(signedRequest(paymentIntentEvent("payment_intent.processing", "pi_processing")));
+
+    expect(response.status).toBe(200);
+    const updated = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+    expect(updated.status).toBe("PROCESSING");
+  });
+
+  it("payment_intent.requires_action marks a payment REQUIRES_ACTION", async () => {
+    const business = await makeBusiness();
+    const payment = await makePendingCardPayment(business.id, "pi_requires_action");
+    // REQUIRES_ACTION is only a legal move from PROCESSING, never directly
+    // from PENDING — see the state machine's own graph.
+    await prisma.payment.update({ where: { id: payment.id }, data: { status: "PROCESSING" } });
+
+    const response = await POST(
+      signedRequest(paymentIntentEvent("payment_intent.requires_action", "pi_requires_action"))
+    );
+
+    expect(response.status).toBe(200);
+    const updated = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+    expect(updated.status).toBe("REQUIRES_ACTION");
+  });
+
+  it("payment_intent.payment_failed records the failure code and message", async () => {
+    const business = await makeBusiness();
+    const payment = await makePendingCardPayment(business.id, "pi_failed");
+
+    const response = await POST(
+      signedRequest(
+        paymentIntentEvent("payment_intent.payment_failed", "pi_failed", {
+          last_payment_error: { code: "card_declined", message: "Your card was declined." },
+        })
+      )
+    );
+
+    expect(response.status).toBe(200);
+    const updated = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+    expect(updated.status).toBe("FAILED");
+    expect(updated.failureCode).toBe("card_declined");
+  });
+
+  it("payment_intent.canceled marks a payment CANCELLED", async () => {
+    const business = await makeBusiness();
+    const payment = await makePendingCardPayment(business.id, "pi_canceled");
+
+    const response = await POST(signedRequest(paymentIntentEvent("payment_intent.canceled", "pi_canceled")));
+
+    expect(response.status).toBe(200);
+    const updated = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+    expect(updated.status).toBe("CANCELLED");
+  });
 });
