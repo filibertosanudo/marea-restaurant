@@ -456,3 +456,35 @@ tablero personal.
 - No se rellena la bitácora hacia atrás. Los módulos 1 a 6 se entregaron antes
   de que existiera; se escribe el del módulo que se cierra.
 - No se mencionan herramientas de IA en el vault, igual que en el repositorio.
+
+---
+
+## 10. Integración continua y protección de rama
+
+`.github/workflows/ci.yml` corre en cada pull request y en cada push a `main`,
+con cuatro jobs:
+
+| Job | Qué hace | ¿Bloquea la fusión? |
+|---|---|---|
+| `check` | `tsc --noEmit`, `eslint`, `npm run test:unit` — sin base de datos | Sí |
+| `integration` | Levanta un servicio `postgres:17`, aplica migraciones y corre `npm run test:integration` | Sí |
+| `commits` | Valida cada mensaje de commit del pull request con `scripts/validate-commit-msg.sh` | Sí |
+| `pr-size` | Avisa si el diff pasa de ~400 líneas — nunca falla | No |
+
+**Configuración manual en GitHub** (Settings → Branches → Branch protection
+rules, regla sobre `main`), porque esto no se puede hacer desde el repositorio:
+
+- **Require a pull request before merging.**
+- **Require status checks to pass before merging**, y marcar como obligatorios:
+  `check`, `integration`, `commits`. **No** marcar `pr-size`: es un aviso, no
+  una puerta, y CI lo deja siempre en verde a propósito.
+- **Require branches to be up to date before merging.**
+- **Do not allow bypassing the above settings** (incluido para
+  administradores, salvo que una emergencia real lo justifique).
+
+Un clon sin `git config core.hooksPath .githooks` activado no tiene el hook
+local, pero el job `commits` corre la misma validación
+(`scripts/validate-commit-msg.sh`, la única fuente de verdad — el hook es un
+wrapper de una línea sobre el mismo script) del lado del servidor, así que un
+commit mal formado no llega a fusionarse aunque el clon nunca haya activado el
+hook.
