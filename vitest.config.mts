@@ -19,7 +19,10 @@ export default defineConfig({
           name: "unit",
           environment: "node",
           setupFiles: ["./test/setup.ts"],
-          exclude: ["**/node_modules/**", "**/*.integration.test.ts"],
+          // .next/standalone carries a traced copy of some source files,
+          // test files included — without this, a machine that ran
+          // `npm run build` before testing double-counts them.
+          exclude: ["**/node_modules/**", "**/.next/**", "**/*.integration.test.ts"],
         },
       },
       {
@@ -28,6 +31,7 @@ export default defineConfig({
           name: "integration",
           environment: "node",
           include: ["**/*.integration.test.ts"],
+          exclude: ["**/node_modules/**", "**/.next/**"],
           setupFiles: ["./test/setup.integration.ts"],
         },
       },
