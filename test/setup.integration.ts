@@ -1,6 +1,5 @@
 import { beforeEach, vi } from "vitest";
 import { ensureSchemaReady, resetDb } from "./db";
-import { clearTestCookies } from "./stubs/next-headers";
 import { clearTestSession } from "./stubs/auth-session";
 
 // There's no live Next.js request to back either of these outside one —
@@ -31,6 +30,5 @@ ensureSchemaReady();
 
 beforeEach(async () => {
   await resetDb();
-  clearTestCookies();
   clearTestSession();
 });
