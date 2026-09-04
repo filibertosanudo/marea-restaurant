@@ -1,5 +1,14 @@
-import { beforeEach } from "vitest";
+import { beforeEach, vi } from "vitest";
 import { ensureSchemaReady, resetDb } from "./db";
+import { clearTestSession } from "./stubs/auth-session";
+
+// There's no live Next.js request to back either of these outside one —
+// see the stubs' own header comments. vi.mock (not a static resolve.alias)
+// because @/lib/auth/session collides with the broader "@" path alias
+// otherwise: whichever of the two vitest checks first wins, and there's no
+// way to guarantee this one does.
+vi.mock("next/headers", async () => import("./stubs/next-headers"));
+vi.mock("@/lib/auth/session", async () => import("./stubs/auth-session"));
 
 // Integration tests run against a real Postgres instance — unlike the unit
 // project's setup.ts, there is no placeholder fallback here. A missing
@@ -21,4 +30,5 @@ ensureSchemaReady();
 
 beforeEach(async () => {
   await resetDb();
+  clearTestSession();
 });
