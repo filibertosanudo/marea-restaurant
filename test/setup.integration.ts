@@ -42,6 +42,14 @@ if (!process.env.DATABASE_URL) {
 // max_connections. Real values (set by the app or CI) always win.
 process.env.DATABASE_POOL_MAX ??= "5";
 
+// Never used to make a real authenticated call — every test that touches
+// lib/stripe/client.ts's `stripe` mocks the specific network-calling
+// method it needs (stripe.refunds.create, stripe.refunds.list, ...). Still
+// required: the SDK now refuses to even construct a client with an empty
+// key, and that construction happens the moment anything accesses
+// `stripe.<anything>`, mocked or not.
+process.env.STRIPE_SECRET_KEY ??= "sk_test_placeholder";
+
 ensureSchemaReady();
 
 beforeEach(async () => {

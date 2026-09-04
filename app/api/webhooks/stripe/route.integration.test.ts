@@ -5,10 +5,6 @@ import { POST } from "./route";
 import { makeBusiness, makeOrder } from "@/test/factories";
 
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_test_secret";
-// Never used to make a real authenticated call (every real network method
-// this suite touches — refunds.list, charges.retrieve — is mocked below),
-// but the SDK now refuses to even construct a client with an empty key.
-process.env.STRIPE_SECRET_KEY = "sk_test_placeholder";
 
 function signedRequest(event: object) {
   const payload = JSON.stringify(event);
