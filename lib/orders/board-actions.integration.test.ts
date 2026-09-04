@@ -42,6 +42,23 @@ describe("advanceOrderStatusAction", () => {
     expect(updated.status).toBe("PREPARING");
   });
 
+  it("enqueues an order.ready notification when advancing to READY for a guest with an email", async () => {
+    const business = await makeCurrentBusiness();
+    await loginAs("STAFF");
+    const { order } = await makeOrderWithCashPayment(business.id, {
+      status: "PREPARING",
+      guestEmail: "ana@example.com",
+    });
+
+    await advanceOrderStatusAction(order.id);
+
+    const updated = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(updated.status).toBe("READY");
+    expect(updated.readyAt).not.toBeNull();
+    const job = await prisma.notificationJob.findFirst({ where: { relatedOrderId: order.id } });
+    expect(job?.templateKey).toBe("order.ready");
+  });
+
   it("rejects advancing past a terminal status instead of skipping ahead", async () => {
     const business = await makeCurrentBusiness();
     await loginAs("STAFF");
@@ -59,6 +76,20 @@ describe("advanceOrderStatusAction", () => {
 });
 
 describe("cancelOrderAction", () => {
+  it("enqueues an order.cancelled notification for a guest with an email", async () => {
+    const business = await makeCurrentBusiness();
+    await loginAs("BUSINESS_ADMIN");
+    const { order } = await makeOrderWithCashPayment(business.id, {
+      status: "PENDING",
+      guestEmail: "ana@example.com",
+    });
+
+    await cancelOrderAction(order.id, "guest called to cancel");
+
+    const job = await prisma.notificationJob.findFirst({ where: { relatedOrderId: order.id } });
+    expect(job?.templateKey).toBe("order.cancelled");
+  });
+
   it("returns tracked inventory and restores availability once stock crosses back above zero", async () => {
     const business = await makeCurrentBusiness();
     await loginAs("BUSINESS_ADMIN");
