@@ -52,6 +52,13 @@ export default defineConfig({
           include: ["**/*.integration.test.ts"],
           exclude: ["**/node_modules/**", "**/.next/**"],
           setupFiles: ["./test/setup.integration.ts"],
+          // Every worker's first file (per worker, not per whole run — see
+          // test/db.ts) shells out to `prisma migrate deploy`, and Prisma's
+          // own migration advisory lock is scoped to the database, not the
+          // schema each worker migrates — too many workers hitting it at
+          // once starts timing out waiting for that single lock instead of
+          // for anything this test suite actually owns.
+          maxWorkers: 4,
         },
       },
     ],
