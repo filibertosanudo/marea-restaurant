@@ -11,6 +11,11 @@ dist
 build
 coverage
 
+# Playwright (e2e/) output
+test-results/
+playwright-report/
+blob-report/
+
 # generated Prisma client (regenerated via `npm run db:generate`)
 lib/generated/
 

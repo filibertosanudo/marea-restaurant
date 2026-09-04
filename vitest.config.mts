@@ -40,8 +40,10 @@ export default defineConfig({
           setupFiles: ["./test/setup.ts"],
           // .next/standalone carries a traced copy of some source files,
           // test files included — without this, a machine that ran
-          // `npm run build` before testing double-counts them.
-          exclude: ["**/node_modules/**", "**/.next/**", "**/*.integration.test.ts"],
+          // `npm run build` before testing double-counts them. e2e/**'s
+          // own *.spec.ts files (Playwright, not vitest) would otherwise
+          // match vitest's default include pattern too.
+          exclude: ["**/node_modules/**", "**/.next/**", "**/*.integration.test.ts", "e2e/**"],
         },
       },
       {
