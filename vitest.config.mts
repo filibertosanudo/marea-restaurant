@@ -59,6 +59,11 @@ export default defineConfig({
           // once starts timing out waiting for that single lock instead of
           // for anything this test suite actually owns.
           maxWorkers: 4,
+          // Required the moment the two projects' maxWorkers differ —
+          // vitest otherwise refuses to run, needing a distinct group per
+          // differing pool option. The actual order doesn't matter here,
+          // only that it's different from the unit project's (default 0).
+          sequence: { groupOrder: 1 },
         },
       },
     ],
