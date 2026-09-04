@@ -13,6 +13,18 @@ vi.mock("@/lib/auth/session", async () => import("./stubs/auth-session"));
 // to invalidate the admin panel's cache — irrelevant to what these tests
 // assert, and there's no cache to invalidate outside a real request either.
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+// redirect() throws a special control-flow error Next's own rendering
+// layer catches — outside a real request there's nothing to catch it, so
+// tests that exercise a redirecting action need to assert against this
+// thrown value instead of a return value.
+vi.mock("next/navigation", () => ({
+  redirect: (url: string) => {
+    throw new Error(`REDIRECT:${url}`);
+  },
+  notFound: () => {
+    throw new Error("NOT_FOUND");
+  },
+}));
 
 // Integration tests run against a real Postgres instance — unlike the unit
 // project's setup.ts, there is no placeholder fallback here. A missing
