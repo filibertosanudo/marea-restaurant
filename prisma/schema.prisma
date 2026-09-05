@@ -447,6 +447,21 @@ model LoginAttempt {
   @@index([ipAddress, createdAt])
 }
 
+/// Generic sliding-window counter for any per-scope, per-key rate limit
+/// (reservation creation, cart mutation, payment intents, ...) that isn't a
+/// login attempt. Used to share LoginAttempt's `email` column as a free-text
+/// scope string — a contract enforced only by a runtime `throw`, which broke
+/// once for real (see commit 9f80c20). A dedicated column removes the
+/// contract instead of policing it harder.
+model RateLimitCounter {
+  id        String   @id @default(cuid())
+  scope     String
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([scope, key, createdAt])
+}
+
 /// La costura del multi-tenant: un usuario puede ser mesero en un negocio y
 /// cliente en otro. En v1 creas una fila por cada empleado y ya.
 model BusinessMembership {
