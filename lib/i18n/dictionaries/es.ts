@@ -464,6 +464,7 @@ export const es = {
       "Una opción elegida para {dish} ya no está disponible — revisa tu carrito.",
     errorModifierInvalidNamed:
       "Las opciones elegidas para {dish} ya no son válidas — revisa tu carrito.",
+    errorRateLimited: "Demasiados intentos. Espera unos minutos y vuelve a intentar.",
     requiredField: "Este campo es obligatorio.",
     yourOrder: "Tu pedido",
     statusPending: "Recibido",
