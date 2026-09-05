@@ -25,6 +25,14 @@ RUN npm run build
 FROM build AS migrate
 CMD ["npx", "prisma", "migrate", "deploy"]
 
+# --- seed: same reasoning as `migrate` (needs tsx and its own dependency
+# tree, not traced into the standalone runner). Never part of the `app`
+# service's own startup — seeding stays a command someone (or CI, for the
+# E2E stack) explicitly runs, never something a real deployment does on
+# every boot.
+FROM build AS seed
+CMD ["npx", "tsx", "prisma/seed.ts"]
+
 # --- runner: the actual deployed image ---
 FROM node:22-alpine AS runner
 WORKDIR /app

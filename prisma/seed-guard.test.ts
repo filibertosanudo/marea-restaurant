@@ -29,7 +29,11 @@ describe("prisma/seed.ts local-target guard", () => {
     });
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("Refusing to seed");
-  });
+    // runSeed's own spawnSync timeout is 15s — a cold npx/tsx start can run
+    // close to vitest's 5s default, so the test's budget has to be at
+    // least as generous as the subprocess's own, or this flakes on exactly
+    // the slow-start case it's supposed to tolerate, not on a real bug.
+  }, 15_000);
 
   it("still allows a genuine local target", () => {
     const result = runSeed({
@@ -41,5 +45,5 @@ describe("prisma/seed.ts local-target guard", () => {
       // failure past that point is a separate, expected outcome here.
     });
     expect(result.stderr).not.toContain("Refusing to seed");
-  });
+  }, 15_000);
 });

@@ -24,14 +24,17 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPrismaClient(): PrismaClient {
-  const adapter = new PrismaPg({
-    connectionString: env.DATABASE_URL,
-    // Outside serverless the app is a long-lived process with its own pool
-    // — see the DATABASE_POOL_MAX comment in lib/env.ts for the formula.
-    max: env.DATABASE_POOL_MAX,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000,
-  });
+  const adapter = new PrismaPg(
+    {
+      connectionString: env.DATABASE_URL,
+      // Outside serverless the app is a long-lived process with its own pool
+      // — see the DATABASE_POOL_MAX comment in lib/env.ts for the formula.
+      max: env.DATABASE_POOL_MAX,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 5_000,
+    },
+    env.DATABASE_SCHEMA ? { schema: env.DATABASE_SCHEMA } : undefined
+  );
   return new PrismaClient({ adapter });
 }
 

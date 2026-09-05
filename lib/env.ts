@@ -22,6 +22,12 @@ const schema = z
     // and headroom for a future worker, 25 per process is comfortable.
     // Whoever needs to raise it should know what it's measured against.
     DATABASE_POOL_MAX: withDefault(z.coerce.number().int().min(1).default(25)),
+    // Unset in every real deployment — the app always queries "public".
+    // Exists so the integration test harness can point the same client at
+    // a throwaway per-worker schema instead: @prisma/adapter-pg qualifies
+    // every generated query with whatever schema it's given (defaulting to
+    // "public"), and doesn't infer it from the connection's search_path.
+    DATABASE_SCHEMA: optional(z.string().min(1)),
     AUTH_SECRET: z.string().min(1),
     AUTH_URL: optional(z.string().url()),
     APP_ORIGIN: optional(z.string().url()),

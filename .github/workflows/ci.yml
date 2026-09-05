@@ -1,0 +1,189 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npm run test:unit
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: marea
+          POSTGRES_PASSWORD: marea
+          POSTGRES_DB: marea
+        ports:
+          - 5432:5432
+        # Migrate needs the connection to be accepting queries, not just
+        # listening — without this, the earliest steps run against a
+        # database that hasn't finished initdb yet.
+        options: >-
+          --health-cmd "pg_isready -U marea"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://marea:marea@localhost:5432/marea
+      AUTH_SECRET: ci-test-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npx prisma generate
+      # The bootstrap user created by the postgres image is a superuser
+      # regardless of its name, so it can create extensions — the
+      # reservation_no_overlap migration needs btree_gist. A service
+      # account without CREATE privileges would fail here with an error
+      # that doesn't say "extension", it says "permission denied".
+      - run: npx prisma migrate deploy
+      # Runs both projects (unit + integration) with coverage in one pass —
+      # the coverage thresholds in vitest.config.mts (90% for the money
+      # directories, 70% for the rest of lib/**) only mean anything if a CI
+      # step actually enforces them; `npm run test:integration` alone never
+      # invokes `--coverage`, so a regression below either floor would pass
+      # CI silently without this.
+      - run: npm run test:coverage
+
+  # Against the actual docker-compose.yml stack (built images, not `next
+  # dev`) — the one suite that would catch a `standalone` output-tracing
+  # gap or an env-only-in-Docker bug no vitest run against a live Node
+  # process ever would. GHA-cached image layers keep repeat runs fast; a
+  # cold cache (first run, or a Dockerfile change) is the one case this
+  # can run past the ~3-minute steady-state target.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      POSTGRES_PASSWORD: e2e-test-password
+      AUTH_SECRET: ci-test-secret
+      AUTH_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      # lib/generated/prisma is gitignored (regenerated via `npm run
+      # db:generate`) — the Docker build makes its own copy inside each
+      # image, but e2e/scripts/get-first-table.ts runs directly on this
+      # runner's checkout, not in a container, and needs its own.
+      - run: npx prisma generate
+
+      - name: Build compose images (cached)
+        run: |
+          declare -A tags=([migrate]=marea-migrate:local [seed]=marea-seed:local [runner]=marea-app:local)
+          for target in migrate seed runner; do
+            docker buildx build \
+              --target "$target" \
+              --tag "${tags[$target]}" \
+              --cache-from type=gha,scope=$target \
+              --cache-to type=gha,mode=max,scope=$target \
+              --load .
+          done
+
+      - name: Start the stack
+        run: docker compose up -d --no-build db migrate app
+
+      - name: Wait for the app to answer
+        # /api/health, not /: every other page calls getCurrentBusiness(),
+        # which 500s until the seed step (still ahead of us) creates the
+        # Business row — polling / would never see a 200 no matter how
+        # long we waited. /api/health only checks the DB connection.
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/api/health > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::App never became reachable"
+          echo "::group::docker compose ps"
+          docker compose ps
+          echo "::endgroup::"
+          echo "::group::app logs"
+          docker compose logs app
+          echo "::endgroup::"
+          echo "::group::migrate logs"
+          docker compose logs migrate
+          echo "::endgroup::"
+          exit 1
+
+      - run: docker compose run --rm seed
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        env:
+          E2E_BASE_URL: http://localhost:3000
+          E2E_DATABASE_URL: postgresql://marea:${{ env.POSTGRES_PASSWORD }}@localhost:5434/marea
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Tear down the stack
+        if: always()
+        run: docker compose down -v
+
+  commits:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate commit messages
+        run: |
+          set -e
+          status=0
+          for sha in $(git rev-list "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"); do
+            git log -1 --format=%B "$sha" > /tmp/commit-msg.txt
+            if ! sh scripts/validate-commit-msg.sh /tmp/commit-msg.txt; then
+              echo "Commit $sha failed validation" >&2
+              status=1
+            fi
+          done
+          exit $status
+
+  pr-size:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Warn on large pull request
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          LINES=$(git diff --shortstat "$BASE...$HEAD" | awk '{print $4+$6}')
+          LINES=${LINES:-0}
+          if [ "$LINES" -gt 400 ]; then
+            echo "::warning::This pull request changes $LINES lines, over the ~400-line guideline in docs/CONVENCIONES.md section 6.1. That's fine for a legitimate exception — say why in the description."
+          fi

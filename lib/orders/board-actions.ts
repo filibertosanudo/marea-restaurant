@@ -125,9 +125,22 @@ export async function cancelOrderAction(
 
     const order = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
-      include: { items: { select: { menuItemId: true, quantity: true } } },
+      include: {
+        items: { select: { menuItemId: true, quantity: true } },
+        payments: { include: { refunds: true } },
+      },
     });
     if (!isCancellable(order.status)) return { error: "not_cancellable" } as const;
+
+    // A payment can succeed (cash collected, or a card webhook lands) while
+    // this same lock was held by a concurrent collect/webhook that committed
+    // first — without this check, cancelling afterward leaves a CANCELLED
+    // order sitting next to a payment that still says it was collected,
+    // since cancelOpenPayments below deliberately never touches a SUCCEEDED
+    // one. Same settlement check collectCashPaymentAction already runs.
+    if (computePaymentSummary(order.payments, order.total).isSettled) {
+      return { error: "already_settled" } as const;
+    }
 
     await tx.order.update({
       where: { id: order.id },

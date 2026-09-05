@@ -1,56 +1,7 @@
 #!/bin/sh
-# Valida el mensaje de commit contra docs/CONVENCIONES.md seccion 3.
-# Activar una vez por clon:  git config core.hooksPath .githooks
+# Enable once per clone: git config core.hooksPath .githooks
+# The actual validation lives in scripts/validate-commit-msg.sh, shared
+# with the CI "commits" job so the rules never drift between the two.
 
-MSG_FILE="$1"
-SUBJECT=$(head -n 1 "$MSG_FILE")
-
-# Los commits que git genera solo (merge, revert, fixup, squash) pasan sin tocar.
-case "$SUBJECT" in
-  Merge\ *|Revert\ *|fixup!\ *|squash!\ *) exit 0 ;;
-esac
-
-fail() {
-  echo "commit-msg: $1" >&2
-  echo "" >&2
-  echo "  asunto: $SUBJECT" >&2
-  echo "  formato: <tipo>(<ambito>): <descripcion>   maximo 50 caracteres" >&2
-  echo "  tipos: feat fix refactor perf docs test build ci style chore" >&2
-  echo "  ver docs/CONVENCIONES.md" >&2
-  exit 1
-}
-
-TYPES='feat|fix|refactor|perf|docs|test|build|ci|style|chore'
-
-echo "$SUBJECT" | grep -Eq "^($TYPES)(\([a-z0-9-]+\))?: .+" \
-  || fail "falta el prefijo semantico o el formato no coincide"
-
-echo "$SUBJECT" | grep -Eq "^($TYPES)(\([a-z0-9-]+\))?: [a-z]" \
-  || fail "la descripcion empieza en mayuscula"
-
-[ "${#SUBJECT}" -le 50 ] \
-  || fail "el asunto mide ${#SUBJECT} caracteres, el maximo es 50"
-
-case "$SUBJECT" in
-  *.|*...) fail "el asunto no lleva punto final" ;;
-esac
-
-# Verbo en imperativo: rechaza las terminaciones de pasado y de tercera persona
-# mas comunes en la primera palabra de la descripcion.
-VERB=$(echo "$SUBJECT" | sed -E "s/^($TYPES)(\([a-z0-9-]+\))?: ([a-z]+).*/\3/")
-case "$VERB" in
-  *ed|adds|fixes|removes|updates|changes|creates|deletes)
-    fail "usa imperativo presente: add, fix, remove, no '$VERB'" ;;
-esac
-
-# Ninguna mencion a herramientas, en el mensaje completo.
-grep -Eiq "claude|copilot|chatgpt|co-authored|generated with|written with|assisted by" "$MSG_FILE" \
-  && fail "el mensaje menciona una herramienta o atribuye coautoria"
-
-# Sin emojis. Solo si este grep soporta -P; si no, se salta en silencio.
-if echo "" | grep -qP "" 2>/dev/null; then
-  grep -qP "[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{FE0F}\x{2190}-\x{21FF}]" "$MSG_FILE" \
-    && fail "el mensaje contiene emojis"
-fi
-
-exit 0
+ROOT=$(git rev-parse --show-toplevel)
+exec "$ROOT/scripts/validate-commit-msg.sh" "$1"
