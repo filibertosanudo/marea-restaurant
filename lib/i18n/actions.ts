@@ -9,6 +9,7 @@ const ONE_YEAR = 60 * 60 * 24 * 365;
 export async function setAdminLangAction(lang: Lang) {
   const cookieStore = await cookies();
   cookieStore.set(ADMIN_LANG_COOKIE, lang, {
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: ONE_YEAR,
     sameSite: "lax",
