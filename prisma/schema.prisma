@@ -385,6 +385,7 @@ model User {
   testimonials Testimonial[]
   refunds      Refund[]
   notifications NotificationJob[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([role])
 }
@@ -1336,6 +1337,26 @@ model NotificationJob {
   @@index([businessId, createdAt])
   @@index([relatedOrderId])
   @@index([relatedReservationId])
+}
+
+/// One reset link, one use. The raw token only ever exists in the emailed
+/// link and the requester's browser — only its hash is stored, same reason
+/// passwords never are. expiresAt is set once at creation (30 minutes);
+/// usedAt is set both when this exact token is redeemed and, defensively,
+/// on every other still-valid token for the same user the moment one of
+/// them is (see resetPasswordAction) — a stale link from an older request
+/// must not still work after a newer one already changed the password.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 /// Suscriptores del footer ("Let's connect with us").
