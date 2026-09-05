@@ -15,9 +15,15 @@ export function ChangePasswordForm({ dict }: { dict: AdminDictionary }) {
   const errorMessage =
     state?.error === "passwordTooShort"
       ? dict.auth.passwordTooShort
-      : state?.error === "passwordsDontMatch"
-        ? dict.auth.passwordsDontMatch
-        : undefined;
+      : state?.error === "passwordTooWeak"
+        ? dict.auth.passwordTooWeak
+        : state?.error === "passwordsDontMatch"
+          ? dict.auth.passwordsDontMatch
+          : state?.error === "invalidCurrentPassword"
+            ? dict.auth.invalidCurrentPassword
+            : state?.error === "notAuthenticated"
+              ? dict.auth.notAuthenticated
+              : undefined;
 
   return (
     <form action={action} className="flex flex-col gap-md">
@@ -28,7 +34,7 @@ export function ChangePasswordForm({ dict }: { dict: AdminDictionary }) {
         label={dict.auth.newPassword}
         autoComplete="new-password"
         required
-        minLength={8}
+        minLength={12}
       />
       <Input
         id="confirmPassword"
@@ -37,7 +43,7 @@ export function ChangePasswordForm({ dict }: { dict: AdminDictionary }) {
         label={dict.auth.confirmPassword}
         autoComplete="new-password"
         required
-        minLength={8}
+        minLength={12}
       />
 
       {errorMessage && (
