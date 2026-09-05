@@ -85,6 +85,11 @@ jobs:
           node-version: "22"
           cache: "npm"
       - run: npm ci
+      # lib/generated/prisma is gitignored (regenerated via `npm run
+      # db:generate`) — the Docker build makes its own copy inside each
+      # image, but e2e/scripts/get-first-table.ts runs directly on this
+      # runner's checkout, not in a container, and needs its own.
+      - run: npx prisma generate
 
       - name: Build compose images (cached)
         run: |
