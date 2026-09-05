@@ -7,6 +7,7 @@ import { loginSchema } from "@/lib/auth/schemas";
 import { DUMMY_HASH, verifyPassword } from "@/lib/auth/password";
 import { getEffectiveRole } from "@/lib/auth/roles";
 import { isRateLimited, recordLoginAttempt, getClientIp } from "@/lib/auth/rate-limit";
+import { isRevokedByPasswordChange } from "@/lib/auth/token-revalidation";
 
 // How long a token is trusted before the next request re-checks the
 // membership in the database. Amortizes the cost (not a query per request)
@@ -139,6 +140,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       });
 
       if (!dbUser || dbUser.deletedAt) {
+        token.revoked = true;
+        return token;
+      }
+
+      if (isRevokedByPasswordChange(dbUser.passwordChangedAt, token.iat)) {
         token.revoked = true;
         return token;
       }
