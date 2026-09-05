@@ -57,40 +57,114 @@ describe("changePasswordAction", () => {
     expect(result).toEqual({ error: "notAuthenticated" });
   });
 
-  it("rejects mismatched passwords", async () => {
-    authMock.auth.mockResolvedValue({ user: { id: "user_1" } });
+  it("rejects an unknown user id", async () => {
+    authMock.auth.mockResolvedValue({ user: { id: "does-not-exist" } });
 
     const result = await changePasswordAction(
       undefined,
-      passwordForm({ newPassword: "longenough", confirmPassword: "different" })
+      passwordForm({ newPassword: "greenTurtleUmbrella99", confirmPassword: "greenTurtleUmbrella99" })
+    );
+
+    expect(result).toEqual({ error: "notAuthenticated" });
+  });
+
+  it("rejects mismatched passwords", async () => {
+    const user = await prisma.user.create({
+      data: { email: "mesero1@marea.test", passwordHash: await hashPassword("old"), mustChangePassword: true },
+    });
+    authMock.auth.mockResolvedValue({ user: { id: user.id } });
+
+    const result = await changePasswordAction(
+      undefined,
+      passwordForm({ newPassword: "greenTurtleUmbrella99", confirmPassword: "different1234" })
     );
 
     expect(result).toEqual({ error: "passwordsDontMatch" });
   });
 
-  it("rejects a password shorter than 8 characters", async () => {
-    authMock.auth.mockResolvedValue({ user: { id: "user_1" } });
+  it("rejects a password shorter than 12 characters", async () => {
+    const user = await prisma.user.create({
+      data: { email: "mesero2@marea.test", passwordHash: await hashPassword("old"), mustChangePassword: true },
+    });
+    authMock.auth.mockResolvedValue({ user: { id: user.id } });
 
     const result = await changePasswordAction(undefined, passwordForm({ newPassword: "short", confirmPassword: "short" }));
 
     expect(result).toEqual({ error: "passwordTooShort" });
   });
 
-  it("updates the password, clears mustChangePassword, and signs out", async () => {
+  it("rejects a long but predictable password", async () => {
     const user = await prisma.user.create({
-      data: { email: "mesero@marea.test", passwordHash: await hashPassword("old"), mustChangePassword: true },
+      data: { email: "mesero3@marea.test", passwordHash: await hashPassword("old"), mustChangePassword: true },
+    });
+    authMock.auth.mockResolvedValue({ user: { id: user.id } });
+
+    const result = await changePasswordAction(
+      undefined,
+      passwordForm({ newPassword: "password12345", confirmPassword: "password12345" })
+    );
+
+    expect(result).toEqual({ error: "passwordTooWeak" });
+  });
+
+  it("does not require the current password when mustChangePassword is true", async () => {
+    const user = await prisma.user.create({
+      data: { email: "mesero4@marea.test", passwordHash: await hashPassword("old"), mustChangePassword: true },
+    });
+    authMock.auth.mockResolvedValue({ user: { id: user.id } });
+    authMock.signOut.mockResolvedValue(undefined);
+
+    const result = await changePasswordAction(
+      undefined,
+      passwordForm({ newPassword: "greenTurtleUmbrella99", confirmPassword: "greenTurtleUmbrella99" })
+    );
+
+    expect(result).toBeUndefined();
+    const updated = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(updated.mustChangePassword).toBe(false);
+    expect(updated.passwordChangedAt).not.toBeNull();
+  });
+
+  it("rejects the wrong current password when not on a forced change", async () => {
+    const user = await prisma.user.create({
+      data: { email: "admin1@marea.test", passwordHash: await hashPassword("old"), mustChangePassword: false },
+    });
+    authMock.auth.mockResolvedValue({ user: { id: user.id } });
+
+    const result = await changePasswordAction(
+      undefined,
+      passwordForm({
+        currentPassword: "wrong",
+        newPassword: "greenTurtleUmbrella99",
+        confirmPassword: "greenTurtleUmbrella99",
+      })
+    );
+
+    expect(result).toEqual({ error: "invalidCurrentPassword" });
+    const unchanged = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(unchanged.passwordHash).toBe(user.passwordHash);
+  });
+
+  it("updates the password, clears mustChangePassword, stamps passwordChangedAt, and signs out", async () => {
+    const user = await prisma.user.create({
+      data: { email: "admin2@marea.test", passwordHash: await hashPassword("old"), mustChangePassword: false },
     });
     authMock.auth.mockResolvedValue({ user: { id: user.id } });
     authMock.signOut.mockResolvedValue(undefined);
 
     await changePasswordAction(
       undefined,
-      passwordForm({ newPassword: "brandnewpassword", confirmPassword: "brandnewpassword" })
+      passwordForm({
+        currentPassword: "old",
+        newPassword: "greenTurtleUmbrella99",
+        confirmPassword: "greenTurtleUmbrella99",
+      })
     );
 
     const updated = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
     expect(updated.mustChangePassword).toBe(false);
     expect(updated.passwordHash).not.toBe(user.passwordHash);
+    expect(updated.passwordChangedAt).not.toBeNull();
     expect(authMock.signOut).toHaveBeenCalledWith({ redirectTo: "/admin/login" });
   });
 });

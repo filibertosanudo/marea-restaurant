@@ -3,7 +3,7 @@
 import { AuthError } from "next-auth";
 import { signIn, signOut, auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/auth/password";
+import { DUMMY_HASH, hashPassword, verifyPassword } from "@/lib/auth/password";
 import { changePasswordSchema } from "@/lib/auth/schemas";
 
 export type LoginState = { error?: string } | undefined;
@@ -41,23 +41,42 @@ export async function changePasswordAction(
     return { error: "notAuthenticated" };
   }
 
+  // Read fresh from the database rather than trusting the session's
+  // mustChangePassword — the JWT can be up to REVALIDATE_INTERVAL_MS stale.
+  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!user) {
+    return { error: "notAuthenticated" };
+  }
+
   const parsed = changePasswordSchema.safeParse({
+    currentPassword: formData.get("currentPassword"),
     newPassword: formData.get("newPassword"),
     confirmPassword: formData.get("confirmPassword"),
   });
 
   if (!parsed.success) {
-    const tooShort = parsed.error.issues.some(
-      (issue) => issue.path[0] === "newPassword"
-    );
-    return { error: tooShort ? "passwordTooShort" : "passwordsDontMatch" };
+    const newPasswordIssue = parsed.error.issues.find((issue) => issue.path[0] === "newPassword");
+    if (newPasswordIssue) {
+      return { error: newPasswordIssue.code === "too_small" ? "passwordTooShort" : "passwordTooWeak" };
+    }
+    return { error: "passwordsDontMatch" };
+  }
+
+  // Temporary passwords are dictated by an admin and typed once, under
+  // duress of a forced first login — asking for them again is friction with
+  // no security gain. Anyone else must prove they still hold the account.
+  if (!user.mustChangePassword) {
+    const validCurrent = await verifyPassword(user.passwordHash ?? DUMMY_HASH, parsed.data.currentPassword ?? "");
+    if (!validCurrent) {
+      return { error: "invalidCurrentPassword" };
+    }
   }
 
   const passwordHash = await hashPassword(parsed.data.newPassword);
 
   await prisma.user.update({
-    where: { id: session.user.id },
-    data: { passwordHash, mustChangePassword: false },
+    where: { id: user.id },
+    data: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date() },
   });
 
   await signOut({ redirectTo: "/admin/login" });
