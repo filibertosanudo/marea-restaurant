@@ -37,6 +37,7 @@ export async function getOrderLang(defaultLang: Lang = "es"): Promise<Lang> {
 export async function setOrderLang(lang: Lang): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(ORDER_LANG_COOKIE, lang, {
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
