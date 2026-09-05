@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/business";
 import { getOrderForPaymentIntentByPublicToken } from "@/lib/orders/queries";
@@ -7,12 +8,19 @@ import { stripe } from "@/lib/stripe/client";
 import { toStripeAmount } from "./amount";
 import { computePaymentSummary } from "./summary";
 import { isUniqueConstraintError } from "./prisma-errors";
+import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 
 export type CreatePaymentIntentResult =
   | { ok: true; clientSecret: string }
   | {
       ok: false;
-      error: "not_found" | "order_cancelled" | "already_paid" | "online_payment_disabled" | "try_again";
+      error:
+        | "not_found"
+        | "order_cancelled"
+        | "already_paid"
+        | "online_payment_disabled"
+        | "try_again"
+        | "rate_limited";
     };
 
 const OPEN_STRIPE_STATUSES = ["PENDING", "PROCESSING", "REQUIRES_ACTION"] as const;
@@ -20,23 +28,28 @@ const OPEN_STRIPE_STATUSES = ["PENDING", "PROCESSING", "REQUIRES_ACTION"] as con
 // PaymentIntent can still be confirmed from.
 const CONFIRMABLE_INTENT_STATUSES = ["requires_payment_method", "requires_confirmation", "requires_action"];
 
+const INTENT_SCOPE = "payment:intent";
+const INTENT_MAX_ATTEMPTS = 10;
+const INTENT_WINDOW_MS = 15 * 60 * 1000;
+
 /**
  * Called from the order-tracking page when a guest picks "pay with card".
  * Re-reads the order and its total from the DB — never trusts a client
  * amount. The idempotency key is derived from the order itself (not a
  * fresh id per click), so two overlapping submissions for the same order
  * resolve to the same PaymentIntent at Stripe instead of two charges.
- *
- * No rate limit: this is a public Server Action guarded only by knowing a
- * publicToken, but adding one the way lib/auth/rate-limit.ts does (a
- * dedicated Postgres table keyed by identity) would mean a schema change,
- * which this module doesn't authorize. The one concrete harm that absence
- * used to enable — a fixed idempotency key trapping a changed amount
- * behind Stripe's 24h window — is what keying it on the amount above
- * closes; every other effect of hammering this action is a harmless extra
- * PaymentIntent against an order it re-validates in full on every call.
  */
 export async function createPaymentIntentAction(publicToken: string): Promise<CreatePaymentIntentResult> {
+  const ip = getClientIp(await headers());
+  if (await isScopeRateLimited(INTENT_SCOPE, ip, INTENT_MAX_ATTEMPTS, INTENT_WINDOW_MS)) {
+    return { ok: false, error: "rate_limited" };
+  }
+  // Charged per call here, not per success: unlike order creation or cart
+  // mutation, every call past this point round-trips to Stripe (a retrieve
+  // or a create) regardless of outcome, so the cost this limit protects
+  // against is incurred on every attempt, not just a successful one.
+  await recordScopeAttempt(INTENT_SCOPE, ip);
+
   const business = await getCurrentBusiness();
   if (!business.acceptsOnlinePayment) return { ok: false, error: "online_payment_disabled" };
 
