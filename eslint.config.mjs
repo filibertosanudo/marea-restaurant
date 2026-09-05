@@ -7,6 +7,7 @@ const config = [
       "lib/generated/**",
       ".next/**",
       "**/dist/**",
+      "coverage/**",
       "node_modules/**",
       ".ds-sync/**",
       "ds-bundle/**",

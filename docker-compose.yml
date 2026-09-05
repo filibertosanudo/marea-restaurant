@@ -7,6 +7,14 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # Exposed on 5434, not Postgres's default 5432, since a machine running
+    # this stack often already has its own local Postgres on 5432 (this
+    # project's own vitest integration harness included) — for the E2E
+    # suite's own Node-side setup (see e2e/scripts/), never read by the app
+    # container itself, which still talks to `db` over the internal
+    # network regardless of this mapping.
+    ports:
+      - "5434:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U marea"]
       interval: 5s
@@ -16,6 +24,7 @@ services:
   # One-shot: applies migrations, then exits. `app` won't start until this
   # succeeds. Never runs the seed — that stays a command someone types.
   migrate:
+    image: marea-migrate:local
     build:
       context: .
       target: migrate
@@ -25,7 +34,32 @@ services:
       db:
         condition: service_healthy
 
+  # Never depended on by `app` — seeding stays a command someone types
+  # (`docker compose run --rm seed`), same rule seed.ts's own doc comment
+  # states. Exists in this file at all only so the E2E stack can invoke it
+  # without a second compose file.
+  seed:
+    image: marea-seed:local
+    build:
+      context: .
+      target: seed
+    environment:
+      DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
+      # seed.ts refuses to run against a host it can't prove is local
+      # (see prisma/seed.ts's assertLocalTarget) — "db" is this project's
+      # own service name in a *real* deployment's compose file too, so it
+      # can't be trusted as a "this is just CI" signal. This escape hatch
+      # is the intended one: an ephemeral CI/E2E database, never a real
+      # deployment's environment.
+      I_KNOW_WHAT_IM_DOING: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
   app:
+    image: marea-app:local
     build:
       context: .
       target: runner
