@@ -1406,6 +1406,12 @@ model NewsletterSubscriber {
   unsubscribedAt DateTime?
   createdAt    DateTime  @default(now())
 
+  /// Capability token for the no-session unsubscribe link in every email
+  /// footer — same reasoning and same cuid(2) as Order.publicToken: a
+  /// structured cuid() would let one subscriber's token narrow the search
+  /// space for another's signed up around the same time.
+  unsubscribeToken String @unique @default(cuid(2))
+
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@unique([businessId, email])
