@@ -102,9 +102,13 @@ jobs:
         run: docker compose up -d --no-build db migrate app
 
       - name: Wait for the app to answer
+        # /api/health, not /: every other page calls getCurrentBusiness(),
+        # which 500s until the seed step (still ahead of us) creates the
+        # Business row — polling / would never see a 200 no matter how
+        # long we waited. /api/health only checks the DB connection.
         run: |
           for i in $(seq 1 60); do
-            if curl -sf http://localhost:3000/ > /dev/null; then exit 0; fi
+            if curl -sf http://localhost:3000/api/health > /dev/null; then exit 0; fi
             sleep 2
           done
           echo "::error::App never became reachable"
