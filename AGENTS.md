@@ -58,6 +58,7 @@ see [`docs/DEPLOY.md`](docs/DEPLOY.md).
 | `npm run db:seed` | Seed dev data — refuses against a non-local database |
 | `npm run db:studio` | Prisma Studio |
 | `npm run storage:sweep` | Delete storage keys no `MenuItem` row references |
+| `npm run rate-limits:purge` | Delete `RateLimitCounter` rows past every scope's window (`-- --dry-run` to preview) |
 
 ## Where things live
 
