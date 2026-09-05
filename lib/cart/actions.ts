@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/business";
@@ -10,7 +11,14 @@ import { validateModifierSelection } from "@/lib/cart/modifier-validation";
 import { getOrCreateCartForMutation, getCartItemForMutation } from "@/lib/cart/queries";
 import { setTableIdCookie } from "@/lib/cart/cookie";
 import { addToCartSchema, updateCartItemQuantitySchema } from "@/lib/cart/schemas";
+import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import type { Lang } from "@/lib/i18n/lang";
+
+// One shared scope across add/update/remove: a guest bypassing a limit on
+// one by hammering another would defeat the point of having it at all.
+const MUTATE_SCOPE = "cart:mutate";
+const MUTATE_MAX_ATTEMPTS = 60;
+const MUTATE_WINDOW_MS = 15 * 60 * 1000;
 
 /**
  * Called client-side on mount by /t/[qrToken] right after it renders — a
@@ -47,6 +55,11 @@ export async function addToCartAction(
   });
   if (!parsed.success) return { error: "invalid_input" };
 
+  const ip = getClientIp(await headers());
+  if (await isScopeRateLimited(MUTATE_SCOPE, ip, MUTATE_MAX_ATTEMPTS, MUTATE_WINDOW_MS)) {
+    return { error: "rate_limited" };
+  }
+
   const business = await getCurrentBusiness();
   const item = await getPublicMenuItemRaw(business.id, parsed.data.menuItemId);
   if (!item || !item.isAvailable) {
@@ -80,6 +93,7 @@ export async function addToCartAction(
     }
   });
 
+  await recordScopeAttempt(MUTATE_SCOPE, ip);
   revalidatePath("/menu");
   return { success: true };
 }
@@ -87,6 +101,9 @@ export async function addToCartAction(
 export async function updateCartItemQuantityAction(cartItemId: string, quantity: number) {
   const parsed = updateCartItemQuantitySchema.safeParse({ cartItemId, quantity });
   if (!parsed.success) return;
+
+  const ip = getClientIp(await headers());
+  if (await isScopeRateLimited(MUTATE_SCOPE, ip, MUTATE_MAX_ATTEMPTS, MUTATE_WINDOW_MS)) return;
 
   const business = await getCurrentBusiness();
   const cart = await getOrCreateCartForMutation(business.id);
@@ -102,15 +119,20 @@ export async function updateCartItemQuantityAction(cartItemId: string, quantity:
     });
   }
 
+  await recordScopeAttempt(MUTATE_SCOPE, ip);
   revalidatePath("/menu");
 }
 
 export async function removeCartItemAction(cartItemId: string) {
+  const ip = getClientIp(await headers());
+  if (await isScopeRateLimited(MUTATE_SCOPE, ip, MUTATE_MAX_ATTEMPTS, MUTATE_WINDOW_MS)) return;
+
   const business = await getCurrentBusiness();
   const cart = await getOrCreateCartForMutation(business.id);
   const existing = await getCartItemForMutation(cart.id, cartItemId);
   if (!existing) return;
 
   await prisma.cartItem.delete({ where: { id: existing.id } });
+  await recordScopeAttempt(MUTATE_SCOPE, ip);
   revalidatePath("/menu");
 }

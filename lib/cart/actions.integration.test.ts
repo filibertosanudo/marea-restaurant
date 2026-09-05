@@ -37,6 +37,23 @@ describe("addToCartAction", () => {
 
     expect(result).toEqual({ error: "item_unavailable" });
   });
+
+  it("reports rate_limited once this IP's cart-mutation attempts exceed the cap", async () => {
+    const business = await makeBusiness({ slug: "marea" });
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id);
+    const formData = new FormData();
+    formData.set("menuItemId", item.id);
+    formData.set("quantity", "1");
+    await prisma.rateLimitCounter.createMany({
+      data: Array.from({ length: 60 }, () => ({ scope: "cart:mutate", key: "unknown" })),
+    });
+
+    const result = await withCart(() => addToCartAction("en", undefined, formData));
+
+    expect(result).toEqual({ error: "rate_limited" });
+    await expect(prisma.cartItem.findFirst({ where: { menuItemId: item.id } })).resolves.toBeNull();
+  });
 });
 
 describe("updateCartItemQuantityAction / removeCartItemAction", () => {

@@ -163,4 +163,16 @@ describe("createPaymentIntentAction", () => {
     const paymentCount = await prisma.payment.count({ where: { stripePaymentIntentId: "pi_shared" } });
     expect(paymentCount).toBe(1);
   });
+
+  it("reports rate_limited once this IP's intent attempts exceed the cap", async () => {
+    const business = await makeBusiness({ slug: "marea" });
+    const order = await makeOrder(business.id, { total: "23.19" });
+    await prisma.rateLimitCounter.createMany({
+      data: Array.from({ length: 10 }, () => ({ scope: "payment:intent", key: "unknown" })),
+    });
+
+    const result = await createPaymentIntentAction(order.publicToken);
+
+    expect(result).toEqual({ ok: false, error: "rate_limited" });
+  });
 });

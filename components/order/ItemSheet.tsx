@@ -30,6 +30,8 @@ function errorMessage(code: string, dict: OrderDictionary): string {
     case "modifier_option_unavailable":
     case "modifier_group_selection_out_of_range":
       return dict.errorModifierSelection;
+    case "rate_limited":
+      return dict.errorRateLimited;
     default:
       return dict.errorGeneric;
   }
