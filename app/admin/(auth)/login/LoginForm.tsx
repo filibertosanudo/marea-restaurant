@@ -41,6 +41,13 @@ export function LoginForm({ dict }: { dict: AdminDictionary }) {
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? dict.auth.signingIn : dict.auth.signIn}
       </Button>
+
+      <a
+        href="/admin/forgot-password"
+        className="text-center text-[13px] text-on-surface-muted underline"
+      >
+        {dict.auth.forgotPassword}
+      </a>
     </form>
   );
 }
