@@ -332,6 +332,8 @@ export const en = {
       temporaryPassword: "Temporary password",
       deactivate: "Deactivate",
       deactivateConfirm: "Deactivate this team member?",
+      lastAdminError: "You can't do this: they're the business's last active administrator.",
+      genericMutationError: "Couldn't complete that change. Try again.",
     },
     settings: {
       title: "Business settings",

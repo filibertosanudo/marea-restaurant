@@ -386,6 +386,7 @@ model User {
   refunds      Refund[]
   notifications NotificationJob[]
   passwordResetTokens PasswordResetToken[]
+  membershipEvents MembershipEvent[]
 
   @@index([role])
 }
@@ -475,9 +476,30 @@ model BusinessMembership {
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  events   MembershipEvent[]
 
   @@unique([userId, businessId])
   @@index([businessId, role])
+}
+
+/// Same pattern as OrderStatusEvent: one row per role or active/inactive
+/// change, written inside the same transaction as the change itself. Money
+/// already had this trail (OrderStatusEvent.changedById, Refund.createdById)
+/// — access didn't, which is the gap this closes.
+model MembershipEvent {
+  id           String    @id @default(cuid())
+  membershipId String
+  changedById  String?
+  fromRole     UserRole?
+  toRole       UserRole?
+  fromActive   Boolean?
+  toActive     Boolean?
+  createdAt    DateTime  @default(now())
+
+  membership BusinessMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  changedBy  User?              @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([membershipId, createdAt])
 }
 
 // ============================================================================
