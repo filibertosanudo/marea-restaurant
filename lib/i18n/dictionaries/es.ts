@@ -336,6 +336,9 @@ export const es = {
       temporaryPassword: "Contraseña temporal",
       deactivate: "Desactivar",
       deactivateConfirm: "¿Desactivar a este miembro del equipo?",
+      lastAdminError:
+        "No puedes hacer esto: es el último administrador activo del negocio.",
+      genericMutationError: "No se pudo completar el cambio. Intenta de nuevo.",
     },
     settings: {
       title: "Configuración del negocio",

@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { TeamMemberFormModal } from "./TeamMemberFormModal";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import type { TeamMemberDTO } from "@/lib/dto/team";
-import { setTeamMemberActiveAction } from "@/lib/team/actions";
+import { setTeamMemberActiveAction, setTeamMemberRoleAction, type TeamMutationResult } from "@/lib/team/actions";
 
 export function TeamMemberList({
   members,
@@ -22,18 +22,38 @@ export function TeamMemberList({
   const [showForm, setShowForm] = useState(false);
   const [target, setTarget] = useState<TeamMemberDTO | null>(null);
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function errorMessage(result: Extract<TeamMutationResult, { ok: false }>): string {
+    return result.error === "last_admin" ? dict.team.lastAdminError : dict.team.genericMutationError;
+  }
 
   async function handleConfirmToggle() {
     if (!target) return;
     setPending(true);
-    await setTeamMemberActiveAction(target.membershipId, !target.isActive);
+    const result = await setTeamMemberActiveAction(target.membershipId, !target.isActive);
     setPending(false);
-    setItems((prev) =>
-      prev.map((m) =>
-        m.membershipId === target.membershipId ? { ...m, isActive: !m.isActive } : m
-      )
-    );
+    if (result.ok) {
+      setError(null);
+      setItems((prev) =>
+        prev.map((m) =>
+          m.membershipId === target.membershipId ? { ...m, isActive: !m.isActive } : m
+        )
+      );
+    } else {
+      setError(errorMessage(result));
+    }
     setTarget(null);
+  }
+
+  async function handleRoleChange(member: TeamMemberDTO, role: "STAFF" | "BUSINESS_ADMIN") {
+    const result = await setTeamMemberRoleAction(member.membershipId, role);
+    if (result.ok) {
+      setError(null);
+      setItems((prev) => prev.map((m) => (m.membershipId === member.membershipId ? { ...m, role } : m)));
+    } else {
+      setError(errorMessage(result));
+    }
   }
 
   return (
@@ -44,6 +64,16 @@ export function TeamMemberList({
         </h1>
         <Button onClick={() => setShowForm(true)}>{dict.team.newMember}</Button>
       </div>
+
+      {error && (
+        <p
+          role="alert"
+          aria-live="polite"
+          className="mb-md rounded-md bg-error/10 px-md py-[10px] text-[13px] text-error"
+        >
+          {error}
+        </p>
+      )}
 
       <div className="overflow-hidden rounded-md border border-border bg-surface">
         <table className="w-full border-collapse text-left text-[13px]">
@@ -73,7 +103,20 @@ export function TeamMemberList({
                 <td className="px-md py-[8px] font-medium text-on-surface">{member.name}</td>
                 <td className="px-md py-[8px] text-on-surface-muted">{member.email}</td>
                 <td className="px-md py-[8px] text-on-surface-muted">
-                  {member.role === "BUSINESS_ADMIN" ? dict.team.roleAdmin : dict.team.roleStaff}
+                  {member.userId === currentUserId ? (
+                    member.role === "BUSINESS_ADMIN" ? dict.team.roleAdmin : dict.team.roleStaff
+                  ) : (
+                    <select
+                      value={member.role}
+                      onChange={(e) =>
+                        handleRoleChange(member, e.target.value as "STAFF" | "BUSINESS_ADMIN")
+                      }
+                      className="rounded-sm border border-border bg-surface px-sm py-[4px] text-[13px]"
+                    >
+                      <option value="STAFF">{dict.team.roleStaff}</option>
+                      <option value="BUSINESS_ADMIN">{dict.team.roleAdmin}</option>
+                    </select>
+                  )}
                 </td>
                 <td className="px-md py-[8px]">
                   <StatusBadge variant={member.isActive ? "success" : "neutral"}>
