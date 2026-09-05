@@ -23,6 +23,21 @@ export const en = {
       updatePassword: "Update password",
       noPublicSignup: "Staff only — accounts are created by an administrator.",
       signOut: "Sign out",
+      forgotPassword: "Forgot your password?",
+      forgotPasswordTitle: "Reset your password",
+      forgotPasswordBody:
+        "Enter your email and, if it has an account, we'll send a link to choose a new password.",
+      sendResetLink: "Send reset link",
+      invalidEmail: "Enter a valid email.",
+      resetLinkSentTitle: "Check your email",
+      resetLinkSentBody:
+        "If that email has an account, you'll get a link to reset your password. The link expires in 30 minutes.",
+      backToLogin: "Back to sign in",
+      resetPasswordTitle: "Choose a new password",
+      resetPasswordBody: "Your link is valid — set your new password.",
+      invalidOrExpiredToken: "This link is invalid or has expired. Request a new one.",
+      resetPasswordSuccessTitle: "Password updated",
+      resetPasswordSuccessBody: "You can now sign in with your new password.",
     },
     nav: {
       menu: "Menu",
