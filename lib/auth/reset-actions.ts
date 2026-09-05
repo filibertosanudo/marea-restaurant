@@ -55,6 +55,13 @@ export async function requestPasswordResetAction(
 
   const user = await prisma.user.findUnique({ where: { email, deletedAt: null } });
   if (!user || !user.passwordHash) {
+    // Costs roughly the same as the real branch below (a transaction with
+    // two statements) without writing anything, so response timing doesn't
+    // become the oracle the identical response body was meant to close.
+    await prisma.$transaction([
+      prisma.passwordResetToken.count({ where: { userId: email } }),
+      prisma.notificationJob.count({ where: { businessId: email } }),
+    ]);
     return submittedState;
   }
 
