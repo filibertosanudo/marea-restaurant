@@ -59,24 +59,39 @@ export function PaymentSection({
   }
 
   useEffect(() => {
-    if (method !== "CARD" || clientSecret || loadingIntent) return;
+    if (method !== "CARD" || clientSecret) return;
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingIntent(true);
     setIntentError(null);
-    createPaymentIntentAction(publicToken).then((result) => {
-      if (cancelled) return;
-      setLoadingIntent(false);
-      if (result.ok) {
-        setClientSecret(result.clientSecret);
-      } else {
+    createPaymentIntentAction(publicToken)
+      .then((result) => {
+        if (cancelled) return;
+        setLoadingIntent(false);
+        if (result.ok) {
+          setClientSecret(result.clientSecret);
+        } else {
+          setIntentError(dict.cardIntentError);
+        }
+      })
+      .catch(() => {
+        // The action can reject outright (a rethrown non-constraint DB
+        // error, a network drop) rather than resolve with { ok: false } —
+        // without this, that leaves loadingIntent stuck true forever with
+        // no way for the guest to retry.
+        if (cancelled) return;
+        setLoadingIntent(false);
         setIntentError(dict.cardIntentError);
-      }
-    });
+      });
     return () => {
       cancelled = true;
     };
-  }, [method, clientSecret, loadingIntent, publicToken, dict.cardIntentError]);
+    // loadingIntent is deliberately not a dependency: it's set inside this
+    // same effect, so including it re-triggers the effect on that very
+    // state change — React then cleans up the first run (setting
+    // `cancelled = true`) before the in-flight request it started ever
+    // resolves, and the real result gets silently discarded.
+  }, [method, clientSecret, publicToken, dict.cardIntentError]);
 
   if (paymentStatus === "SUCCEEDED") {
     return (
