@@ -90,10 +90,16 @@ export function CardPaymentPanel({
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
   const [elementReady, setElementReady] = useState(false);
   const [stuckProcessing, setStuckProcessing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const mountNodeRef = useRef<HTMLDivElement | null>(null);
   const stripeRef = useRef<StripeJS | null>(null);
   const elementsRef = useRef<StripeElements | null>(null);
   const paymentElementRef = useRef<StripePaymentElement | null>(null);
+  // A ref, not just the isSubmitting state, because handleSubmit must reject
+  // a second call synchronously — two clicks dispatched close enough
+  // together can both run before React commits the re-render that disables
+  // the button, but a ref write is visible immediately.
+  const submittingRef = useRef(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -107,16 +113,13 @@ export function CardPaymentPanel({
   }, [status]);
 
   useEffect(() => {
-    // The mount node only exists in the DOM while status === "form" (every
-    // other status is its own early-return branch below). Without this
-    // guard, retrying after a failed payment flips status back to "form"
-    // and React renders a brand-new, empty mount div that this effect never
-    // re-runs for — the guest sees the "Pagar" button with no card field
-    // above it. Depending on `status` here means a failed→form retry reruns
-    // this same mount logic against that new node instead of relying on a
-    // stale ref into a div React already discarded.
-    if (status !== "form") return;
-
+    // Deliberately not keyed on `status`. The mount node stays in the DOM
+    // for the component's whole lifetime now (see the render below) so a
+    // status change never has to remount anything — it also means this
+    // effect must never tear the Element down just because handleSubmit
+    // flips status to "processing" mid-confirm (see that comment for why
+    // an earlier version of this effect did exactly that, and broke every
+    // card payment as a result).
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setElementReady(false);
@@ -151,23 +154,47 @@ export function CardPaymentPanel({
 
     return () => {
       cancelled = true;
-      // Unmounts the iframe before the next effect run (a clientSecret
-      // change, or leaving and re-entering "form") creates a new one —
-      // without this, either case would stack a second Payment Element
-      // into the same DOM node instead of replacing the first.
+      // Only ever fires on a real clientSecret change or on this
+      // component unmounting entirely (switching to "pay at register") —
+      // both cases where tearing the old Element down is actually correct.
       paymentElementRef.current?.unmount();
       paymentElementRef.current = null;
       elementsRef.current = null;
       stripeRef.current = null;
     };
-  }, [clientSecret, status]);
+  }, [clientSecret]);
 
   async function handleSubmit() {
+    // Guards against a double-click firing this twice while status is
+    // still "form" — the Pay button can't flip to disabled until after the
+    // first elements.submit() below resolves, so without this a fast
+    // second click would race a second confirmPayment against the same
+    // PaymentIntent.
+    if (submittingRef.current) return;
     const stripeInstance = stripeRef.current;
     const elements = elementsRef.current;
     if (!stripeInstance || !elements) return;
 
+    submittingRef.current = true;
+    setIsSubmitting(true);
     setErrorMessage(undefined);
+
+    // Required before confirmPayment() — without it, Stripe.js can't
+    // actually read what the customer typed into the Payment Element and
+    // confirmPayment fails with "could not retrieve data from the
+    // specified Element", regardless of the Element being mounted and
+    // ready. Validates client-side (declined-looking input, incomplete
+    // fields) before the transition to "processing", so those show up as
+    // a normal validation error rather than a failed payment attempt.
+    const { error: submitError } = await elements.submit();
+    if (submitError) {
+      setErrorMessage(submitError.message);
+      setStatus("failed");
+      submittingRef.current = false;
+      setIsSubmitting(false);
+      return;
+    }
+
     setStatus("processing");
 
     const { error } = await stripeInstance.confirmPayment({
@@ -179,102 +206,130 @@ export function CardPaymentPanel({
     if (error) {
       setErrorMessage(error.message);
       setStatus("failed");
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
     // No error: stays on "processing" — see the doc comment above.
   }
 
   function handleRetry() {
     setErrorMessage(undefined);
+    submittingRef.current = false;
+    setIsSubmitting(false);
     setStatus("form");
   }
 
-  if (status === "processing") {
-    return (
-      <div className="flex flex-col items-center gap-sm rounded-lg border border-border/25 bg-surface p-lg text-center">
-        <Spinner />
-        <p className="text-[14px] font-semibold text-on-surface">{dict.processingTitle}</p>
-        <p className="text-[12.5px] text-on-surface-muted">{dict.processingBody}</p>
-        {stuckProcessing && (
-          <button
-            type="button"
-            onClick={() => router.refresh()}
-            className="mt-[4px] text-[12.5px] font-semibold text-primary underline underline-offset-2"
-          >
-            {dict.stillWaitingRefresh}
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  if (status === "requires_action") {
-    return (
-      <div className="flex flex-col items-center gap-sm rounded-lg border border-warning/30 bg-warning/8 p-lg text-center">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-warning/16 text-warning">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="4" y="9" width="16" height="11" rx="2" />
-            <path d="M8 9V6a4 4 0 0 1 8 0v3" />
-          </svg>
-        </div>
-        <p className="text-[14px] font-semibold text-on-surface">{dict.requiresActionTitle}</p>
-        <p className="text-[12.5px] text-on-surface-muted">{dict.requiresActionBody}</p>
-      </div>
-    );
-  }
-
-  if (status === "failed") {
-    return (
-      <div className="flex flex-col gap-sm rounded-lg border border-error/30 bg-error/8 p-lg">
-        <div className="flex items-start gap-sm">
-          <div className="mt-[1px] flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-error/16 text-error">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3">
-              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-[14px] font-semibold text-error">{dict.failedTitle}</p>
-            <p className="mt-[2px] text-[12.5px] leading-snug text-on-surface-muted">
-              {errorMessage || dict.failedBodyFallback}
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-sm">
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="flex-1 rounded-full bg-primary py-[12px] text-[13.5px] font-semibold text-on-primary transition-colors hover:bg-primary-hover"
-          >
-            {dict.retry}
-          </button>
-          <button
-            type="button"
-            onClick={onSwitchToCash}
-            className="flex-1 rounded-full border border-border/40 py-[12px] text-[13.5px] font-semibold text-on-surface transition-colors hover:bg-surface-subtle"
-          >
-            {dict.switchToCash}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+  // The card field + Pay button stay mounted across every status instead of
+  // each status being its own early-return branch — see the mount effect's
+  // comment for why a status change must never remove this from the DOM.
+  // "processing"/"requires_action"/"failed" render as an overlay card on
+  // top of it, and CSS-hide (not unmount) the form underneath.
   return (
     <div className="flex flex-col gap-sm">
-      <div>
-        <span className="mb-[6px] block text-[13px] font-medium text-on-surface">
-          {dict.cardFieldLabel}
-        </span>
-        <div ref={mountNodeRef} aria-label={dict.cardFieldPlaceholder} />
-      </div>
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={!elementReady}
-        className="mt-[4px] w-full rounded-full bg-primary py-[15px] text-[14.5px] font-semibold text-on-primary transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+      {status === "processing" && (
+        <div className="flex flex-col items-center gap-sm rounded-lg border border-border/25 bg-surface p-lg text-center">
+          <Spinner />
+          <p className="text-[14px] font-semibold text-on-surface">{dict.processingTitle}</p>
+          <p className="text-[12.5px] text-on-surface-muted">{dict.processingBody}</p>
+          {stuckProcessing && (
+            <button
+              type="button"
+              onClick={() => router.refresh()}
+              className="mt-[4px] text-[12.5px] font-semibold text-primary underline underline-offset-2"
+            >
+              {dict.stillWaitingRefresh}
+            </button>
+          )}
+        </div>
+      )}
+
+      {status === "requires_action" && (
+        <div className="flex flex-col items-center gap-sm rounded-lg border border-warning/30 bg-warning/8 p-lg text-center">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-warning/16 text-warning">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="4" y="9" width="16" height="11" rx="2" />
+              <path d="M8 9V6a4 4 0 0 1 8 0v3" />
+            </svg>
+          </div>
+          <p className="text-[14px] font-semibold text-on-surface">{dict.requiresActionTitle}</p>
+          <p className="text-[12.5px] text-on-surface-muted">{dict.requiresActionBody}</p>
+        </div>
+      )}
+
+      {status === "failed" && (
+        <div className="flex flex-col gap-sm rounded-lg border border-error/30 bg-error/8 p-lg">
+          <div className="flex items-start gap-sm">
+            <div className="mt-[1px] flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-error/16 text-error">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3">
+                <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-[14px] font-semibold text-error">{dict.failedTitle}</p>
+              <p className="mt-[2px] text-[12.5px] leading-snug text-on-surface-muted">
+                {errorMessage || dict.failedBodyFallback}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-sm">
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="flex-1 rounded-full bg-primary py-[12px] text-[13.5px] font-semibold text-on-primary transition-colors hover:bg-primary-hover"
+            >
+              {dict.retry}
+            </button>
+            <button
+              type="button"
+              onClick={onSwitchToCash}
+              className="flex-1 rounded-full border border-border/40 py-[12px] text-[13.5px] font-semibold text-on-surface transition-colors hover:bg-surface-subtle"
+            >
+              {dict.switchToCash}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/*
+        Deliberately never `display:none` (via the `hidden` attribute, or a
+        0-height/0-opacity collapse) once status leaves "form" — a
+        zero-dimension container reads to Stripe as "not really mounted",
+        the exact same IntegrationError as removing it from the DOM
+        entirely. `pointer-events-none` + a lower opacity keeps it a real,
+        laid-out element (non-zero size) so confirmPayment's in-flight
+        Element lookup still has something genuine to attach to. `inert`
+        (not just `aria-hidden`, which doesn't remove it from the tab
+        order) keeps a keyboard/screen-reader user from reaching the
+        now-dimmed card fields — the 3D Secure challenge itself renders as
+        its own top-level overlay outside this div, so `inert` here never
+        blocks it.
+      */}
+      <div
+        className={status !== "form" ? "pointer-events-none opacity-40" : undefined}
+        inert={status !== "form"}
       >
-        {dict.payLabel.replace("{amount}", amountLabel)}
-      </button>
-      {!elementReady && <p className="text-center text-[11.5px] text-on-surface-muted">{dict.disabledCaption}</p>}
+        <div>
+          <span className="mb-[6px] block text-[13px] font-medium text-on-surface">
+            {dict.cardFieldLabel}
+          </span>
+          <div ref={mountNodeRef} aria-label={dict.cardFieldPlaceholder} />
+        </div>
+        {status === "form" && (
+          <>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!elementReady || isSubmitting}
+              className="mt-[4px] w-full rounded-full bg-primary py-[15px] text-[14.5px] font-semibold text-on-primary transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {dict.payLabel.replace("{amount}", amountLabel)}
+            </button>
+            {!elementReady && (
+              <p className="text-center text-[11.5px] text-on-surface-muted">{dict.disabledCaption}</p>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
