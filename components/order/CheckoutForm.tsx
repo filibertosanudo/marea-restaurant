@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { createOrderAction, type CheckoutState } from "@/lib/orders/actions";
 import type { OrderDictionary } from "@/lib/i18n/dictionaries";
 import type { Lang } from "@/lib/i18n/lang";
@@ -102,6 +103,10 @@ export function CheckoutForm({ dict, lang }: { dict: OrderDictionary; lang: Lang
       >
         {pending ? dict.confirmingOrder : dict.confirmOrder}
       </button>
+
+      <Link href="/privacidad" className="text-center text-[12px] text-on-surface-muted underline">
+        {dict.privacyNotice}
+      </Link>
     </form>
   );
 }
