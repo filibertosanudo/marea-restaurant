@@ -33,6 +33,13 @@ CMD ["npx", "prisma", "migrate", "deploy"]
 FROM build AS seed
 CMD ["npx", "tsx", "prisma/seed.ts"]
 
+# --- worker: the notification queue's long-running mode. Same reasoning
+# as `seed` — scripts/worker.ts isn't part of the Next page tree `next
+# build --output standalone` traces, so it needs tsx and the full
+# node_modules the `runner` stage below deliberately doesn't carry.
+FROM build AS worker
+CMD ["npm", "run", "notifications:worker"]
+
 # --- runner: the actual deployed image ---
 FROM node:22-alpine AS runner
 WORKDIR /app

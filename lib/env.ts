@@ -44,6 +44,18 @@ const schema = z
     S3_REGION: optional(z.string().min(1)),
     S3_ACCESS_KEY_ID: optional(z.string().min(1)),
     S3_SECRET_ACCESS_KEY: optional(z.string().min(1)),
+    MAIL_DRIVER: withDefault(z.enum(["console", "smtp", "resend"]).default("console")),
+    MAIL_FROM_EMAIL: optional(z.string().email()),
+    MAIL_FROM_NAME: withDefault(z.string().min(1).default("Marea")),
+    SMTP_HOST: optional(z.string().min(1)),
+    SMTP_PORT: withDefault(z.coerce.number().int().min(1).max(65_535).default(587)),
+    SMTP_SECURE: withDefault(z.coerce.boolean().default(false)),
+    SMTP_USER: optional(z.string().min(1)),
+    SMTP_PASSWORD: optional(z.string().min(1)),
+    RESEND_API_KEY: optional(z.string().min(1)),
+    // Guards app/api/cron/notifications — the serverless-friendly way to
+    // drive the same queue a long-running worker polls, per Fase 3.
+    CRON_SECRET: optional(z.string().min(16)),
   })
   .superRefine((value, ctx) => {
     // APP_ORIGIN (or its AUTH_URL fallback) only matters once a URL gets
@@ -72,6 +84,23 @@ const schema = z
       for (const key of required) {
         if (!value[key]) {
           ctx.addIssue({ code: "custom", path: [key], message: "required when STORAGE_DRIVER=s3" });
+        }
+      }
+    }
+
+    // Same shape again for the mail driver: a chosen provider with a
+    // missing credential must fail at boot, not on the worker's first send.
+    if (value.MAIL_DRIVER === "smtp") {
+      for (const key of ["SMTP_HOST", "MAIL_FROM_EMAIL"] as const) {
+        if (!value[key]) {
+          ctx.addIssue({ code: "custom", path: [key], message: "required when MAIL_DRIVER=smtp" });
+        }
+      }
+    }
+    if (value.MAIL_DRIVER === "resend") {
+      for (const key of ["RESEND_API_KEY", "MAIL_FROM_EMAIL"] as const) {
+        if (!value[key]) {
+          ctx.addIssue({ code: "custom", path: [key], message: "required when MAIL_DRIVER=resend" });
         }
       }
     }

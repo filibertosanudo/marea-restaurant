@@ -21,6 +21,16 @@ services:
       timeout: 5s
       retries: 10
 
+  # Fake SMTP server with a web UI to see rendered emails during
+  # development — never used in production, where MAIL_DRIVER=smtp points
+  # at a real server instead. 1025 is where `app`'s smtp driver connects;
+  # 8025 is the inbox at http://localhost:8025.
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   # One-shot: applies migrations, then exits. `app` won't start until this
   # succeeds. Never runs the seed — that stays a command someone types.
   migrate:
@@ -71,6 +81,11 @@ services:
       STORAGE_DRIVER: local
       STORAGE_LOCAL_DIR: /data/media
       TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-1}
+      MAIL_DRIVER: smtp
+      MAIL_FROM_EMAIL: ${MAIL_FROM_EMAIL:-notifications@marea.local}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Marea}
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
     volumes:
       - media:/data/media
     ports:
@@ -80,17 +95,32 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      mailhog:
+        condition: service_started
 
-  # Module 10. The notification queue (NotificationJob) already exists and
-  # is written to today — nothing reads it yet. Left visible on purpose.
-  # worker:
-  #   build: .
-  #   command: ["node", "worker.js"]
-  #   environment:
-  #     DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
+  # The notification queue's long-running mode: poll -> send -> sleep,
+  # forever. app/api/cron/notifications is the alternative for platforms
+  # with no long-running process — both call the same processQueue().
+  worker:
+    image: marea-worker:local
+    build:
+      context: .
+      target: worker
+    environment:
+      DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
+      AUTH_SECRET: ${AUTH_SECRET}
+      MAIL_DRIVER: smtp
+      MAIL_FROM_EMAIL: ${MAIL_FROM_EMAIL:-notifications@marea.local}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Marea}
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      mailhog:
+        condition: service_started
 
 volumes:
   pgdata:

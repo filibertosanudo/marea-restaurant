@@ -344,6 +344,7 @@ export const es = {
       title: "Configuración del negocio",
       tabHours: "Horario y cierres",
       tabBusiness: "Ajustes del negocio",
+      tabNotifications: "Notificaciones",
 
       hoursTitle: "Horario semanal",
       hoursLead: "Un día puede tener dos bloques (comida y cena). Si la hora de cierre es menor a la de apertura, se interpreta como después de medianoche.",
@@ -399,6 +400,25 @@ export const es = {
       saveSettings: "Guardar ajustes",
       errorGeneric: "Algo salió mal. Intenta de nuevo.",
       errorInvalid: "Revisa los campos marcados.",
+
+      notifications: {
+        title: "Cola de notificaciones",
+        lead: "Los últimos 50 envíos de correo — reservaciones, pedidos y recuperación de contraseña.",
+        dueCount: "Pendientes ahora",
+        columnStatus: "Estado",
+        columnRecipient: "Destinatario",
+        columnTemplate: "Plantilla",
+        columnAttempts: "Intentos",
+        columnWhen: "Cuándo",
+        statusQueued: "En cola",
+        statusProcessing: "Enviando",
+        statusSent: "Enviado",
+        statusFailed: "Falló",
+        statusCancelled: "Cancelado",
+        retry: "Reintentar",
+        retrying: "Reintentando…",
+        empty: "Todavía no hay notificaciones.",
+      },
     },
     common: {
       save: "Guardar",

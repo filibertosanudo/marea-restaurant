@@ -5,6 +5,8 @@ import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import type { Lang } from "@/lib/i18n/lang";
 import { ScheduleEditor, type OpeningHourRow, type ClosureRow } from "./ScheduleEditor";
 import { BusinessSettingsForm, type BusinessSettings } from "./BusinessSettingsForm";
+import { NotificationQueuePanel } from "./NotificationQueuePanel";
+import type { NotificationJobDTO } from "@/lib/notifications/dto";
 
 type SettingsDict = AdminDictionary["settings"];
 
@@ -15,6 +17,8 @@ export function SettingsShell({
   openingHours,
   closures,
   business,
+  notificationsDueCount,
+  notificationJobs,
 }: {
   dict: SettingsDict;
   lang: Lang;
@@ -22,8 +26,10 @@ export function SettingsShell({
   openingHours: OpeningHourRow[];
   closures: ClosureRow[];
   business: BusinessSettings;
+  notificationsDueCount: number;
+  notificationJobs: NotificationJobDTO[];
 }) {
-  const [tab, setTab] = useState<"hours" | "business">("hours");
+  const [tab, setTab] = useState<"hours" | "business" | "notifications">("hours");
 
   return (
     <div className="p-lg">
@@ -50,12 +56,28 @@ export function SettingsShell({
         >
           {dict.tabBusiness}
         </button>
+        <button
+          type="button"
+          onClick={() => setTab("notifications")}
+          className={`rounded-full px-md py-[6px] text-[12.5px] font-medium ${
+            tab === "notifications" ? "bg-primary text-on-primary" : "text-on-surface-muted"
+          }`}
+        >
+          {dict.tabNotifications}
+        </button>
       </div>
 
-      {tab === "hours" ? (
+      {tab === "hours" && (
         <ScheduleEditor dict={dict} lang={lang} timezone={timezone} openingHours={openingHours} closures={closures} />
-      ) : (
-        <BusinessSettingsForm dict={dict} business={business} />
+      )}
+      {tab === "business" && <BusinessSettingsForm dict={dict} business={business} />}
+      {tab === "notifications" && (
+        <NotificationQueuePanel
+          dict={dict.notifications}
+          lang={lang}
+          dueCount={notificationsDueCount}
+          jobs={notificationJobs}
+        />
       )}
     </div>
   );

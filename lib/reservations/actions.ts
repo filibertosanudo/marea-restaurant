@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/business";
 import type { Business } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
+import { toIntlLocale } from "@/lib/dto/money";
+import { appOrigin } from "@/lib/env";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import { getAvailableSlots, findSlot, localWallClockToUtc } from "./availability";
 import {
@@ -179,6 +181,15 @@ export async function createReservationAction(input: {
       });
 
       if (created.guestEmail) {
+        const reservedForLabel = new Intl.DateTimeFormat(toIntlLocale(input.lang), {
+          timeZone: business.timezone,
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          hour: "numeric",
+          minute: "2-digit",
+        }).format(created.reservedFor);
+
         await tx.notificationJob.create({
           data: {
             businessId: business.id,
@@ -188,8 +199,9 @@ export async function createReservationAction(input: {
             locale: input.lang,
             payload: {
               confirmationCode: created.confirmationCode,
-              reservedFor: created.reservedFor.toISOString(),
               partySize: created.partySize,
+              reservedForLabel,
+              reservationUrl: `${appOrigin()}/r/${created.confirmationCode}`,
             },
             relatedReservationId: created.id,
             dedupeKey: `reservation:${created.id}:PENDING`,

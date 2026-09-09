@@ -85,7 +85,7 @@ export async function requestPasswordResetAction(
         recipientUserId: user.id,
         recipientEmail: user.email ?? email,
         locale: business.defaultLocale,
-        payload: { resetUrl },
+        payload: { resetUrl, expiresInMinutes: RESET_TOKEN_TTL_MS / 60_000 },
         dedupeKey: `password-reset:${resetToken.id}`,
       },
     });

@@ -6,6 +6,10 @@ describe("lib/env empty-string env var handling", () => {
     delete process.env.APP_ORIGIN;
     delete process.env.DATABASE_POOL_MAX;
     delete process.env.STORAGE_DRIVER;
+    delete process.env.MAIL_DRIVER;
+    delete process.env.SMTP_HOST;
+    delete process.env.MAIL_FROM_EMAIL;
+    delete process.env.RESEND_API_KEY;
   });
 
   it("treats an empty string the same as an absent optional var", async () => {
@@ -28,5 +32,29 @@ describe("lib/env empty-string env var handling", () => {
     const { env } = await import("@/lib/env");
     expect(env.DATABASE_POOL_MAX).toBe(25);
     expect(env.STORAGE_DRIVER).toBe("local");
+  });
+
+  it("defaults MAIL_DRIVER to console, which needs no credentials", async () => {
+    const { env } = await import("@/lib/env");
+    expect(env.MAIL_DRIVER).toBe("console");
+  });
+
+  it("fails at import when MAIL_DRIVER=smtp is missing its host and from address", async () => {
+    process.env.MAIL_DRIVER = "smtp";
+    await expect(import("@/lib/env").then((m) => m.env.MAIL_DRIVER)).rejects.toThrow(/SMTP_HOST/);
+  });
+
+  it("fails at import when MAIL_DRIVER=resend is missing its api key", async () => {
+    process.env.MAIL_DRIVER = "resend";
+    process.env.MAIL_FROM_EMAIL = "notifications@marea.test";
+    await expect(import("@/lib/env").then((m) => m.env.MAIL_DRIVER)).rejects.toThrow(/RESEND_API_KEY/);
+  });
+
+  it("accepts MAIL_DRIVER=smtp once its required fields are set", async () => {
+    process.env.MAIL_DRIVER = "smtp";
+    process.env.SMTP_HOST = "mailhog";
+    process.env.MAIL_FROM_EMAIL = "notifications@marea.test";
+    const { env } = await import("@/lib/env");
+    expect(env.MAIL_DRIVER).toBe("smtp");
   });
 });

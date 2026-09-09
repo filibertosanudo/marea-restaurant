@@ -6,6 +6,8 @@ import { getCartSessionToken } from "@/lib/cart/cookie";
 import { pickTranslation } from "@/lib/i18n/translations";
 import { toPublicModifierGroup } from "@/lib/menu/public-menu";
 import { validateModifierSelection } from "@/lib/cart/modifier-validation";
+import { formatMoney } from "@/lib/dto/money";
+import { appOrigin } from "@/lib/env";
 
 export class CheckoutError extends Error {
   code: "empty_cart" | "item_unavailable" | "modifier_unavailable" | "modifier_invalid";
@@ -245,7 +247,17 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
           templateKey: "order.confirmed",
           recipientEmail: guest.guestEmail,
           locale: lang,
-          payload: { orderNumber: createdOrder.orderNumber, publicToken: createdOrder.publicToken },
+          payload: {
+            orderNumber: createdOrder.orderNumber,
+            orderUrl: `${appOrigin()}/o/${createdOrder.publicToken}`,
+            items: lineInputs.map((l) => ({
+              name: l.nameSnapshot,
+              quantity: l.quantity,
+              lineTotal: formatMoney(l.lineTotal.toString(), business.currency, lang),
+            })),
+            total: formatMoney(total.toString(), business.currency, lang),
+            currency: business.currency,
+          },
           relatedOrderId: createdOrder.id,
           dedupeKey: `order:${createdOrder.id}:PENDING`,
         },

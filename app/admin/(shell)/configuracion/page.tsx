@@ -6,6 +6,8 @@ import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getOpeningHours } from "@/lib/reservations/queries";
 import { getBusinessClosuresForAdmin } from "@/lib/settings/queries";
 import { SettingsShell } from "@/components/admin/settings/SettingsShell";
+import { listRecentNotificationJobs, countDueNotificationJobs } from "@/lib/notifications/queries";
+import { toNotificationJobDTO } from "@/lib/notifications/dto";
 
 export default async function SettingsPage() {
   await requirePageRole("/admin/menu", UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN);
@@ -13,9 +15,11 @@ export default async function SettingsPage() {
   const [business, lang] = await Promise.all([getCurrentBusiness(), getAdminLang()]);
   const dict = getDictionary(lang).settings;
 
-  const [openingHours, closures] = await Promise.all([
+  const [openingHours, closures, notificationJobs, notificationsDueCount] = await Promise.all([
     getOpeningHours(business.id),
     getBusinessClosuresForAdmin(business.id),
+    listRecentNotificationJobs(business.id),
+    countDueNotificationJobs(business.id),
   ]);
 
   return (
@@ -40,6 +44,8 @@ export default async function SettingsPage() {
         minBookingLeadMinutes: business.minBookingLeadMinutes,
         minCancelLeadMinutes: business.minCancelLeadMinutes,
       }}
+      notificationsDueCount={notificationsDueCount}
+      notificationJobs={notificationJobs.map(toNotificationJobDTO)}
     />
   );
 }
