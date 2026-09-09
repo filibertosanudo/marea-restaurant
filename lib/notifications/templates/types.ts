@@ -42,6 +42,10 @@ export type PasswordResetPayload = {
   expiresInMinutes: number;
 };
 
+export type NewsletterConfirmPayload = {
+  confirmUrl: string;
+};
+
 /** One entry per templateKey the queue can carry — see prisma/schema.prisma's NotificationJob comment for where each is enqueued. */
 export type TemplatePayloadMap = {
   "reservation.confirmed": ReservationConfirmedPayload;
@@ -50,6 +54,7 @@ export type TemplatePayloadMap = {
   "order.delivered": OrderStatusPayload;
   "order.cancelled": OrderCancelledPayload;
   "password.reset": PasswordResetPayload;
+  "newsletter.confirm": NewsletterConfirmPayload;
 };
 
 export type TemplateKey = keyof TemplatePayloadMap;
