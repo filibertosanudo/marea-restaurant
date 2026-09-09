@@ -79,11 +79,10 @@ export async function advanceOrderStatusAction(orderId: string): Promise<BoardAc
           channel: "EMAIL",
           templateKey,
           recipientEmail: order.guestEmail,
-          // The order itself doesn't persist the guest's browsing language
-          // (only the checkout Server Action knows that, at creation time),
-          // so status-change notifications fall back to the business's own
-          // default locale rather than guessing from unrelated data.
-          locale: business.defaultLocale,
+          // Order.locale is null for orders placed before that column
+          // existed — falls back to the business's own default locale
+          // rather than guessing from unrelated data.
+          locale: order.locale ?? business.defaultLocale,
           payload: { orderNumber: order.orderNumber, publicToken: order.publicToken },
           relatedOrderId: order.id,
           dedupeKey: `order:${order.id}:${nextStatus}`,
@@ -204,6 +203,7 @@ export async function cancelOrderAction(
           channel: "EMAIL",
           templateKey: "order.cancelled",
           recipientEmail: order.guestEmail,
+          locale: order.locale ?? business.defaultLocale,
           payload: { orderNumber: order.orderNumber, reason: trimmedReason },
           relatedOrderId: order.id,
           dedupeKey: `order:${order.id}:CANCELLED`,

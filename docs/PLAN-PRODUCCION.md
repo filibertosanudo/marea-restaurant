@@ -41,6 +41,52 @@
 depende de esas dos.
 
 ---
+## Estado (9 de septiembre de 2026)
+
+Actualiza esta tabla al cerrar cada módulo. Es lo primero que se lee al volver
+al proyecto después de un tiempo fuera.
+
+| Fase | Módulos | Estado |
+|---|---|---|
+| 0 · Desanclaje: Postgres puro y deploy portátil | 07 | **Terminada**, fusionada en `main` |
+| — · Generador de documentación | 08 | **Terminada**, fusionada en `main` |
+| 1 · Red de seguridad: CI y pruebas | 09 | **Terminada**. De 10 a 64 archivos de prueba, integración contra Postgres real, 3 E2E, umbrales de cobertura que rompen el build |
+| 2 · Endurecimiento de seguridad | 10 | **Terminada salvo el segundo factor**, que se pospuso a un módulo propio |
+| 3 · Notificaciones reales | 11 | Prompt escrito, sin aplicar |
+| 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | Sin empezar |
+| 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | Sin empezar |
+| 6 · Rendimiento y tiempo real | 16 | Sin empezar |
+| 7 · Multi-sucursal | 17 | Sin empezar |
+| 8 · Producto vendible | 18 | Sin empezar |
+
+### Pospuesto a propósito
+
+- **Segundo factor (TOTP).** Salió de la fase 2 tras evaluarlo: alta, códigos de
+  respaldo, recuperación por pérdida de teléfono y una tabla más son un módulo
+  pequeño metido dentro de otro, y el panel ya tiene límite de tasa por correo y
+  por IP, contraseñas de 12 caracteres con puntaje mínimo, y sesiones de 8 horas
+  revalidadas cada minuto. Módulo propio cuando haga falta, típicamente al
+  vender a una cadena.
+- **WhatsApp y SMS.** El enum los contempla desde el primer día. Salen del
+  módulo 11 porque son otro proveedor, otro formato y otras reglas de
+  consentimiento. Alto valor comercial en México: candidatos a plan superior.
+- **Inventario de insumos** (recetas, escandallos, mermas). Nunca entra en este
+  plan: es otro producto. Ver el Apéndice E.
+
+### Lo que bloquea la venta, hoy
+
+En orden. Ninguno es técnico: son las cuatro cosas que un restaurante toca a
+diario y que todavía no existen.
+
+1. **Notificaciones** (fase 3). No sale un solo correo.
+2. **Reportes de venta y corte de caja** (fase 4). La pantalla que el dueño abre
+   todos los días.
+3. **Comanda impresa en cocina** (fase 4). En México la cocina imprime.
+4. **Inventario usable** (fase 5). La lógica existe desde el módulo 2; no hay
+   pantalla para activarla.
+
+---
+
 ## Cómo se usa este documento
 
 Cada fase de este plan se convierte, cuando llega su turno, en un prompt propio
@@ -1905,7 +1951,7 @@ la numeración de los seis existentes:
 | `08-documentacion-y-vault.md` | — | `feature/docs-generator` |
 | `09-ci-y-pruebas.md` | 1 | `feature/test-harness` |
 | `10-endurecimiento.md` | 2 | `feature/hardening` |
-| `11-notificaciones.md` | 3 | `feature/notifications` |
+| `11-notificaciones.md` | 3 | `feature/notifications-fase-N` |
 | `12-reportes-y-corte-de-caja.md` | 4.1–4.2 | `feature/reports-and-cash` |
 | `13-comanda-y-kds.md` | 4.3–4.4 | `feature/kitchen` |
 | `14-inventario-y-promociones.md` | 5.1–5.2 | `feature/catalog-completion` |

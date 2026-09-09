@@ -4,7 +4,7 @@ import { createReservationAction, getReservationSlotsAction, cancelReservationBy
 import { makeBusiness } from "@/test/factories";
 import { runConcurrently, partitionSettled } from "@/test/concurrency";
 
-const guest = { guestName: "Ana Ruiz", guestEmail: "ana@example.com" };
+const guest = { guestName: "Ana Ruiz", guestEmail: "ana@example.com", lang: "es" as const };
 
 /** A business open every hour of every day, with a single two-seat table — removes opening-hours/lead-time edge cases from a test that's about the EXCLUDE constraint, not availability.ts (already covered by its own unit tests). */
 async function makeAlwaysOpenBusiness() {
@@ -66,6 +66,24 @@ describe("createReservationAction", () => {
     expect(reservationCount).toBe(1);
   });
 
+  it("persists the guest's browsing language on the reservation and its confirmation email", async () => {
+    await makeAlwaysOpenBusiness();
+    const date = tomorrowDateString();
+    const slots = await getReservationSlotsAction(date, 2);
+    if (!slots.ok) throw new Error("test setup: no slots came back");
+
+    const result = await createReservationAction({ ...guest, partySize: 2, date, time: slots.slots[0], lang: "en" });
+    if (!result.ok) throw new Error("test setup: booking failed");
+
+    const reservation = await prisma.reservation.findUniqueOrThrow({
+      where: { confirmationCode: result.confirmationCode },
+    });
+    expect(reservation.locale).toBe("en");
+
+    const job = await prisma.notificationJob.findFirst({ where: { relatedReservationId: reservation.id } });
+    expect(job?.locale).toBe("en");
+  });
+
   it("rejects invalid input with per-field errors", async () => {
     await makeAlwaysOpenBusiness();
     const date = tomorrowDateString();
@@ -75,6 +93,7 @@ describe("createReservationAction", () => {
       partySize: 2,
       date,
       time: 600,
+      lang: "es",
     });
 
     if (result.ok || result.error !== "invalid_input") throw new Error("unreachable");

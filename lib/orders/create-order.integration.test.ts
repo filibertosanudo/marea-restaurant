@@ -201,6 +201,19 @@ describe("createOrderFromCart", () => {
     const job = await prisma.notificationJob.findFirst({ where: { relatedOrderId: order.id } });
     expect(job).not.toBeNull();
     expect(job?.templateKey).toBe("order.confirmed");
+    expect(job?.locale).toBe("en");
+  });
+
+  it("persists the guest's checkout language on the order itself", async () => {
+    const business = await makeBusiness();
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id);
+    const cart = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cart.id, menuItemId: item.id, quantity: 1 } });
+
+    const order = await checkout(cart, business, { ...guest, guestEmail: "ana@example.com" });
+
+    expect(order.locale).toBe("en");
   });
 
   it("leaves no orphaned NotificationJob when the order fails to create", async () => {
