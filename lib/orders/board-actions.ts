@@ -10,6 +10,7 @@ import { cancelOpenPayments, markPaymentSucceeded } from "@/lib/payments/actions
 import { computePaymentSummary } from "@/lib/payments/summary";
 import { IllegalPaymentTransitionError } from "@/lib/payments/state-machine";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { appOrigin } from "@/lib/env";
 
 export type BoardActionState = { error?: string } | undefined;
 
@@ -83,7 +84,7 @@ export async function advanceOrderStatusAction(orderId: string): Promise<BoardAc
           // existed — falls back to the business's own default locale
           // rather than guessing from unrelated data.
           locale: order.locale ?? business.defaultLocale,
-          payload: { orderNumber: order.orderNumber, publicToken: order.publicToken },
+          payload: { orderNumber: order.orderNumber, orderUrl: `${appOrigin()}/o/${order.publicToken}` },
           relatedOrderId: order.id,
           dedupeKey: `order:${order.id}:${nextStatus}`,
         },
@@ -204,7 +205,11 @@ export async function cancelOrderAction(
           templateKey: "order.cancelled",
           recipientEmail: order.guestEmail,
           locale: order.locale ?? business.defaultLocale,
-          payload: { orderNumber: order.orderNumber, reason: trimmedReason },
+          payload: {
+            orderNumber: order.orderNumber,
+            orderUrl: `${appOrigin()}/o/${order.publicToken}`,
+            reason: trimmedReason,
+          },
           relatedOrderId: order.id,
           dedupeKey: `order:${order.id}:CANCELLED`,
         },
