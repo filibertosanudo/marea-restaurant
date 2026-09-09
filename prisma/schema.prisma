@@ -887,6 +887,13 @@ model Order {
   guestEmail String?
   guestPhone String?
 
+  /// Language the guest was browsing in at checkout — create-order.ts
+  /// already receives it as `lang` to freeze dish names, and until now that
+  /// was its only use. Null on orders older than this column; status-change
+  /// notifications fall back to business.defaultLocale when it's missing,
+  /// never guess.
+  locale String? @db.VarChar(10)
+
   notes         String? @db.Text
   scheduledFor  DateTime? // preorder: "lo recojo a las 8pm"
   guestCount    Int?      // comensales en mesa
@@ -1098,6 +1105,10 @@ model Reservation {
   guestName  String
   guestEmail String?
   guestPhone String?
+
+  /// Language the guest was browsing in at booking time. Same rationale as
+  /// Order.locale elsewhere in this file.
+  locale String? @db.VarChar(10)
 
   partySize Int
 
