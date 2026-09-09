@@ -359,6 +359,11 @@ model User {
   /// Fuerza el cambio de contraseña en el primer login, cuando el admin creó
   /// la cuenta del empleado con una contraseña temporal.
   mustChangePassword  Boolean   @default(false)
+  /// Timestamp of the last password change. The `jwt` callback compares this
+  /// against the token's issuance (`token.iat`): anything issued before it is
+  /// revoked. The only way to kick a JWT session for someone who's still a
+  /// valid user — `revoked` only covers account/membership deactivation.
+  passwordChangedAt   DateTime?
   lastLoginAt         DateTime?
 
   /// Rol de plataforma. v1 lee esto directo en el middleware.

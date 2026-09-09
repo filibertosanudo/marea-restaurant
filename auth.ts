@@ -4,22 +4,16 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@/lib/generated/prisma/client";
 import { loginSchema } from "@/lib/auth/schemas";
-import { verifyPassword } from "@/lib/auth/password";
+import { DUMMY_HASH, verifyPassword } from "@/lib/auth/password";
 import { getEffectiveRole } from "@/lib/auth/roles";
 import { isRateLimited, recordLoginAttempt, getClientIp } from "@/lib/auth/rate-limit";
+import { isRevokedByPasswordChange } from "@/lib/auth/token-revalidation";
 
 // How long a token is trusted before the next request re-checks the
 // membership in the database. Amortizes the cost (not a query per request)
 // while keeping a deactivation or role change from taking up to 8 hours to
 // take effect.
 const REVALIDATE_INTERVAL_MS = 60 * 1000;
-
-// A precomputed argon2id hash of a value nobody will ever type, used to
-// keep authorize()'s timing identical whether the email exists or not —
-// otherwise "no such user" would return faster than "wrong password" and
-// leak which emails have accounts.
-const DUMMY_HASH =
-  "$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHRzYWx0c2FsdA$K2f3f6vX2sVh8m2b8QhZbA1lM2z3vqk1uV1H4rQxYqM";
 
 declare module "next-auth" {
   interface Session {
@@ -146,6 +140,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       });
 
       if (!dbUser || dbUser.deletedAt) {
+        token.revoked = true;
+        return token;
+      }
+
+      if (isRevokedByPasswordChange(dbUser.passwordChangedAt, token.iat)) {
         token.revoked = true;
         return token;
       }

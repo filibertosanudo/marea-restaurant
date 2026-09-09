@@ -27,6 +27,7 @@ export async function setCartSessionToken(token: string): Promise<void> {
   const store = await cookies();
   store.set(CART_COOKIE, token, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: CART_COOKIE_MAX_AGE,
@@ -42,6 +43,7 @@ export async function setTableIdCookie(tableId: string): Promise<void> {
   const store = await cookies();
   store.set(TABLE_COOKIE, tableId, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: TABLE_COOKIE_MAX_AGE,

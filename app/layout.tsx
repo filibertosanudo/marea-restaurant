@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Montserrat_Alternates, Poppins } from "next/font/google";
+import { headers } from "next/headers";
+import { CSP_NONCE_HEADER } from "@/lib/security/csp";
 import "./globals.css";
 
 const montserratAlternates = Montserrat_Alternates({
@@ -28,11 +30,13 @@ export const metadata: Metadata = {
 // an isolated Docker build stage, which a portable build can't assume.
 export const dynamic = "force-dynamic";
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const nonce = (await headers()).get(CSP_NONCE_HEADER) ?? undefined;
+
   return (
     // suppressHydrationWarning: the inline script below sets data-theme
     // before React hydrates, which otherwise reports a (harmless, expected)
@@ -40,6 +44,7 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <head>
         <script
+          nonce={nonce}
           // Set data-theme before paint so there's no flash of the wrong
           // theme while React hydrates.
           dangerouslySetInnerHTML={{

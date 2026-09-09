@@ -12,10 +12,15 @@ export const es = {
       mustChangePasswordTitle: "Define una nueva contraseña",
       mustChangePasswordBody:
         "Tu cuenta tiene una contraseña temporal. Elige una nueva para continuar.",
+      currentPassword: "Contraseña actual",
       newPassword: "Nueva contraseña",
       confirmPassword: "Confirmar contraseña",
       passwordsDontMatch: "Las contraseñas no coinciden.",
-      passwordTooShort: "La contraseña debe tener al menos 8 caracteres.",
+      passwordTooShort: "La contraseña debe tener al menos 12 caracteres.",
+      passwordTooWeak:
+        "Esa contraseña es demasiado predecible. Prueba con una frase más larga y menos común.",
+      invalidCurrentPassword: "La contraseña actual no es correcta.",
+      notAuthenticated: "Tu sesión expiró. Inicia sesión de nuevo.",
       updatePassword: "Actualizar contraseña",
       noPublicSignup:
         "Solo personal — las cuentas las crea un administrador.",
