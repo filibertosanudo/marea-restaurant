@@ -162,10 +162,14 @@ export async function processQueue(limit: number): Promise<ProcessQueueResult> {
 
 // Re-exported for the admin queue screen's manual retry button (Fase 4) —
 // resets a FAILED job back to QUEUED so the next poll picks it up, without
-// duplicating this same shape of update at the call site.
-export async function retryJob(jobId: string): Promise<void> {
+// duplicating this same shape of update at the call site. Scoped to
+// businessId, same as every other admin mutation in this codebase — an
+// admin's session only ever gets jobId from their own business's own
+// queue screen, but the query stays scoped regardless of what the caller
+// trusts the input to be.
+export async function retryJob(jobId: string, businessId: string): Promise<void> {
   await prisma.notificationJob.updateMany({
-    where: { id: jobId, status: "FAILED" },
+    where: { id: jobId, businessId, status: "FAILED" },
     data: { status: "QUEUED", runAfter: new Date(), lockedAt: null, lockedBy: null },
   });
 }

@@ -209,7 +209,7 @@ describe("retryJob", () => {
       lastError: "mailbox does not exist",
     });
 
-    await retryJob(job.id);
+    await retryJob(job.id, business.id);
 
     const updated = await prisma.notificationJob.findUniqueOrThrow({ where: { id: job.id } });
     expect(updated.status).toBe("QUEUED");
@@ -220,9 +220,20 @@ describe("retryJob", () => {
     const business = await makeCurrentBusiness();
     const job = await makeQueuedJob(business.id, { status: "SENT", sentAt: new Date() });
 
-    await retryJob(job.id);
+    await retryJob(job.id, business.id);
 
     const updated = await prisma.notificationJob.findUniqueOrThrow({ where: { id: job.id } });
     expect(updated.status).toBe("SENT");
+  });
+
+  it("does nothing to a FAILED job that belongs to a different business", async () => {
+    const business = await makeCurrentBusiness();
+    const otherBusiness = await makeBusiness();
+    const job = await makeQueuedJob(business.id, { status: "FAILED", lastError: "mailbox does not exist" });
+
+    await retryJob(job.id, otherBusiness.id);
+
+    const updated = await prisma.notificationJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect(updated.status).toBe("FAILED");
   });
 });
