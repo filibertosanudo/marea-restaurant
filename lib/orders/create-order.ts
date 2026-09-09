@@ -201,6 +201,7 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
         guestName: guest.guestName,
         guestPhone: guest.guestPhone,
         guestEmail: guest.guestEmail,
+        locale: lang,
         notes: guest.notes,
         subtotal,
         taxTotal,
