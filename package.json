@@ -28,7 +28,8 @@
     "storage:sweep": "tsx --conditions=react-server scripts/sweep-orphaned-media.ts",
     "rate-limits:purge": "tsx --conditions=react-server scripts/purge-rate-limits.ts",
     "privacy:purge-ip-data": "tsx --conditions=react-server scripts/purge-old-ip-data.ts",
-    "privacy:anonymize-guests": "tsx --conditions=react-server scripts/anonymize-old-guests.ts"
+    "privacy:anonymize-guests": "tsx --conditions=react-server scripts/anonymize-old-guests.ts",
+    "notifications:worker": "tsx --require ./scripts/loaders/server-only-noop.cjs scripts/worker.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

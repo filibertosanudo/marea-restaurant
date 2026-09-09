@@ -23,6 +23,16 @@ const nextConfig = {
   turbopack: {
     root: __dirname,
   },
+  // @react-email/render's Node entry imports react-dom/server directly —
+  // bundled through the app router's own server graph, that resolves
+  // against React's "react-server" condition instead of Node's real one,
+  // and React's react-server build of react-dom throws on purpose rather
+  // than silently allowing a full server renderer into an RSC bundle.
+  // Marking it (and the component primitives it renders) external makes
+  // Next require() them with Node's own resolution at runtime instead —
+  // still traced into the standalone output, just not passed through the
+  // bundler pass that applies that condition.
+  serverExternalPackages: ["@react-email/render", "@react-email/components"],
   images: {
     // Only the storage host, never a wildcard — an open remote pattern
     // turns Next's image optimizer into an SSRF proxy for any URL an
