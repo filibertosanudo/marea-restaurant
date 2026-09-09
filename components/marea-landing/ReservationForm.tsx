@@ -112,6 +112,7 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
       date,
       time: Number(time),
       notes: notes || undefined,
+      lang,
     });
 
     if (result.ok) {

@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/business";
 import type { Business } from "@/lib/generated/prisma/client";
+import type { Lang } from "@/lib/i18n/lang";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import { getAvailableSlots, findSlot, localWallClockToUtc } from "./availability";
 import {
@@ -134,6 +135,7 @@ export async function createReservationAction(input: {
   /** Minutes since the requested day's local midnight — the exact value getReservationSlotsAction listed, never a re-derived "HH:mm" string. */
   time: number;
   notes?: string;
+  lang: Lang;
 }): Promise<CreateReservationResult> {
   const parsed = createReservationSchema.safeParse(input);
   if (!parsed.success) {
@@ -172,6 +174,7 @@ export async function createReservationAction(input: {
           durationMinutes: business.defaultReservationMinutes,
           endsAt: new Date(slot.startsAt.getTime() + business.defaultReservationMinutes * 60_000),
           notes: parsed.data.notes,
+          locale: input.lang,
         },
       });
 
@@ -182,7 +185,7 @@ export async function createReservationAction(input: {
             channel: "EMAIL",
             templateKey: "reservation.confirmed",
             recipientEmail: created.guestEmail,
-            locale: business.defaultLocale,
+            locale: input.lang,
             payload: {
               confirmationCode: created.confirmationCode,
               reservedFor: created.reservedFor.toISOString(),
