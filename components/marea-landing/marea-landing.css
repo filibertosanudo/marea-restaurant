@@ -923,6 +923,27 @@ html {
   padding: 14px 18px !important;
   font-size: 15px !important;
 }
+.ml-news-success {
+  font-size: 15px;
+  color: rgb(var(--color-on-primary));
+  margin: 0;
+}
+.ml-news-error {
+  font-size: 12.5px;
+  color: rgb(var(--color-on-primary));
+  background: rgb(0 0 0 / 0.18);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 10px;
+  display: inline-block;
+}
+.ml-news-privacy {
+  display: block;
+  font-size: 11.5px;
+  color: rgb(var(--color-on-primary) / 0.6);
+  text-decoration: underline;
+  margin-top: 10px;
+}
 .ml-foot-mid {
   display: grid;
   grid-template-columns: 1.4fr 1fr 1fr;

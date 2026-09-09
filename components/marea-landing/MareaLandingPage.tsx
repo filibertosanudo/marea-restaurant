@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Nav } from "@/components/ui/Nav";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { Tabs } from "@/components/ui/Tabs";
 import { TestimonialCard } from "@/components/ui/TestimonialCard";
 import { StatItem } from "@/components/ui/StatItem";
@@ -16,6 +15,7 @@ import { OfferCard } from "./OfferCard";
 import { Dish } from "./Dish";
 import { Highlight } from "./Highlight";
 import { ReservationForm } from "./ReservationForm";
+import { NewsletterForm } from "./NewsletterForm";
 import { scrollToId } from "./scroll";
 import { ArrowIcon } from "./icons";
 import "./marea-landing.css";
@@ -215,14 +215,7 @@ export function MareaLandingPage({
         <div className="ml-wrap">
           <div className="ml-foot-top">
             <h3>{t.footer.connect}</h3>
-            <form className="ml-news" onSubmit={(e) => e.preventDefault()}>
-              <div className="field">
-                <Input id="news-email" label="" placeholder={t.footer.emailPh} type="email" />
-              </div>
-              <Button variant="secondary" type="submit">
-                {t.footer.subscribe}
-              </Button>
-            </form>
+            <NewsletterForm lang={lang} />
           </div>
           <div className="ml-foot-mid">
             <div>
