@@ -51,4 +51,20 @@ describe("createOrderAction", () => {
     const order = await prisma.order.findFirstOrThrow({ where: { businessId: business.id } });
     expect(order.guestName).toBe("Ana Ruiz");
   });
+
+  it("reports rate_limited once this IP's order-creation attempts exceed the cap", async () => {
+    const business = await makeBusiness({ slug: "marea" });
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id);
+    const cart = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cart.id, menuItemId: item.id, quantity: 1 } });
+    await prisma.rateLimitCounter.createMany({
+      data: Array.from({ length: 5 }, () => ({ scope: "order:create", key: "unknown" })),
+    });
+
+    const result = await checkout(cart, business, { guestName: "Ana Ruiz", guestPhone: "+52 555 000 0000" });
+
+    expect(result).toEqual({ error: "rate_limited" });
+    await expect(prisma.order.findFirst({ where: { businessId: business.id } })).resolves.toBeNull();
+  });
 });

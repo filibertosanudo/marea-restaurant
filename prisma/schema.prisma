@@ -385,6 +385,8 @@ model User {
   testimonials Testimonial[]
   refunds      Refund[]
   notifications NotificationJob[]
+  passwordResetTokens PasswordResetToken[]
+  membershipEvents MembershipEvent[]
 
   @@index([role])
 }
@@ -446,6 +448,21 @@ model LoginAttempt {
   @@index([ipAddress, createdAt])
 }
 
+/// Generic sliding-window counter for any per-scope, per-key rate limit
+/// (reservation creation, cart mutation, payment intents, ...) that isn't a
+/// login attempt. Used to share LoginAttempt's `email` column as a free-text
+/// scope string — a contract enforced only by a runtime `throw`, which broke
+/// once for real (see commit 9f80c20). A dedicated column removes the
+/// contract instead of policing it harder.
+model RateLimitCounter {
+  id        String   @id @default(cuid())
+  scope     String
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([scope, key, createdAt])
+}
+
 /// La costura del multi-tenant: un usuario puede ser mesero en un negocio y
 /// cliente en otro. En v1 creas una fila por cada empleado y ya.
 model BusinessMembership {
@@ -459,9 +476,30 @@ model BusinessMembership {
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  events   MembershipEvent[]
 
   @@unique([userId, businessId])
   @@index([businessId, role])
+}
+
+/// Same pattern as OrderStatusEvent: one row per role or active/inactive
+/// change, written inside the same transaction as the change itself. Money
+/// already had this trail (OrderStatusEvent.changedById, Refund.createdById)
+/// — access didn't, which is the gap this closes.
+model MembershipEvent {
+  id           String    @id @default(cuid())
+  membershipId String
+  changedById  String?
+  fromRole     UserRole?
+  toRole       UserRole?
+  fromActive   Boolean?
+  toActive     Boolean?
+  createdAt    DateTime  @default(now())
+
+  membership BusinessMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  changedBy  User?              @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([membershipId, createdAt])
 }
 
 // ============================================================================
@@ -1338,6 +1376,26 @@ model NotificationJob {
   @@index([relatedReservationId])
 }
 
+/// One reset link, one use. The raw token only ever exists in the emailed
+/// link and the requester's browser — only its hash is stored, same reason
+/// passwords never are. expiresAt is set once at creation (30 minutes);
+/// usedAt is set both when this exact token is redeemed and, defensively,
+/// on every other still-valid token for the same user the moment one of
+/// them is (see resetPasswordAction) — a stale link from an older request
+/// must not still work after a newer one already changed the password.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
 /// Suscriptores del footer ("Let's connect with us").
 model NewsletterSubscriber {
   id           String    @id @default(cuid())
@@ -1347,6 +1405,12 @@ model NewsletterSubscriber {
   confirmedAt  DateTime?
   unsubscribedAt DateTime?
   createdAt    DateTime  @default(now())
+
+  /// Capability token for the no-session unsubscribe link in every email
+  /// footer — same reasoning and same cuid(2) as Order.publicToken: a
+  /// structured cuid() would let one subscriber's token narrow the search
+  /// space for another's signed up around the same time.
+  unsubscribeToken String @unique @default(cuid(2))
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 

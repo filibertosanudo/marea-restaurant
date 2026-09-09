@@ -98,11 +98,10 @@ describe("createReservationAction", () => {
   it("reports rate_limited once this IP's reservation-creation attempts exceed the per-scope cap", async () => {
     await makeAlwaysOpenBusiness();
     const date = tomorrowDateString();
-    await prisma.loginAttempt.createMany({
+    await prisma.rateLimitCounter.createMany({
       data: Array.from({ length: 20 }, () => ({
-        email: "reservation:create",
-        ipAddress: "unknown",
-        succeeded: true,
+        scope: "reservation:create",
+        key: "unknown",
       })),
     });
 
@@ -215,11 +214,10 @@ describe("cancelReservationByCodeAction", () => {
         status: "PENDING",
       },
     });
-    await prisma.loginAttempt.createMany({
+    await prisma.rateLimitCounter.createMany({
       data: Array.from({ length: 20 }, () => ({
-        email: "reservation:cancel",
-        ipAddress: "unknown",
-        succeeded: true,
+        scope: "reservation:cancel",
+        key: "unknown",
       })),
     });
 

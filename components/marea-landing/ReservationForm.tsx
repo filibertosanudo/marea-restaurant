@@ -327,6 +327,9 @@ export function ReservationForm({ lang, maxPartySize }: { lang: Lang; maxPartySi
         {submitting && <span className="ml-spinner" style={{ marginRight: 8 }} />}
         {submitting ? t.submitting : t.submit}
       </Button>
+      <Link href="/privacidad" className="ml-form-hint" style={{ alignSelf: "center" }}>
+        {t.privacyNotice}
+      </Link>
     </form>
   );
 }
