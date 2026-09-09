@@ -25,6 +25,23 @@ export const es = {
       noPublicSignup:
         "Solo personal — las cuentas las crea un administrador.",
       signOut: "Cerrar sesión",
+      forgotPassword: "¿Olvidaste tu contraseña?",
+      forgotPasswordTitle: "Recupera tu contraseña",
+      forgotPasswordBody:
+        "Escribe tu correo y, si tiene una cuenta, te enviaremos un enlace para elegir una nueva contraseña.",
+      sendResetLink: "Enviar enlace",
+      invalidEmail: "Escribe un correo válido.",
+      resetLinkSentTitle: "Revisa tu correo",
+      resetLinkSentBody:
+        "Si ese correo tiene una cuenta, recibirás un enlace para restablecer tu contraseña. El enlace vence en 30 minutos.",
+      backToLogin: "Volver a iniciar sesión",
+      resetPasswordTitle: "Elige una nueva contraseña",
+      resetPasswordBody: "Tu enlace es válido — define tu nueva contraseña.",
+      invalidOrExpiredToken:
+        "Este enlace no es válido o ya venció. Solicita uno nuevo.",
+      resetPasswordSuccessTitle: "Contraseña actualizada",
+      resetPasswordSuccessBody:
+        "Ya puedes iniciar sesión con tu nueva contraseña.",
     },
     nav: {
       menu: "Menú",
@@ -319,6 +336,9 @@ export const es = {
       temporaryPassword: "Contraseña temporal",
       deactivate: "Desactivar",
       deactivateConfirm: "¿Desactivar a este miembro del equipo?",
+      lastAdminError:
+        "No puedes hacer esto: es el último administrador activo del negocio.",
+      genericMutationError: "No se pudo completar el cambio. Intenta de nuevo.",
     },
     settings: {
       title: "Configuración del negocio",
@@ -447,7 +467,9 @@ export const es = {
       "Una opción elegida para {dish} ya no está disponible — revisa tu carrito.",
     errorModifierInvalidNamed:
       "Las opciones elegidas para {dish} ya no son válidas — revisa tu carrito.",
+    errorRateLimited: "Demasiados intentos. Espera unos minutos y vuelve a intentar.",
     requiredField: "Este campo es obligatorio.",
+    privacyNotice: "Aviso de privacidad",
     yourOrder: "Tu pedido",
     statusPending: "Recibido",
     statusPreparing: "Preparando",

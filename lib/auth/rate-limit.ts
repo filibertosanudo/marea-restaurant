@@ -106,46 +106,30 @@ export const DEFAULT_SCOPE_WINDOW_MS = WINDOW_MS;
 
 /**
  * The same sliding-window mechanics as isRateLimited/recordLoginAttempt,
- * generalized to any per-IP action instead of just login — reusing
- * LoginAttempt's table and indexes (the `scope` string lives in its
- * free-text `email` column) rather than a second table or a second
- * rate-limiting mechanism this module isn't authorized to add on its own.
+ * generalized to any scope+key rate limit — reservation creation, cart
+ * mutation, payment intents, a password-reset request — backed by its own
+ * table (RateLimitCounter) instead of overloading LoginAttempt's columns.
  *
  * Unlike isRateLimited, this counts every attempt regardless of outcome:
  * a spammer's 200 *successful* reservations are exactly the harm being
  * limited, not just failed ones, so there's no `succeeded` filter here.
- *
- * Contract: `scope` must never contain "@" — recordLoginAttempt's own
- * stale-row cleanup uses that to tell a real login attempt from a scope
- * row sharing this table, so a scope shaped like an email would get its
- * rows swept by login's shorter window instead of living out its own.
- * Enforced at runtime by assertValidScope below, not just by convention.
+ * Callers that want "charge the quota only on success" (see AGENTS.md)
+ * simply call recordScopeAttempt after the mutation commits, not before.
  */
-function assertValidScope(scope: string): void {
-  if (scope.includes("@")) {
-    throw new Error(`Invalid rate-limit scope "${scope}": scopes must not contain "@" (reserved for real emails)`);
-  }
-}
-
 export async function isScopeRateLimited(
   scope: string,
-  ipAddress: string,
+  key: string,
   maxAttempts: number = DEFAULT_SCOPE_MAX_ATTEMPTS_PER_IP,
   windowMs: number = DEFAULT_SCOPE_WINDOW_MS
 ): Promise<boolean> {
-  assertValidScope(scope);
   const since = new Date(Date.now() - windowMs);
-  const count = await prisma.loginAttempt.count({
-    where: { email: scope, ipAddress, createdAt: { gte: since } },
+  const count = await prisma.rateLimitCounter.count({
+    where: { scope, key, createdAt: { gte: since } },
   });
   return count >= maxAttempts;
 }
 
-/** Records one attempt against `scope`+`ipAddress` and prunes anything old enough that no caller's window could still read it — a scope with no other cleanup would otherwise only ever grow this table. */
-export async function recordScopeAttempt(scope: string, ipAddress: string): Promise<void> {
-  assertValidScope(scope);
-  await prisma.loginAttempt.create({ data: { email: scope, ipAddress, succeeded: true } });
-  await prisma.loginAttempt.deleteMany({
-    where: { email: scope, ipAddress, createdAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
-  });
+/** Records one attempt against `scope`+`key`. Purged periodically by scripts/purge-rate-limits.ts, not on every write — see AGENTS.md. */
+export async function recordScopeAttempt(scope: string, key: string): Promise<void> {
+  await prisma.rateLimitCounter.create({ data: { scope, key } });
 }

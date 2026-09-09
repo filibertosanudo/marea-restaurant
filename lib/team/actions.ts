@@ -4,12 +4,22 @@ import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
+import { isAdminRole } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
 import { hashPassword } from "@/lib/auth/password";
 import { teamMemberSchema } from "@/lib/team/schemas";
 import { UserRole } from "@/lib/generated/prisma/client";
 
 const ADMIN_ROLES = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
+
+export type TeamMutationResult = { ok: true } | { ok: false; error: "not_found" | "self" | "last_admin" };
+
+/** Active BUSINESS_ADMIN or SUPER_ADMIN memberships in this business — the count that decides whether deactivating or demoting one more would leave nobody in charge. */
+function countActiveAdmins(businessId: string) {
+  return prisma.businessMembership.count({
+    where: { businessId, isActive: true, role: { in: [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] } },
+  });
+}
 
 export type TeamFormState =
   | { success: true; temporaryPassword: string }
@@ -71,23 +81,88 @@ export async function createTeamMemberAction(
   return { success: true, temporaryPassword };
 }
 
-export async function setTeamMemberActiveAction(membershipId: string, isActive: boolean) {
+export async function setTeamMemberActiveAction(membershipId: string, isActive: boolean): Promise<TeamMutationResult> {
   const session = await requireRole(...ADMIN_ROLES);
   const business = await getCurrentBusiness();
 
   const membership = await prisma.businessMembership.findFirst({
     where: { id: membershipId, businessId: business.id },
   });
-  if (!membership) return;
+  if (!membership) return { ok: false, error: "not_found" };
   if (membership.userId === session.user.id) {
     // Refuse to let an admin lock themselves out from the UI layer too —
     // requireRole alone wouldn't stop this since it's their own valid session.
-    return;
+    return { ok: false, error: "self" };
   }
 
-  await prisma.businessMembership.update({
-    where: { id: membershipId },
-    data: { isActive },
+  if (!isActive && membership.isActive && isAdminRole(membership.role)) {
+    const activeAdmins = await countActiveAdmins(business.id);
+    // This membership is one of the ones counted, so 1 means it's the last.
+    if (activeAdmins <= 1) {
+      return { ok: false, error: "last_admin" };
+    }
+  }
+
+  if (membership.isActive === isActive) return { ok: true };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.businessMembership.update({ where: { id: membershipId }, data: { isActive } });
+    await tx.membershipEvent.create({
+      data: {
+        membershipId,
+        changedById: session.user.id,
+        fromActive: membership.isActive,
+        toActive: isActive,
+      },
+    });
   });
+
   revalidatePath("/admin/equipo");
+  return { ok: true };
+}
+
+/**
+ * Restrictions mirror setTeamMemberActiveAction: nobody changes their own
+ * role, and demoting the last active admin out of that role is refused the
+ * same way deactivating them is.
+ */
+export async function setTeamMemberRoleAction(
+  membershipId: string,
+  role: "STAFF" | "BUSINESS_ADMIN"
+): Promise<TeamMutationResult> {
+  const session = await requireRole(...ADMIN_ROLES);
+  const business = await getCurrentBusiness();
+
+  const membership = await prisma.businessMembership.findFirst({
+    where: { id: membershipId, businessId: business.id },
+  });
+  if (!membership) return { ok: false, error: "not_found" };
+  if (membership.userId === session.user.id) {
+    return { ok: false, error: "self" };
+  }
+
+  const isDemotion = membership.isActive && isAdminRole(membership.role) && !isAdminRole(role);
+  if (isDemotion) {
+    const activeAdmins = await countActiveAdmins(business.id);
+    if (activeAdmins <= 1) {
+      return { ok: false, error: "last_admin" };
+    }
+  }
+
+  if (membership.role === role) return { ok: true };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.businessMembership.update({ where: { id: membershipId }, data: { role } });
+    await tx.membershipEvent.create({
+      data: {
+        membershipId,
+        changedById: session.user.id,
+        fromRole: membership.role,
+        toRole: role,
+      },
+    });
+  });
+
+  revalidatePath("/admin/equipo");
+  return { ok: true };
 }

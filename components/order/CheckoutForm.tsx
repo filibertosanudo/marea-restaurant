@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { createOrderAction, type CheckoutState } from "@/lib/orders/actions";
 import type { OrderDictionary } from "@/lib/i18n/dictionaries";
 import type { Lang } from "@/lib/i18n/lang";
@@ -16,6 +17,8 @@ function errorMessage(state: CheckoutState, dict: OrderDictionary): string | nul
       return dict.errorModifierUnavailableNamed.replace("{dish}", state.dishName ?? "");
     case "modifier_invalid":
       return dict.errorModifierInvalidNamed.replace("{dish}", state.dishName ?? "");
+    case "rate_limited":
+      return dict.errorRateLimited;
     case "invalid_input":
       return dict.requiredField;
   }
@@ -100,6 +103,10 @@ export function CheckoutForm({ dict, lang }: { dict: OrderDictionary; lang: Lang
       >
         {pending ? dict.confirmingOrder : dict.confirmOrder}
       </button>
+
+      <Link href="/privacidad" className="text-center text-[12px] text-on-surface-muted underline">
+        {dict.privacyNotice}
+      </Link>
     </form>
   );
 }
