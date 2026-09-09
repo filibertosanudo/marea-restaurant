@@ -66,6 +66,18 @@ export function TestimonialsIcon({ className = "" }: IconProps) {
   );
 }
 
+export function ReportsIcon({ className = "" }: IconProps) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={`${base} ${className}`}>
+      <path d="M4 20V4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M4 20h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <rect x="6" y="14" width="3" height="6" rx="0.6" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="11" y="9" width="3" height="11" rx="0.6" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="16" y="5" width="3" height="15" rx="0.6" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
 export function TeamIcon({ className = "" }: IconProps) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={`${base} ${className}`}>
@@ -215,6 +227,7 @@ export const NAV_ICONS: Record<string, (props: IconProps) => React.ReactElement>
   promotions: PromotionsIcon,
   tables: TablesIcon,
   testimonials: TestimonialsIcon,
+  reports: ReportsIcon,
   team: TeamIcon,
   settings: SettingsIcon,
 };

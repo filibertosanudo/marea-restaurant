@@ -50,6 +50,7 @@ export const es = {
       promotions: "Promociones",
       tables: "Mesas y QR",
       testimonials: "Testimonios",
+      reports: "Reportes",
       team: "Equipo",
       settings: "Configuración",
       comingSoon: "Próximamente",
