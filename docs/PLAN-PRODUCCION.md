@@ -52,7 +52,7 @@ al proyecto después de un tiempo fuera.
 | — · Generador de documentación | 08 | **Terminada**, fusionada en `main` |
 | 1 · Red de seguridad: CI y pruebas | 09 | **Terminada**. De 10 a 64 archivos de prueba, integración contra Postgres real, 3 E2E, umbrales de cobertura que rompen el build |
 | 2 · Endurecimiento de seguridad | 10 | **Terminada salvo el segundo factor**, que se pospuso a un módulo propio |
-| 3 · Notificaciones reales | 11 | Prompt escrito, sin aplicar |
+| 3 · Notificaciones reales | 11 | **Terminada**, fases apiladas (PRs #41–#47) sin fusionar. SMTP contra un proveedor real sin probar de punta a punta por falta de credenciales |
 | 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | Sin empezar |
 | 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | Sin empezar |
 | 6 · Rendimiento y tiempo real | 16 | Sin empezar |
@@ -75,15 +75,17 @@ al proyecto después de un tiempo fuera.
 
 ### Lo que bloquea la venta, hoy
 
-En orden. Ninguno es técnico: son las cuatro cosas que un restaurante toca a
+En orden. Ninguno es técnico: son las tres cosas que un restaurante toca a
 diario y que todavía no existen.
 
-1. **Notificaciones** (fase 3). No sale un solo correo.
-2. **Reportes de venta y corte de caja** (fase 4). La pantalla que el dueño abre
+1. **Reportes de venta y corte de caja** (fase 4). La pantalla que el dueño abre
    todos los días.
-3. **Comanda impresa en cocina** (fase 4). En México la cocina imprime.
-4. **Inventario usable** (fase 5). La lógica existe desde el módulo 2; no hay
+2. **Comanda impresa en cocina** (fase 4). En México la cocina imprime.
+3. **Inventario usable** (fase 5). La lógica existe desde el módulo 2; no hay
    pantalla para activarla.
+
+Notificaciones (fase 3) se cerró: el worker manda correo real en los seis
+eventos que ya encolaba, en el idioma del invitado.
 
 ---
 
