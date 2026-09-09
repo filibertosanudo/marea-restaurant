@@ -41,7 +41,7 @@
 depende de esas dos.
 
 ---
-## Estado (9 de septiembre de 2026)
+## Estado (9 de septiembre de 2026, tras el módulo 11)
 
 Actualiza esta tabla al cerrar cada módulo. Es lo primero que se lee al volver
 al proyecto después de un tiempo fuera.
@@ -53,7 +53,7 @@ al proyecto después de un tiempo fuera.
 | 1 · Red de seguridad: CI y pruebas | 09 | **Terminada**. De 10 a 64 archivos de prueba, integración contra Postgres real, 3 E2E, umbrales de cobertura que rompen el build |
 | 2 · Endurecimiento de seguridad | 10 | **Terminada salvo el segundo factor**, que se pospuso a un módulo propio |
 | 3 · Notificaciones reales | 11 | **Terminada**, fases apiladas (PRs #41–#47) sin fusionar. SMTP contra un proveedor real sin probar de punta a punta por falta de credenciales |
-| 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | Sin empezar |
+| 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | Prompt del 12 escrito, sin aplicar |
 | 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | Sin empezar |
 | 6 · Rendimiento y tiempo real | 16 | Sin empezar |
 | 7 · Multi-sucursal | 17 | Sin empezar |
@@ -85,7 +85,10 @@ diario y que todavía no existen.
    pantalla para activarla.
 
 Notificaciones (fase 3) se cerró: el worker manda correo real en los seis
-eventos que ya encolaba, en el idioma del invitado.
+eventos que ya encolaba, en el idioma del invitado. Queda una verificación
+pendiente que no depende del código: probar el envío contra un proveedor SMTP
+real y comprobar que llega a Gmail sin caer en spam, con SPF, DKIM y DMARC
+configurados en el dominio.
 
 ---
 
