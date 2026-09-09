@@ -59,6 +59,8 @@ see [`docs/DEPLOY.md`](docs/DEPLOY.md).
 | `npm run db:studio` | Prisma Studio |
 | `npm run storage:sweep` | Delete storage keys no `MenuItem` row references |
 | `npm run rate-limits:purge` | Delete `RateLimitCounter` rows past every scope's window (`-- --dry-run` to preview) |
+| `npm run privacy:purge-ip-data` | Delete `LoginAttempt`/`RateLimitCounter` rows older than 90 days (`-- --dry-run` to preview) — safe to schedule |
+| `npm run privacy:anonymize-guests` | Blank guest contact info on `Order`/`Reservation` rows older than 24 months (`-- --dry-run` to preview) — run by hand, not scheduled |
 
 ## Where things live
 

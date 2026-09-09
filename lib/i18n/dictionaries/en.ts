@@ -462,6 +462,7 @@ export const en = {
     errorModifierInvalidNamed: "The options chosen for {dish} are no longer valid — check your cart.",
     errorRateLimited: "Too many attempts. Wait a few minutes and try again.",
     requiredField: "This field is required.",
+    privacyNotice: "Privacy notice",
     yourOrder: "Your order",
     statusPending: "Received",
     statusPreparing: "Preparing",
