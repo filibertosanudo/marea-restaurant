@@ -339,6 +339,7 @@ export const en = {
       title: "Business settings",
       tabHours: "Hours & closures",
       tabBusiness: "Business settings",
+      tabNotifications: "Notifications",
 
       hoursTitle: "Weekly schedule",
       hoursLead: "A day can have two blocks (lunch and dinner). If the closing time is before the opening time, it's read as after midnight.",
@@ -394,6 +395,25 @@ export const en = {
       saveSettings: "Save settings",
       errorGeneric: "Something went wrong. Try again.",
       errorInvalid: "Check the highlighted fields.",
+
+      notifications: {
+        title: "Notification queue",
+        lead: "The last 50 email sends — reservations, orders, and password recovery.",
+        dueCount: "Due now",
+        columnStatus: "Status",
+        columnRecipient: "Recipient",
+        columnTemplate: "Template",
+        columnAttempts: "Attempts",
+        columnWhen: "When",
+        statusQueued: "Queued",
+        statusProcessing: "Sending",
+        statusSent: "Sent",
+        statusFailed: "Failed",
+        statusCancelled: "Cancelled",
+        retry: "Retry",
+        retrying: "Retrying…",
+        empty: "No notifications yet.",
+      },
     },
     common: {
       save: "Save",
