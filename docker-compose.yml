@@ -98,29 +98,29 @@ services:
       mailhog:
         condition: service_started
 
-  # Fase 3 fills this in once scripts/worker.ts exists: the long-running
-  # mode of the same processQueue() that app/api/cron/notifications also
-  # calls for serverless deploys.
-  # worker:
-  #   image: marea-app:local
-  #   build:
-  #     context: .
-  #     target: runner
-  #   command: ["node", "scripts/worker.js"]
-  #   environment:
-  #     DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
-  #     MAIL_DRIVER: smtp
-  #     MAIL_FROM_EMAIL: ${MAIL_FROM_EMAIL:-notifications@marea.local}
-  #     MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Marea}
-  #     SMTP_HOST: mailhog
-  #     SMTP_PORT: 1025
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #     migrate:
-  #       condition: service_completed_successfully
-  #     mailhog:
-  #       condition: service_started
+  # The notification queue's long-running mode: poll -> send -> sleep,
+  # forever. app/api/cron/notifications is the alternative for platforms
+  # with no long-running process — both call the same processQueue().
+  worker:
+    image: marea-worker:local
+    build:
+      context: .
+      target: worker
+    environment:
+      DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
+      AUTH_SECRET: ${AUTH_SECRET}
+      MAIL_DRIVER: smtp
+      MAIL_FROM_EMAIL: ${MAIL_FROM_EMAIL:-notifications@marea.local}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Marea}
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      mailhog:
+        condition: service_started
 
 volumes:
   pgdata:
