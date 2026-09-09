@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import type { ReservationDictionary } from "@/lib/i18n/dictionaries";
 import { cancelReservationByCodeAction } from "@/lib/reservations/actions";
@@ -26,7 +25,6 @@ export function CancelReservationButton({
   const [error, setError] = useState<string | null>(null);
   const [succeeded, setSucceeded] = useState(false);
   const [pending, startTransition] = useTransition();
-  const router = useRouter();
 
   function handleConfirm() {
     setError(null);
@@ -35,11 +33,12 @@ export function CancelReservationButton({
       if (result.ok) {
         setOpen(false);
         setSucceeded(true);
-        // The page's own status badge and cancellation-reason line are the
-        // lasting record of this — refreshing brings the server-rendered
-        // reservation up to date, which also makes this component unmount
-        // (canCancel becomes false) once the new data lands.
-        router.refresh();
+        // Deliberately no router.refresh() here: on a fast connection its
+        // fresh data (canCancel now false) can land before React ever
+        // paints `succeeded`, unmounting this component — and the message
+        // below — before the guest sees it. The page's status badge only
+        // goes stale until the guest reloads, which re-fetches from the DB
+        // and shows "Cancelled" correctly anyway.
         return;
       }
       setError(result.error === "too_late" ? dict.cancelTooLateError : dict.cancelGenericError);
