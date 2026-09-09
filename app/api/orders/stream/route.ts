@@ -22,15 +22,27 @@ type Scope = { kind: "board"; businessId: string } | { kind: "order"; orderId: s
  * transition) plus the latest Payment update (catches collectCashPaymentAction,
  * which touches Payment but not Order — an OrderStatusEvent-only signature
  * would miss a cash collection landing on the board). For a single tracked
- * order: its own status + updatedAt is enough.
+ * order: its own status + updatedAt, plus its latest Payment update for the
+ * same reason.
  */
 async function getSignature(scope: Scope): Promise<string | null> {
   if (scope.kind === "order") {
+    // Webhook-driven payment updates (see handlePaymentIntentSucceeded)
+    // only ever touch the Payment row, never the Order row itself — a
+    // signature built from the order alone would never change when a card
+    // payment settles, so the tracking page would poll forever without
+    // ever seeing it. Nested select, one query — the same pattern
+    // getOrderByPublicToken already uses to fetch an order's payments.
     const order = await prisma.order.findUnique({
       where: { id: scope.orderId },
-      select: { status: true, updatedAt: true },
+      select: {
+        status: true,
+        updatedAt: true,
+        payments: { orderBy: { updatedAt: "desc" }, take: 1, select: { updatedAt: true } },
+      },
     });
-    return order ? `${order.status}:${order.updatedAt.getTime()}` : null;
+    if (!order) return null;
+    return `${order.status}:${order.updatedAt.getTime()}:${order.payments[0]?.updatedAt.getTime() ?? "-"}`;
   }
 
   const [latestEvent, latestPayment] = await Promise.all([
