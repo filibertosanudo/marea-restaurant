@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
-import { ADMIN_ROLES } from "@/lib/auth/roles";
+import { ADMIN_ROLES, STAFF_ROLES } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
 import { deviceSchema } from "@/lib/devices/schemas";
 import { generateDeviceToken } from "@/lib/devices/token";
+import { getActivePrinterStatus } from "@/lib/devices/queries";
 
 const DEVICES_PATH = "/admin/configuracion";
 
@@ -67,4 +68,18 @@ export async function setDeviceActiveAction(deviceId: string, isActive: boolean)
     data: { isActive },
   });
   revalidatePath(DEVICES_PATH);
+}
+
+/**
+ * Polled from the kitchen screen every so often so its printer pill stays
+ * accurate through a lull with no new orders — the SSE stream only ever
+ * signals order/payment changes, never a device's own heartbeat, so
+ * nothing else would refresh this. STAFF and up: this is the same
+ * audience the kitchen screen itself is gated to, not an admin-only read.
+ */
+export async function getPrinterStatusAction(): Promise<{ lastSeenAt: string | null }> {
+  await requireRole(...STAFF_ROLES);
+  const business = await getCurrentBusiness();
+  const printer = await getActivePrinterStatus(business.id);
+  return { lastSeenAt: printer?.lastSeenAt?.toISOString() ?? null };
 }

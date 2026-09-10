@@ -3,6 +3,7 @@ import { UserRole } from "@/lib/generated/prisma/client";
 export type AdminNavKey =
   | "menu"
   | "orders"
+  | "kitchen"
   | "reservations"
   | "promotions"
   | "tables"
@@ -28,6 +29,10 @@ const ADMIN_ONLY = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN];
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: "menu", href: "/admin/menu", roles: STAFF_UP, enabled: true },
   { key: "orders", href: "/admin/pedidos", roles: STAFF_UP, enabled: true },
+  // Its own route outside the (shell) group on purpose — see
+  // app/admin/cocina/page.tsx — so this link is how staff reach it, but
+  // the kitchen screen itself never renders this sidebar back.
+  { key: "kitchen", href: "/admin/cocina", roles: STAFF_UP, enabled: true },
   { key: "reservations", href: "/admin/reservaciones", roles: STAFF_UP, enabled: true },
   { key: "promotions", href: "/admin/promociones", roles: ADMIN_ONLY, enabled: false },
   { key: "tables", href: "/admin/mesas", roles: ADMIN_ONLY, enabled: true },

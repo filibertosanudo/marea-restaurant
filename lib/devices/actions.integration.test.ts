@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { makeBusiness, makeStaff } from "@/test/factories";
 import { setTestSession, sessionUserFromRow } from "@/test/stubs/auth-session";
-import { createDeviceAction, rotateDeviceTokenAction, setDeviceActiveAction } from "./actions";
+import { createDeviceAction, rotateDeviceTokenAction, setDeviceActiveAction, getPrinterStatusAction } from "./actions";
 import { hashDeviceToken } from "./token";
 
 // getCurrentBusiness() resolves by a fixed slug, same as board-actions.ts.
@@ -98,5 +98,67 @@ describe("setDeviceActiveAction", () => {
 
     const updated = await prisma.device.findUniqueOrThrow({ where: { id: device.id } });
     expect(updated.isActive).toBe(false);
+  });
+});
+
+describe("getPrinterStatusAction", () => {
+  it("is reachable by STAFF — the kitchen screen's own audience, not admin-only", async () => {
+    const business = await makeCurrentBusiness();
+    await loginAs("STAFF");
+    await prisma.device.create({
+      data: { businessId: business.id, name: "Impresora cocina", tokenHash: "hash-1", lastSeenAt: new Date() },
+    });
+
+    const result = await getPrinterStatusAction();
+
+    expect(result.lastSeenAt).not.toBeNull();
+  });
+
+  it("returns null when no active printer has ever been seen", async () => {
+    await makeCurrentBusiness();
+    await loginAs("STAFF");
+
+    const result = await getPrinterStatusAction();
+
+    expect(result.lastSeenAt).toBeNull();
+  });
+
+  it("ignores a deactivated device — a disabled printer reads as unconfigured, not stale", async () => {
+    const business = await makeCurrentBusiness();
+    await loginAs("STAFF");
+    await prisma.device.create({
+      data: {
+        businessId: business.id,
+        name: "Impresora vieja",
+        tokenHash: "hash-1",
+        lastSeenAt: new Date(),
+        isActive: false,
+      },
+    });
+
+    const result = await getPrinterStatusAction();
+
+    expect(result.lastSeenAt).toBeNull();
+  });
+
+  it("picks the most recently seen active printer when more than one exists", async () => {
+    const business = await makeCurrentBusiness();
+    await loginAs("STAFF");
+    await prisma.device.create({
+      data: {
+        businessId: business.id,
+        name: "Impresora vieja",
+        tokenHash: "hash-1",
+        lastSeenAt: new Date(Date.now() - 60_000),
+      },
+    });
+    const recent = new Date();
+    await prisma.device.create({
+      data: { businessId: business.id, name: "Impresora nueva", tokenHash: "hash-2", lastSeenAt: recent },
+    });
+
+    const result = await getPrinterStatusAction();
+
+    expect(result.lastSeenAt).toBe(recent.toISOString());
   });
 });

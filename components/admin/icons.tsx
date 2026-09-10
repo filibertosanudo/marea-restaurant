@@ -192,6 +192,26 @@ export function AllergyIcon({ className = "" }: IconProps) {
   );
 }
 
+/** A single table, seen from above — the kitchen screen's dine-in marker, distinct from TablesIcon's grid-of-many used in the sidebar. */
+export function SingleTableIcon({ className = "" }: IconProps) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={`${base} ${className}`}>
+      <rect x="3" y="10" width="18" height="3" rx="1" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M6 13v6M18 13v6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** The kitchen screen's takeaway marker. */
+export function TakeawayBagIcon({ className = "" }: IconProps) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={`${base} ${className}`}>
+      <path d="M6 8h12l-1 12H7L6 8Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function SoundOnIcon({ className = "" }: IconProps) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={`${base} ${className}`}>
@@ -220,9 +240,24 @@ export function SoundOffIcon({ className = "" }: IconProps) {
   );
 }
 
+export function KitchenIcon({ className = "" }: IconProps) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={`${base} ${className}`}>
+      <path
+        d="M6 11a6 6 0 0 1 12 0v6a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-6Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M4 18h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export const NAV_ICONS: Record<string, (props: IconProps) => React.ReactElement> = {
   menu: MenuDishIcon,
   orders: OrdersIcon,
+  kitchen: KitchenIcon,
   reservations: ReservationsIcon,
   promotions: PromotionsIcon,
   tables: TablesIcon,

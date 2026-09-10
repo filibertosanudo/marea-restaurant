@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { listBoardOrdersRaw, listCancelledOrdersRaw, listActiveTablesRaw, getOrderByPublicToken } from "./queries";
+import {
+  listBoardOrdersRaw,
+  listCancelledOrdersRaw,
+  listActiveTablesRaw,
+  listKitchenBoardOrdersRaw,
+  getOrderByPublicToken,
+} from "./queries";
 import { makeBusiness, makeOrder } from "@/test/factories";
 
 describe("listBoardOrdersRaw", () => {
@@ -25,6 +31,41 @@ describe("listBoardOrdersRaw", () => {
 
     expect(orders).toHaveLength(1);
     expect(orders[0].type).toBe("TAKEAWAY");
+  });
+});
+
+describe("listKitchenBoardOrdersRaw", () => {
+  it("includes PENDING, PREPARING, and READY", async () => {
+    const business = await makeBusiness();
+    await makeOrder(business.id, { status: "PENDING" });
+    await makeOrder(business.id, { status: "PREPARING" });
+    await makeOrder(business.id, { status: "READY" });
+
+    const orders = await listKitchenBoardOrdersRaw(business.id);
+
+    expect(orders.map((o) => o.status).sort()).toEqual(["PENDING", "PREPARING", "READY"]);
+  });
+
+  it("never includes DELIVERED or CANCELLED — the kitchen's job ends at Listo", async () => {
+    const business = await makeBusiness();
+    await makeOrder(business.id, { status: "PENDING" });
+    await makeOrder(business.id, { status: "DELIVERED" });
+    await makeOrder(business.id, { status: "CANCELLED" });
+
+    const orders = await listKitchenBoardOrdersRaw(business.id);
+
+    expect(orders).toHaveLength(1);
+    expect(orders[0].status).toBe("PENDING");
+  });
+
+  it("orders oldest first, so the order needing the most attention leads its column", async () => {
+    const business = await makeBusiness();
+    const newer = await makeOrder(business.id, { status: "PENDING", placedAt: new Date() });
+    const older = await makeOrder(business.id, { status: "PENDING", placedAt: new Date(Date.now() - 60_000) });
+
+    const orders = await listKitchenBoardOrdersRaw(business.id);
+
+    expect(orders.map((o) => o.id)).toEqual([older.id, newer.id]);
   });
 });
 
