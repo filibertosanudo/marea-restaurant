@@ -21,4 +21,26 @@ describe("toCsv", () => {
     const csv = toCsv(["Notes"], [["line one\nline two"]]);
     expect(csv).toContain('"line one\nline two"');
   });
+
+  it("neutralizes a leading = so a spreadsheet program can't read it as a formula", () => {
+    const csv = toCsv(["Reason"], [['=cmd|"/c calc.exe"!A1']]);
+    expect(csv).toContain(`'=cmd|`);
+  });
+
+  it("neutralizes other formula-trigger characters: + - @ tab", () => {
+    for (const value of ["+1+1", "-1+1", "@SUM(A1:A9)", "\tsneaky"]) {
+      const csv = toCsv(["Reason"], [[value]]);
+      expect(csv).toContain(`'${value}`);
+    }
+  });
+
+  it("never neutralizes a clean number, including a legitimately negative one", () => {
+    expect(toCsv(["Amount"], [["-50.00"]])).toContain("\r\n-50.00\r\n");
+    expect(toCsv(["Amount"], [["23.19"]])).toContain("\r\n23.19\r\n");
+  });
+
+  it("never neutralizes a numeric-typed value, even a negative one", () => {
+    const csv = toCsv(["Delta"], [[-5]]);
+    expect(csv).toContain("\r\n-5\r\n");
+  });
 });
