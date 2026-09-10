@@ -58,6 +58,24 @@ const config: Config = {
         2: "0 10px 28px rgb(var(--shadow-color) / 0.18)",
         hero: "0 30px 60px rgb(var(--shadow-color) / 0.24)",
       },
+      // The kitchen screen's own card-wide alarms (module 13): a new order
+      // pulses blue, an order stuck past AgingIndicator's own HOT_AFTER_MIN
+      // pulses red. Read at three meters, where a static ring is easy to
+      // miss and motion isn't.
+      keyframes: {
+        "kitchen-pulse-new": {
+          "0%, 100%": { boxShadow: "0 0 0 0 rgb(var(--color-info) / 0.35)" },
+          "50%": { boxShadow: "0 0 0 8px rgb(var(--color-info) / 0)" },
+        },
+        "kitchen-pulse-hot": {
+          "0%, 100%": { boxShadow: "0 0 0 0 rgb(var(--color-error) / 0.4)" },
+          "50%": { boxShadow: "0 0 0 10px rgb(var(--color-error) / 0)" },
+        },
+      },
+      animation: {
+        "kitchen-pulse-new": "kitchen-pulse-new 1.8s ease-in-out infinite",
+        "kitchen-pulse-hot": "kitchen-pulse-hot 1.4s ease-in-out infinite",
+      },
     },
   },
   plugins: [],
