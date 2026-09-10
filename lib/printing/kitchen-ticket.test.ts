@@ -74,4 +74,21 @@ describe("buildKitchenTicketDocument", () => {
     const doc = buildKitchenTicketDocument(BASE);
     expect(textOf(doc)).toContain("A-0142");
   });
+
+  it("strips ESC/GS control bytes from a guest-supplied item note, so it can never be read as a printer command", () => {
+    const doc = buildKitchenTicketDocument({
+      ...BASE,
+      items: [{ ...BASE.items[0], notes: "Sin cebolla\x1D\x56\x00\x1B\x70\x00" }],
+    });
+    for (const line of doc.lines) {
+      if (line.type === "rule") continue;
+      expect(line.text).not.toMatch(/[\x00-\x1F\x7F]/);
+    }
+  });
+
+  it("strips control bytes from a guest-supplied order note", () => {
+    const doc = buildKitchenTicketDocument({ ...BASE, orderNote: "Cumpleaños\x1B\x40 sorpresa" });
+    const notes = doc.lines.filter((l) => l.type === "note").map((l) => l.text);
+    expect(notes.some((t) => /[\x00-\x1F\x7F]/.test(t))).toBe(false);
+  });
 });

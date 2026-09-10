@@ -38,8 +38,19 @@ function reverse(on: boolean): Buffer {
   return Buffer.from([GS, 0x42, on ? 1 : 0]);
 }
 
+/**
+ * Belt-and-suspenders against the server sending (or a future server bug
+ * re-introducing) a line whose text carries raw C0/DEL bytes: this encoder
+ * is the one place that actually knows 0x1B/0x1D start a real command, so
+ * it strips them regardless of what already happened upstream in
+ * lib/printing/kitchen-ticket.ts on the server side of this repo.
+ */
+function stripControlBytes(text: string): string {
+  return text.replace(/[\x00-\x1F\x7F]/g, "");
+}
+
 function encodeText(text: string): Buffer {
-  return iconv.encode(text, CODEPAGE);
+  return iconv.encode(stripControlBytes(text), CODEPAGE);
 }
 
 function renderLine(line: PrintLine): Buffer[] {

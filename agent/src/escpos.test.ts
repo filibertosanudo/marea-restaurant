@@ -62,3 +62,17 @@ test("large size toggles double-width/height on then back off (GS ! )", () => {
   assert.ok(onIndex >= 0);
   assert.ok(offIndex > onIndex);
 });
+
+test("strips raw ESC/GS bytes out of line text instead of relaying them as printer commands", () => {
+  // The server is expected to sanitize first (lib/printing/kitchen-ticket.ts)
+  // — this is the encoder's own belt-and-suspenders in case it doesn't.
+  const injected = "Sin cebolla\x1D\x56\x00\x1B\x70\x00 extra";
+  const doc: PrintDocument = { lines: [{ type: "note", text: injected }], cut: false };
+  const bytes = renderEscPos(doc);
+  // Only the reverse-video on/off bytes this module itself emits for a
+  // "note" line should carry 0x1D — none of them may originate from the
+  // attacker's payload, so the injected GS V 0 / ESC p 0 sequences must be
+  // gone entirely, not just relocated.
+  assert.equal(bytes.includes(Buffer.from([0x1d, 0x56, 0x00])), false);
+  assert.equal(bytes.includes(Buffer.from([0x1b, 0x70, 0x00])), false);
+});
