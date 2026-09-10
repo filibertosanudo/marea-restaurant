@@ -2,6 +2,7 @@ import { Prisma } from "@/lib/generated/prisma/client";
 import type { OrderStatus, OrderType, PaymentProvider, PaymentStatus } from "@/lib/generated/prisma/client";
 import { businessLocalDateParts } from "@/lib/reservations/availability";
 import { addDays, type CalendarDate } from "@/lib/reports/date-range";
+import { wasEverSuccessful, sumEverSucceededPayments } from "@/lib/payments/summary";
 
 /**
  * Plain shapes, not Prisma's generated types — same reasoning as
@@ -49,36 +50,18 @@ export type ReportRefundRow = {
 const ZERO = new Prisma.Decimal(0);
 
 /**
- * A payment that ever succeeded — refund-actions.ts moves a payment's own
- * status on to PARTIALLY_REFUNDED/REFUNDED the moment any refund against it
- * is processed (the state machine forbids going back to SUCCEEDED), so
- * filtering on "SUCCEEDED" alone would make a refunded payment's amount
- * vanish from this sum. `amount` never changes when a payment is refunded —
- * only its status does — so all three statuses here still mean "this much
- * money actually moved" on the day the payment happened.
- */
-const PAID_PAYMENT_STATUSES: PaymentStatus[] = ["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED"];
-
-function isPaidPayment(payment: Pick<ReportPaymentRow, "status">): boolean {
-  return PAID_PAYMENT_STATUSES.includes(payment.status);
-}
-
-function sumPaidPaymentAmount(payments: ReportPaymentRow[]): Prisma.Decimal {
-  return payments.filter(isPaidPayment).reduce((sum, p) => sum.add(p.amount), ZERO);
-}
-
-/**
  * Whether an order counts as a sale at all — payments that ever succeeded
- * (ignoring refunds) cover the full total. Deliberately NOT
- * lib/payments/summary.ts's computePaymentSummary().isSettled, which nets
- * out refunds to answer "is anything still owed right now": a fully
- * refunded order reads as unsettled there even though it was a real sale
- * the day it was placed and paid. That sale doesn't get un-counted from
- * its original period — the refund is a separate line, subtracted from
- * whichever period it was actually issued in (see buildSalesSummary).
+ * (ignoring refunds, see lib/payments/summary.ts's wasEverSuccessful) cover
+ * the full total. Deliberately NOT that same module's
+ * computePaymentSummary().isSettled, which nets out refunds to answer "is
+ * anything still owed right now": a fully refunded order reads as unsettled
+ * there even though it was a real sale the day it was placed and paid. That
+ * sale doesn't get un-counted from its original period — the refund is a
+ * separate line, subtracted from whichever period it was actually issued in
+ * (see buildSalesSummary).
  */
 export function wasOrderPaid(order: Pick<ReportOrderRow, "payments" | "total">): boolean {
-  return sumPaidPaymentAmount(order.payments).gte(order.total);
+  return sumEverSucceededPayments(order.payments).gte(order.total);
 }
 
 /** A cancelled order is never a sale, paid or not — it shows in its own table instead. */
@@ -193,7 +176,7 @@ export type PaymentMethodBreakdown = { cash: Prisma.Decimal; card: Prisma.Decima
  * A payment that never succeeded (still PENDING, or FAILED/CANCELLED) isn't
  * money — but one that succeeded and was LATER refunded still did put that
  * amount in the drawer on the day it was collected, which is exactly what
- * this breakdown reconciles against (see isPaidPayment). Not restricted to
+ * this breakdown reconciles against (see wasEverSuccessful). Not restricted to
  * isSoldOrder — a partial cash deposit on an order that isn't fully paid
  * yet is still real money already sitting in the drawer.
  */
@@ -203,7 +186,7 @@ export function buildPaymentMethodBreakdown(orders: ReportOrderRow[]): PaymentMe
   for (const order of orders) {
     if (order.status === "CANCELLED") continue;
     for (const payment of order.payments) {
-      if (!isPaidPayment(payment)) continue;
+      if (!wasEverSuccessful(payment)) continue;
       if (payment.provider === "CASH_REGISTER") cash = cash.add(payment.amount);
       else card = card.add(payment.amount);
     }
@@ -289,7 +272,7 @@ export function buildStaffBreakdown(
       ensure(order.staffId, order.staffName ?? order.staffId).ordersAttended += 1;
     }
     for (const payment of order.payments) {
-      if (isPaidPayment(payment) && payment.provider === "CASH_REGISTER" && payment.collectedByUserId) {
+      if (wasEverSuccessful(payment) && payment.provider === "CASH_REGISTER" && payment.collectedByUserId) {
         const row = ensure(
           payment.collectedByUserId,
           collectorNames.get(payment.collectedByUserId) ?? payment.collectedByUserId

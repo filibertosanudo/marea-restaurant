@@ -9,6 +9,7 @@ import { getNextStatus, isCancellable } from "@/lib/orders/state-machine";
 import { cancelOpenPayments, markPaymentSucceeded } from "@/lib/payments/actions";
 import { computePaymentSummary } from "@/lib/payments/summary";
 import { IllegalPaymentTransitionError } from "@/lib/payments/state-machine";
+import { lockOpenCashSessionForUpdate } from "@/lib/cash-register/queries";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { appOrigin } from "@/lib/env";
 
@@ -258,7 +259,12 @@ export async function collectCashPaymentAction(orderId: string): Promise<BoardAc
       );
       if (!payment) return { error: "not_found" } as const;
 
-      await markPaymentSucceeded(tx, payment, session.user.id);
+      // A cash collection that isn't tied to an open shift is money a corte
+      // de caja can never find — reject rather than let it through untracked.
+      const openSession = await lockOpenCashSessionForUpdate(tx, business.id);
+      if (!openSession) return { error: "no_open_cash_session" } as const;
+
+      await markPaymentSucceeded(tx, payment, session.user.id, openSession.id);
 
       return undefined;
     });

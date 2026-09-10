@@ -17,6 +17,7 @@ const REFUND_ERROR_KEY = {
   reason_required: "refundReasonRequired",
   nothing_refundable: "refundErrorNothingRefundable",
   amount_exceeds_refundable: "refundErrorAmountExceeds",
+  no_open_cash_session: "refundErrorNoOpenCashSession",
   try_again: "refundErrorGeneric",
 } as const satisfies Record<Exclude<CreateRefundResult, { ok: true }>["error"], keyof AdminDictionary["payments"]>;
 

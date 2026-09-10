@@ -124,6 +124,7 @@ export function OrderCard({
 }) {
   const [pending, startTransition] = useTransition();
   const [isNew, setIsNew] = useState(() => isRecent(order.placedAt));
+  const [collectError, setCollectError] = useState<string | null>(null);
   const s = SCALE[density];
 
   useEffect(() => {
@@ -141,8 +142,14 @@ export function OrderCard({
   }
 
   function collectCash() {
+    setCollectError(null);
     startTransition(async () => {
-      await collectCashPaymentAction(order.id);
+      const result = await collectCashPaymentAction(order.id);
+      // Every other error here (not_found, order_cancelled, already_settled,
+      // invalid_transition) means the board is already stale and about to
+      // re-render with the real state — only the missing-shift case needs
+      // its own message, since nothing else on screen explains it.
+      if (result?.error === "no_open_cash_session") setCollectError(dict.collectErrorNoOpenCashSession);
     });
   }
 
@@ -228,14 +235,17 @@ export function OrderCard({
               admin panel's usual dense button padding (button-primary-admin)
               while keeping the same rounded-sm/color tokens. */}
           {order.canCollectCash && (
-            <button
-              type="button"
-              onClick={collectCash}
-              disabled={pending}
-              className={`rounded-sm border border-border/40 font-semibold text-on-surface transition-colors hover:bg-surface-subtle disabled:opacity-50 ${s.collectButton}`}
-            >
-              {dict.collectCash}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={collectCash}
+                disabled={pending}
+                className={`rounded-sm border border-border/40 font-semibold text-on-surface transition-colors hover:bg-surface-subtle disabled:opacity-50 ${s.collectButton}`}
+              >
+                {dict.collectCash}
+              </button>
+              {collectError && <p className="text-[13px] font-medium text-error">{collectError}</p>}
+            </>
           )}
           {nextStatus && (
             <button

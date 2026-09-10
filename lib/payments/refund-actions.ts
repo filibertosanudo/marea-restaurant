@@ -12,13 +12,21 @@ import { toStripeAmount } from "./amount";
 import { refundableForPayment } from "./summary";
 import { isUniqueConstraintError } from "./prisma-errors";
 import { assertPaymentTransition } from "./state-machine";
+import { lockOpenCashSessionForUpdate } from "@/lib/cash-register/queries";
+import { NoOpenCashSessionError } from "@/lib/cash-register/errors";
 import { Prisma, type Payment, type PaymentStatus, type Refund } from "@/lib/generated/prisma/client";
 
 export type CreateRefundResult =
   | { ok: true; detail: OrderPaymentDetailDTO }
   | {
       ok: false;
-      error: "not_found" | "reason_required" | "nothing_refundable" | "amount_exceeds_refundable" | "try_again";
+      error:
+        | "not_found"
+        | "reason_required"
+        | "nothing_refundable"
+        | "amount_exceeds_refundable"
+        | "no_open_cash_session"
+        | "try_again";
     };
 
 type Candidate = { payment: Payment & { refunds: Refund[] }; refundable: Prisma.Decimal };
@@ -93,15 +101,26 @@ async function refundOnePayment(
  * only allows PARTIALLY_REFUNDED -> REFUNDED), so that case is a status
  * no-op rather than a rejected transition — the Refund row still gets
  * written either way.
+ *
+ * The cash physically has to come out of a drawer, so this also requires an
+ * open CashSession (same rule collectCashPaymentAction enforces on the way
+ * in) and automatically records the withdrawal against whichever shift is
+ * open right now — not the shift that originally collected the payment,
+ * which may have closed days ago. That's whose physical drawer loses the
+ * money.
  */
 async function refundCashPayment(
   candidate: Candidate,
   amount: Prisma.Decimal,
   reason: string,
   staffId: string,
-  currency: string
+  currency: string,
+  businessId: string
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
+    const openSession = await lockOpenCashSessionForUpdate(tx, businessId);
+    if (!openSession) throw new NoOpenCashSessionError();
+
     await tx.$queryRaw`SELECT id FROM "Payment" WHERE id = ${candidate.payment.id} FOR UPDATE`;
     const fresh = await tx.payment.findUniqueOrThrow({
       where: { id: candidate.payment.id },
@@ -117,7 +136,7 @@ async function refundCashPayment(
       assertPaymentTransition(fresh.status, targetStatus);
     }
 
-    await tx.refund.create({
+    const refund = await tx.refund.create({
       data: {
         paymentId: fresh.id,
         amount,
@@ -131,6 +150,17 @@ async function refundCashPayment(
     if (fresh.status !== targetStatus) {
       await tx.payment.update({ where: { id: fresh.id }, data: { status: targetStatus } });
     }
+
+    await tx.cashMovement.create({
+      data: {
+        cashSessionId: openSession.id,
+        type: "WITHDRAWAL",
+        amount,
+        reason,
+        createdById: staffId,
+        refundId: refund.id,
+      },
+    });
   });
 }
 
@@ -141,12 +171,13 @@ async function refundCandidate(
   reason: string,
   staffId: string,
   orderId: string,
-  currency: string
+  currency: string,
+  businessId: string
 ): Promise<void> {
   if (candidate.payment.stripePaymentIntentId) {
     await refundOnePayment(candidate, amount, reason, staffId, orderId, currency);
   } else {
-    await refundCashPayment(candidate, amount, reason, staffId, currency);
+    await refundCashPayment(candidate, amount, reason, staffId, currency, businessId);
   }
 }
 
@@ -188,7 +219,8 @@ export async function createRefundAction(
           trimmedReason,
           session.user.id,
           order.id,
-          order.currency
+          order.currency,
+          business.id
         );
       }
     } else {
@@ -202,9 +234,18 @@ export async function createRefundAction(
       if (!target || requestedAmount.lte(0)) {
         return { ok: false, error: "amount_exceeds_refundable" };
       }
-      await refundCandidate(target, requestedAmount, trimmedReason, session.user.id, order.id, order.currency);
+      await refundCandidate(
+        target,
+        requestedAmount,
+        trimmedReason,
+        session.user.id,
+        order.id,
+        order.currency,
+        business.id
+      );
     }
-  } catch {
+  } catch (err) {
+    if (err instanceof NoOpenCashSessionError) return { ok: false, error: "no_open_cash_session" };
     // Whatever refunds in a FULL-mode loop already succeeded at Stripe are
     // still recorded (each has its own Refund row by this point) — the
     // idempotency key makes retrying this same call safe, so surfacing

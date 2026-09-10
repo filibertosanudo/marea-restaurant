@@ -10,8 +10,10 @@ import { loadSalesReportRawData } from "@/lib/reports/queries";
 import { toSalesReportDTO } from "@/lib/dto/reports";
 import { formatMoney, toIntlLocale } from "@/lib/dto/money";
 import { StatusBadge } from "@/components/admin/StatusBadge";
+import { listCashSessionsRaw } from "@/lib/cash-register/queries";
+import { toCashSessionHistoryRowDTO } from "@/lib/dto/cash-register";
 
-type SearchParams = { range?: string; from?: string; to?: string };
+type SearchParams = { view?: string; range?: string; from?: string; to?: string };
 
 const RANGE_KEYS: ReportRangeKey[] = ["today", "yesterday", "7d", "month", "custom"];
 
@@ -37,6 +39,88 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const [business, lang] = await Promise.all([getCurrentBusiness(), getAdminLang()]);
   const dict = getDictionary(lang).reports;
   const locale = toIntlLocale(lang);
+
+  const view = params.view === "cortes" ? "cortes" : "ventas";
+  const viewTabs = (
+    <div className="flex gap-[4px] rounded-full border border-border bg-surface-subtle p-[3px]">
+      <Link
+        href="/admin/reportes?view=ventas"
+        className={`rounded-full px-md py-[6px] text-[12.5px] font-medium transition-colors ${
+          view === "ventas" ? "bg-primary text-on-primary" : "text-on-surface-muted hover:bg-surface"
+        }`}
+      >
+        {dict.viewSalesTab}
+      </Link>
+      <Link
+        href="/admin/reportes?view=cortes"
+        className={`rounded-full px-md py-[6px] text-[12.5px] font-medium transition-colors ${
+          view === "cortes" ? "bg-primary text-on-primary" : "text-on-surface-muted hover:bg-surface"
+        }`}
+      >
+        {dict.viewCortesTab}
+      </Link>
+    </div>
+  );
+
+  if (view === "cortes") {
+    const sessions = (await listCashSessionsRaw(business.id)).map(toCashSessionHistoryRowDTO);
+    const money = (value: string) => formatMoney(value, business.currency, lang);
+    const dateFormatter = new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" });
+    const th = "px-md py-[10px] text-[11px] font-medium uppercase tracking-[0.04em] text-on-surface-muted";
+    const td = "px-md py-[8px]";
+
+    return (
+      <div className="flex flex-col gap-md p-lg">
+        <div className="flex flex-wrap items-center justify-between gap-md">
+          <h1 className="font-display text-[22px] font-semibold text-on-surface">{dict.title}</h1>
+          {viewTabs}
+        </div>
+        {sessions.length === 0 ? (
+          <p className="text-[13px] text-on-surface-muted">{dict.cortesEmpty}</p>
+        ) : (
+          <div className="overflow-hidden rounded-md border border-border bg-surface">
+            <table className="w-full border-collapse text-left text-[13px]">
+              <thead>
+                <tr className="bg-surface-subtle">
+                  <th className={th}>{dict.cortesColOpenedBy}</th>
+                  <th className={th}>{dict.cortesColClosedBy}</th>
+                  <th className={th}>{dict.cortesColOpenedAt}</th>
+                  <th className={th}>{dict.cortesColClosedAt}</th>
+                  <th className={`${th} text-right`}>{dict.cortesColExpected}</th>
+                  <th className={`${th} text-right`}>{dict.cortesColCounted}</th>
+                  <th className={`${th} text-right`}>{dict.cortesColDifference}</th>
+                  <th className={th} />
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((s, index) => {
+                  const isZero = Number(s.difference) === 0;
+                  return (
+                    <tr key={s.id} className={`border-t border-border ${index % 2 === 1 ? "bg-surface-raised" : "bg-surface"}`}>
+                      <td className={`${td} text-on-surface`}>{s.openedByName}</td>
+                      <td className={`${td} text-on-surface`}>{s.closedByName}</td>
+                      <td className={`${td} text-on-surface-muted`}>{dateFormatter.format(new Date(s.openedAt))}</td>
+                      <td className={`${td} text-on-surface-muted`}>{dateFormatter.format(new Date(s.closedAt))}</td>
+                      <td className={`${td} text-right tabular-nums text-on-surface-muted`}>{money(s.expectedAmount)}</td>
+                      <td className={`${td} text-right tabular-nums text-on-surface-muted`}>{money(s.countedAmount)}</td>
+                      <td className={`${td} text-right tabular-nums`}>
+                        <StatusBadge variant={isZero ? "success" : "warning"}>{money(s.difference)}</StatusBadge>
+                      </td>
+                      <td className={`${td} text-right`}>
+                        <Link href={`/admin/reportes/cortes/${s.id}`} className="text-[12.5px] font-medium text-primary hover:underline">
+                          {dict.cortesViewReceipt}
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const parsed = parseRangeParams(params);
   const range = resolveReportRange(resolvableRangeKey(parsed), business.timezone, new Date(), parsed.custom);
@@ -103,7 +187,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   return (
     <div className="flex flex-col gap-md p-lg">
       <div className="flex flex-wrap items-center justify-between gap-md">
-        <h1 className="font-display text-[22px] font-semibold text-on-surface">{dict.title}</h1>
+        <div className="flex flex-wrap items-center gap-md">
+          <h1 className="font-display text-[22px] font-semibold text-on-surface">{dict.title}</h1>
+          {viewTabs}
+        </div>
         <div className="flex flex-wrap items-center gap-sm">
           <div className="flex flex-wrap gap-[4px] rounded-full border border-border bg-surface-subtle p-[3px]">
             {RANGE_KEYS.map((key) => (

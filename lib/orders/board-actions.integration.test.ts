@@ -20,6 +20,12 @@ async function loginAs(role: "STAFF" | "BUSINESS_ADMIN") {
   return user;
 }
 
+/** collectCashPaymentAction requires an open shift to attach the payment to — see lib/cash-register. */
+async function openCashSession(businessId: string) {
+  const cashier = await makeStaff("STAFF");
+  return prisma.cashSession.create({ data: { businessId, openedById: cashier.id, openingFloat: "0.00" } });
+}
+
 async function makeOrderWithCashPayment(businessId: string, overrides: Record<string, unknown> = {}) {
   const order = await prisma.order.create({
     data: { businessId, orderNumber: `A-${Math.random().toString(36).slice(2, 8)}`, total: "23.19", ...overrides },
@@ -336,9 +342,20 @@ describe("collectCashPaymentAction", () => {
     expect(unchanged.status).toBe("PENDING");
   });
 
+  it("reports no_open_cash_session when no shift is open", async () => {
+    const business = await makeCurrentBusiness();
+    await loginAs("STAFF");
+    const { order } = await makeOrderWithCashPayment(business.id, { status: "PENDING" });
+
+    const result = await collectCashPaymentAction(order.id);
+
+    expect(result).toEqual({ error: "no_open_cash_session" });
+  });
+
   it("collects cash normally when nothing else has settled the order", async () => {
     const business = await makeCurrentBusiness();
     await loginAs("STAFF");
+    await openCashSession(business.id);
     const { order, payment } = await makeOrderWithCashPayment(business.id, { status: "PENDING" });
 
     const result = await collectCashPaymentAction(order.id);
@@ -346,6 +363,7 @@ describe("collectCashPaymentAction", () => {
     expect(result).toBeUndefined();
     const updated = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
     expect(updated.status).toBe("SUCCEEDED");
+    expect(updated.cashSessionId).not.toBeNull();
   });
 
   it("a concurrent collect and cancel on the same order: one wins, the other fails cleanly", async () => {
@@ -353,6 +371,7 @@ describe("collectCashPaymentAction", () => {
     // BUSINESS_ADMIN satisfies both actions' role checks (it's in STAFF_ROLES
     // too) — this test is about the Order-row race, not about permissions.
     await loginAs("BUSINESS_ADMIN");
+    await openCashSession(business.id);
     const { order } = await makeOrderWithCashPayment(business.id, { status: "PENDING" });
 
     const results = await runConcurrently([

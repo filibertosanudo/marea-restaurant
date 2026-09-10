@@ -54,16 +54,17 @@ export async function cancelOtherOpenPaymentsIfSettled(
   await cancelOpenPayments(tx, orderId, keepPaymentId);
 }
 
-/** Marks a payment SUCCEEDED — the cash-register collection path. Validates the transition first, never applies it silently, and closes out any other open payment the order no longer needs. */
+/** Marks a payment SUCCEEDED — the cash-register collection path, its only caller. Validates the transition first, never applies it silently, ties the payment to the shift that collected it, and closes out any other open payment the order no longer needs. */
 export async function markPaymentSucceeded(
   tx: TxClient,
   payment: { id: string; status: PaymentStatus; orderId: string },
-  collectedByUserId: string
+  collectedByUserId: string,
+  cashSessionId: string
 ): Promise<void> {
   assertPaymentTransition(payment.status, "SUCCEEDED");
   await tx.payment.update({
     where: { id: payment.id },
-    data: { status: "SUCCEEDED", paidAt: new Date(), collectedByUserId },
+    data: { status: "SUCCEEDED", paidAt: new Date(), collectedByUserId, cashSessionId },
   });
   await cancelOtherOpenPaymentsIfSettled(tx, payment.orderId, payment.id);
 }

@@ -68,11 +68,13 @@ de cliente valen la pena cuando quieras historial y favoritos — v2.
 | Confirmar / asignar reservaciones | — | ✅ | ✅ | ✅ |
 | Moderar testimonios | — | — | ✅ | ✅ |
 | Reportes de venta | — | — | ✅ | ✅ |
+| Abrir / cerrar turno de caja, registrar movimientos | — | ✅ | ✅ | ✅ |
+| Historial de cortes de caja | — | — | ✅ | ✅ |
 | Dar de alta empleados | — | — | ✅ | ✅ |
 | Configuración del negocio | — | — | ✅ | ✅ |
 | Crear / suspender negocios | — | — | — | ✅ |
 
-Dos renglones merecen explicación:
+Tres renglones merecen explicación:
 
 - **"Marcar un platillo como agotado" sí es de STAFF.** Es el único cambio al
   catálogo que ocurre en medio del servicio, lo hace quien está en la cocina, y
@@ -81,6 +83,11 @@ Dos renglones merecen explicación:
 - **Cancelar y reembolsar NO son de STAFF.** Son las dos acciones que mueven
   dinero hacia afuera. Que requieran al administrador es una decisión de
   control, no de desconfianza.
+- **Abrir/cerrar caja SÍ es de STAFF, pero el historial de cortes NO.**
+  Simétrico al mismo principio en sentido contrario: el cajero necesita poder
+  abrir y cerrar su propio turno sin esperar al dueño, pero leer el patrón de
+  descuadres a lo largo del tiempo es una decisión de supervisión, no de
+  operación diaria.
 
 ### Autenticación
 

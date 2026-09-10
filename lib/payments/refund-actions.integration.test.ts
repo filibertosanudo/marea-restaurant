@@ -11,6 +11,12 @@ async function loginAsAdmin() {
   setTestSession(sessionUserFromRow(user));
 }
 
+/** A cash refund now requires an open shift (the money has to come out of an actual drawer) — see lib/cash-register. */
+async function openCashSession(businessId: string) {
+  const cashier = await makeStaff("STAFF");
+  return prisma.cashSession.create({ data: { businessId, openedById: cashier.id, openingFloat: "0.00" } });
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -52,6 +58,7 @@ describe("createRefundAction", () => {
     const business = await makeBusiness({ slug: "marea" });
     await loginAsAdmin();
     const order = await makeOrder(business.id, { total: "20.00" });
+    await openCashSession(business.id);
     const payment = await prisma.payment.create({
       data: {
         businessId: business.id,
@@ -91,6 +98,7 @@ describe("createRefundAction", () => {
     const business = await makeBusiness({ slug: "marea" });
     await loginAsAdmin();
     const order = await makeOrder(business.id, { total: "23.19" });
+    await openCashSession(business.id);
     const payment = await prisma.payment.create({
       data: { businessId: business.id, orderId: order.id, provider: "CASH_REGISTER", status: "SUCCEEDED", amount: "23.19" },
     });
@@ -123,6 +131,7 @@ describe("createRefundAction", () => {
     const business = await makeBusiness({ slug: "marea" });
     await loginAsAdmin();
     const order = await makeOrder(business.id, { total: "23.19" });
+    await openCashSession(business.id);
     const payment = await prisma.payment.create({
       data: { businessId: business.id, orderId: order.id, provider: "CASH_REGISTER", status: "SUCCEEDED", amount: "23.19" },
     });
@@ -135,6 +144,38 @@ describe("createRefundAction", () => {
     expect(refunds[0].amount.toString()).toBe("5");
     const updated = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
     expect(updated.status).toBe("PARTIALLY_REFUNDED");
+  });
+
+  it("rejects a cash refund when no shift is open", async () => {
+    const business = await makeBusiness({ slug: "marea" });
+    await loginAsAdmin();
+    const order = await makeOrder(business.id, { total: "23.19" });
+    await prisma.payment.create({
+      data: { businessId: business.id, orderId: order.id, provider: "CASH_REGISTER", status: "SUCCEEDED", amount: "23.19" },
+    });
+
+    const result = await createRefundAction(order.id, { mode: "FULL", amount: "0", reason: "no shift open" });
+
+    expect(result).toEqual({ ok: false, error: "no_open_cash_session" });
+  });
+
+  it("automatically records a cash withdrawal against the currently open shift", async () => {
+    const business = await makeBusiness({ slug: "marea" });
+    await loginAsAdmin();
+    const order = await makeOrder(business.id, { total: "23.19" });
+    const session = await openCashSession(business.id);
+    const payment = await prisma.payment.create({
+      data: { businessId: business.id, orderId: order.id, provider: "CASH_REGISTER", status: "SUCCEEDED", amount: "23.19" },
+    });
+
+    const result = await createRefundAction(order.id, { mode: "FULL", amount: "0", reason: "spilled the order" });
+    expect(result.ok).toBe(true);
+
+    const refund = await prisma.refund.findFirstOrThrow({ where: { paymentId: payment.id } });
+    const movement = await prisma.cashMovement.findFirstOrThrow({ where: { refundId: refund.id } });
+    expect(movement.cashSessionId).toBe(session.id);
+    expect(movement.type).toBe("WITHDRAWAL");
+    expect(movement.amount.toString()).toBe("23.19");
   });
 
   it("reports try_again when Stripe itself rejects the refund", async () => {
@@ -231,6 +272,7 @@ describe("createRefundAction", () => {
     const business = await makeBusiness({ slug: "marea" });
     await loginAsAdmin();
     const order = await makeOrder(business.id, { total: "20.00" });
+    await openCashSession(business.id);
     const payment = await prisma.payment.create({
       data: { businessId: business.id, orderId: order.id, provider: "CASH_REGISTER", status: "SUCCEEDED", amount: "20.00" },
     });

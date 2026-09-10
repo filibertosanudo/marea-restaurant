@@ -1,4 +1,5 @@
 import { UserRole } from "@/lib/generated/prisma/client";
+import { prisma } from "@/lib/prisma";
 import { requirePageRole } from "@/lib/auth/permissions";
 import { isAdminRole } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
@@ -12,6 +13,8 @@ import {
 import { toBoardOrderDTO } from "@/lib/orders/dto";
 import { OrdersBoard } from "@/components/admin/OrdersBoard";
 import type { OrderType } from "@/lib/generated/prisma/client";
+import { getOpenCashSessionRaw, getCashSessionActivityRaw, listCashMovementsRaw } from "@/lib/cash-register/queries";
+import { toOpenCashSessionDTO, toCashSessionActivityDTO, toCashMovementDTO } from "@/lib/dto/cash-register";
 
 type SearchParams = { type?: string; table?: string; tab?: string };
 
@@ -44,11 +47,16 @@ export default async function OrdersBoardPage({
   const [business, lang] = await Promise.all([getCurrentBusiness(), getAdminLang()]);
   const dict = getDictionary(lang);
 
-  const [boardOrders, cancelledOrders, tables] = await Promise.all([
+  const [boardOrders, cancelledOrders, tables, openSession] = await Promise.all([
     tab === "board" ? listBoardOrdersRaw(business.id, filters) : Promise.resolve([]),
     tab === "cancelled" ? listCancelledOrdersRaw(business.id, filters) : Promise.resolve([]),
     listActiveTablesRaw(business.id),
+    getOpenCashSessionRaw(business.id),
   ]);
+
+  const [cashActivity, cashMovements] = openSession
+    ? await Promise.all([getCashSessionActivityRaw(prisma, openSession.id), listCashMovementsRaw(openSession.id)])
+    : [null, []];
 
   return (
     <OrdersBoard
@@ -57,10 +65,15 @@ export default async function OrdersBoardPage({
       tables={tables}
       dict={dict.orders}
       paymentsDict={dict.payments}
+      cashRegisterDict={dict.cashRegister}
       lang={lang}
       canCancel={canCancel}
       canRefund={canRefund}
       tab={tab}
+      cashSession={openSession ? toOpenCashSessionDTO(openSession) : null}
+      cashActivity={cashActivity ? toCashSessionActivityDTO(openSession!.openingFloat, cashActivity) : null}
+      cashMovements={cashMovements.map(toCashMovementDTO)}
+      currency={business.currency}
     />
   );
 }
