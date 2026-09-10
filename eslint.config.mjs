@@ -14,6 +14,8 @@ const config = [
       ".agents/**",
       ".claude/**",
       ".design-sync/**",
+      // Its own package, own tsconfig, own tooling — see agent/README.md.
+      "agent/**",
     ],
   },
   ...coreWebVitals,

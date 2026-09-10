@@ -43,6 +43,10 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    // Its own package (own tsconfig.json, own NodeNext module resolution)
+    // — see agent/README.md. Never installs Next/Prisma/React, so it can't
+    // share this program's "bundler" resolution or its ambient types.
+    "agent"
   ]
 }
