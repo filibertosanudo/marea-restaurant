@@ -41,7 +41,7 @@
 depende de esas dos.
 
 ---
-## Estado (9 de septiembre de 2026, tras el módulo 12)
+## Estado (10 de septiembre de 2026, tras el módulo 13)
 
 Actualiza esta tabla al cerrar cada módulo. Es lo primero que se lee al volver
 al proyecto después de un tiempo fuera.
@@ -53,7 +53,7 @@ al proyecto después de un tiempo fuera.
 | 1 · Red de seguridad: CI y pruebas | 09 | **Terminada**. De 10 a 64 archivos de prueba, integración contra Postgres real, 3 E2E, umbrales de cobertura que rompen el build |
 | 2 · Endurecimiento de seguridad | 10 | **Terminada salvo el segundo factor**, que se pospuso a un módulo propio |
 | 3 · Notificaciones reales | 11 | **Terminada**, fases apiladas (PRs #41–#47) sin fusionar. SMTP contra un proveedor real sin probar de punta a punta por falta de credenciales |
-| 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | **Reportes y corte de caja terminados** (módulo 12, fusionado en `main`). Comanda impresa y KDS: prompt del 13 escrito, sin aplicar |
+| 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | **Terminada.** Reportes y corte de caja (módulo 12, fusionado en `main`) y comanda impresa + KDS (módulo 13, fases apiladas PRs #54–#57, sin fusionar). No probado contra una impresora térmica física — verificado contra un emulador ESC/POS, ver el módulo 13 |
 | 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | Sin empezar |
 | 6 · Rendimiento y tiempo real | 16 | Sin empezar |
 | 7 · Multi-sucursal | 17 | Sin empezar |
@@ -78,9 +78,7 @@ al proyecto después de un tiempo fuera.
 En orden. Ninguno es técnico: son las cosas que un restaurante toca a diario y
 que todavía no existen.
 
-1. **Comanda impresa en cocina** (fase 4, módulo 13). En México la cocina
-   imprime.
-2. **Inventario usable** (fase 5). La lógica existe desde el módulo 2; no hay
+1. **Inventario usable** (fase 5). La lógica existe desde el módulo 2; no hay
    pantalla para activarla.
 
 Notificaciones (fase 3) se cerró: el worker manda correo real en los seis
@@ -97,6 +95,18 @@ negocio (índice único parcial), cobro y reembolso en efectivo atados al
 turno, cierre con diferencia congelada y comprobante imprimible. Sin
 verificaciones pendientes fuera del código — a diferencia de notificaciones y
 endurecimiento, esto no dependía de credenciales de terceros.
+
+Comanda impresa en cocina y pantalla de cocina (módulo 13) se cerró: cola de
+impresión en Postgres calcada de `NotificationJob`, un agente propio fuera
+del servidor (`agent/`, sin Next/Prisma/React) que nunca ve la impresora
+directamente ni toca la base de datos, `/admin/cocina` sin barra ni precios
+con un solo gesto por pedido, y respaldo imprimible desde el navegador para
+cuando el agente está caído. **Verificación pendiente de hardware, no de
+desarrollo:** todo se probó de punta a punta contra un emulador ESC/POS
+(`agent/dev/mock-printer.ts`) por no tener una impresora térmica física a la
+mano — el protocolo, el corte de papel, los acentos y la nota en negativo
+quedaron verificados igual, pero falta la prueba contra hardware real antes
+de instalarlo en un restaurante de verdad.
 
 ---
 
@@ -1276,14 +1286,16 @@ Modo pantalla completa y bloqueo de suspensión (`WakeLock`).
 
 ## Criterio de terminado — Fase 4
 
-- [ ] El reporte de un día cuadra al centavo contra la suma manual de los pedidos
+- [x] El reporte de un día cuadra al centavo contra la suma manual de los pedidos
       de ese día en la base (test de integración con datos sembrados).
-- [ ] El CSV abre bien en Excel con acentos (BOM UTF-8) y sin desbordar celdas.
-- [ ] No se puede cobrar en efectivo con la caja cerrada.
-- [ ] Un corte con un retiro registrado da diferencia cero.
-- [ ] El agente de impresión imprime una comanda en menos de 3 segundos desde
-      que el pedido entra, y sobrevive a desconectar y reconectar la impresora.
-- [ ] `/admin/cocina` se lee de pie a dos metros de la pantalla.
+- [x] El CSV abre bien en Excel con acentos (BOM UTF-8) y sin desbordar celdas.
+- [x] No se puede cobrar en efectivo con la caja cerrada.
+- [x] Un corte con un retiro registrado da diferencia cero.
+- [x] El agente de impresión imprime una comanda en menos de 3 segundos desde
+      que el pedido entra (2.1 s medidos), y sobrevive a desconectar y
+      reconectar la impresora — verificado contra un emulador ESC/POS, sin
+      impresora térmica física a la mano.
+- [x] `/admin/cocina` se lee de pie a dos metros de la pantalla.
 
 ---
 
