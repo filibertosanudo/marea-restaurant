@@ -6,7 +6,9 @@ import type { Lang } from "@/lib/i18n/lang";
 import { ScheduleEditor, type OpeningHourRow, type ClosureRow } from "./ScheduleEditor";
 import { BusinessSettingsForm, type BusinessSettings } from "./BusinessSettingsForm";
 import { NotificationQueuePanel } from "./NotificationQueuePanel";
+import { DevicesPanel } from "./DevicesPanel";
 import type { NotificationJobDTO } from "@/lib/notifications/dto";
+import type { DeviceDTO } from "@/lib/devices/dto";
 
 type SettingsDict = AdminDictionary["settings"];
 
@@ -19,6 +21,7 @@ export function SettingsShell({
   business,
   notificationsDueCount,
   notificationJobs,
+  devices,
 }: {
   dict: SettingsDict;
   lang: Lang;
@@ -28,8 +31,9 @@ export function SettingsShell({
   business: BusinessSettings;
   notificationsDueCount: number;
   notificationJobs: NotificationJobDTO[];
+  devices: DeviceDTO[];
 }) {
-  const [tab, setTab] = useState<"hours" | "business" | "notifications">("hours");
+  const [tab, setTab] = useState<"hours" | "business" | "notifications" | "devices">("hours");
 
   return (
     <div className="p-lg">
@@ -65,6 +69,15 @@ export function SettingsShell({
         >
           {dict.tabNotifications}
         </button>
+        <button
+          type="button"
+          onClick={() => setTab("devices")}
+          className={`rounded-full px-md py-[6px] text-[12.5px] font-medium ${
+            tab === "devices" ? "bg-primary text-on-primary" : "text-on-surface-muted"
+          }`}
+        >
+          {dict.tabDevices}
+        </button>
       </div>
 
       {tab === "hours" && (
@@ -79,6 +92,7 @@ export function SettingsShell({
           jobs={notificationJobs}
         />
       )}
+      {tab === "devices" && <DevicesPanel dict={dict.devices} lang={lang} devices={devices} />}
     </div>
   );
 }
