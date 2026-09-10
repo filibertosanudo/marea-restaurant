@@ -1,5 +1,5 @@
 import { Prisma } from "@/lib/generated/prisma/client";
-import type { Payment, Refund } from "@/lib/generated/prisma/client";
+import type { Payment, PaymentStatus, Refund } from "@/lib/generated/prisma/client";
 
 /**
  * "Lo pagado" is the sum of SUCCEEDED payments, never a single payment's
@@ -11,6 +11,27 @@ export function sumSucceededPayments(payments: Pick<Payment, "status" | "amount"
   return payments
     .filter((p) => p.status === "SUCCEEDED")
     .reduce((sum, p) => sum.add(p.amount), new Prisma.Decimal(0));
+}
+
+/**
+ * A payment that ever succeeded, whether or not it was later refunded —
+ * refund-actions.ts moves a payment's own status on to
+ * PARTIALLY_REFUNDED/REFUNDED the instant any refund against it lands, and
+ * the state machine forbids moving back to SUCCEEDED. Anything computing
+ * "how much money actually moved through this payment" for the period it
+ * happened in — a sales report bucketing by the order's own date, a
+ * cash-drawer reconciliation for the shift that collected it — needs this
+ * set, not a bare `=== "SUCCEEDED"` check, or a later-refunded payment's
+ * original amount silently disappears from history it actually occurred in.
+ */
+export const EVER_SUCCEEDED_PAYMENT_STATUSES: PaymentStatus[] = ["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED"];
+
+export function wasEverSuccessful(payment: Pick<Payment, "status">): boolean {
+  return EVER_SUCCEEDED_PAYMENT_STATUSES.includes(payment.status);
+}
+
+export function sumEverSucceededPayments(payments: Pick<Payment, "status" | "amount">[]): Prisma.Decimal {
+  return payments.filter(wasEverSuccessful).reduce((sum, p) => sum.add(p.amount), new Prisma.Decimal(0));
 }
 
 /** Same rule for refunds: only SUCCEEDED ones actually moved money back. */

@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { Prisma } from "@/lib/generated/prisma/client";
-import { sumSucceededPayments, sumSucceededRefunds, refundableForPayment, computePaymentSummary } from "./summary";
+import {
+  sumSucceededPayments,
+  sumSucceededRefunds,
+  refundableForPayment,
+  computePaymentSummary,
+  wasEverSuccessful,
+  sumEverSucceededPayments,
+} from "./summary";
 
 const amount = (v: string) => new Prisma.Decimal(v);
 
@@ -22,6 +29,24 @@ describe("sumSucceededRefunds", () => {
       { status: "SUCCEEDED", amount: amount("7.00") },
     ]);
     expect(total.toString()).toBe("7");
+  });
+});
+
+describe("wasEverSuccessful / sumEverSucceededPayments", () => {
+  it("still counts a payment moved to REFUNDED or PARTIALLY_REFUNDED", () => {
+    expect(wasEverSuccessful({ status: "REFUNDED" })).toBe(true);
+    expect(wasEverSuccessful({ status: "PARTIALLY_REFUNDED" })).toBe(true);
+  });
+
+  it("excludes a payment that never succeeded", () => {
+    expect(wasEverSuccessful({ status: "PENDING" })).toBe(false);
+    expect(wasEverSuccessful({ status: "FAILED" })).toBe(false);
+  });
+
+  it("sums a later-refunded payment's original amount, unlike sumSucceededPayments", () => {
+    const payments = [{ status: "REFUNDED" as const, amount: amount("50.00") }];
+    expect(sumEverSucceededPayments(payments).toString()).toBe("50");
+    expect(sumSucceededPayments(payments).toString()).toBe("0");
   });
 });
 
