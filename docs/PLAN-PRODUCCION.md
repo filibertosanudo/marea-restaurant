@@ -53,7 +53,7 @@ al proyecto después de un tiempo fuera.
 | 1 · Red de seguridad: CI y pruebas | 09 | **Terminada**. De 10 a 64 archivos de prueba, integración contra Postgres real, 3 E2E, umbrales de cobertura que rompen el build |
 | 2 · Endurecimiento de seguridad | 10 | **Terminada salvo el segundo factor**, que se pospuso a un módulo propio |
 | 3 · Notificaciones reales | 11 | **Terminada**, fases apiladas (PRs #41–#47) sin fusionar. SMTP contra un proveedor real sin probar de punta a punta por falta de credenciales |
-| 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | **Reportes y corte de caja terminados** (módulo 12, PRs #48–#52 apiladas). Comanda impresa y KDS siguen en el 13 |
+| 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | **Reportes y corte de caja terminados** (módulo 12, fusionado en `main`). Comanda impresa y KDS: prompt del 13 escrito, sin aplicar |
 | 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | Sin empezar |
 | 6 · Rendimiento y tiempo real | 16 | Sin empezar |
 | 7 · Multi-sucursal | 17 | Sin empezar |
@@ -84,10 +84,11 @@ que todavía no existen.
    pantalla para activarla.
 
 Notificaciones (fase 3) se cerró: el worker manda correo real en los seis
-eventos que ya encolaba, en el idioma del invitado. Queda una verificación
-pendiente que no depende del código: probar el envío contra un proveedor SMTP
-real y comprobar que llega a Gmail sin caer en spam, con SPF, DKIM y DMARC
-configurados en el dominio.
+eventos que ya encolaba, en el idioma del invitado. **Verificación pendiente
+de infraestructura, no de desarrollo:** probar el envío contra un proveedor
+SMTP real y comprobar que llega a Gmail sin caer en spam, con SPF, DKIM y
+DMARC configurados en el dominio. No se resuelve escribiendo código; hace
+falta un dominio propio con esos tres registros.
 
 Reportes de venta y corte de caja (módulo 12) se cerró: rango de fechas
 resuelto en la zona del negocio, comparación contra el periodo anterior
