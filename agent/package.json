@@ -1,0 +1,25 @@
+{
+  "name": "marea-print-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local ESC/POS print agent for Marea kitchen tickets. Runs inside the restaurant's own network (a Raspberry Pi, or the cash-register machine) — never touches the database, never installs Next/Prisma/React. Not part of the main npm workspace on purpose; see README.md.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "node --env-file=.env dist/main.js",
+    "dev": "node --env-file=.env --experimental-strip-types src/main.ts",
+    "mock-printer": "node --experimental-strip-types dev/mock-printer.ts",
+    "test": "node --experimental-strip-types --test src/*.test.ts"
+  },
+  "dependencies": {
+    "iconv-lite": "^0.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
