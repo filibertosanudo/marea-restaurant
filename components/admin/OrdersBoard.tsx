@@ -14,6 +14,8 @@ import { BOARD_COLUMNS } from "@/lib/orders/state-machine";
 import { SoundOnIcon, SoundOffIcon } from "./icons";
 import { useEventStream } from "@/lib/realtime/useEventStream";
 import { playChime, primeAudio } from "@/lib/realtime/chime";
+import { CashRegisterWidget } from "./cash-register/CashRegisterWidget";
+import type { OpenCashSessionDTO, CashSessionActivityDTO, CashMovementDTO } from "@/lib/dto/cash-register";
 
 const COLUMN_LABEL_KEY = {
   PENDING: "columnPending",
@@ -38,20 +40,30 @@ export function OrdersBoard({
   tables,
   dict,
   paymentsDict,
+  cashRegisterDict,
   lang,
   canCancel,
   canRefund,
   tab,
+  cashSession,
+  cashActivity,
+  cashMovements,
+  currency,
 }: {
   boardOrders: BoardOrderDTO[];
   cancelledOrders: BoardOrderDTO[];
   tables: { id: string; code: string; zone: string | null }[];
   dict: AdminDictionary["orders"];
   paymentsDict: AdminDictionary["payments"];
+  cashRegisterDict: AdminDictionary["cashRegister"];
   lang: Lang;
   canCancel: boolean;
   canRefund: boolean;
   tab: "board" | "cancelled";
+  cashSession: OpenCashSessionDTO | null;
+  cashActivity: CashSessionActivityDTO | null;
+  cashMovements: CashMovementDTO[];
+  currency: string;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -202,6 +214,14 @@ export function OrdersBoard({
             </span>
           )}
           {tabsBar}
+          <CashRegisterWidget
+            session={cashSession}
+            activity={cashActivity}
+            movements={cashMovements}
+            currency={currency}
+            lang={lang}
+            dict={cashRegisterDict}
+          />
         </div>
         {filterBar}
       </div>
