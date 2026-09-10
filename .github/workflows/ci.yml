@@ -64,6 +64,28 @@ jobs:
       # CI silently without this.
       - run: npm run test:coverage
 
+  # The print agent (module 13) is its own package on purpose — see
+  # agent/README.md — so it gets its own job instead of piggybacking on
+  # `check`, which installs the root's package-lock.json and would defeat
+  # the entire point of keeping Next/Prisma/React off the machine this
+  # ships to.
+  agent:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: agent/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
   # Against the actual docker-compose.yml stack (built images, not `next
   # dev`) — the one suite that would catch a `standalone` output-tracing
   # gap or an env-only-in-Docker bug no vitest run against a live Node

@@ -17,6 +17,7 @@ function baseOrder() {
     cancellationReason: null,
     notes: null,
     table: null,
+    printJobs: [],
     items: [
       {
         id: "item_1",
@@ -101,6 +102,20 @@ describe("toBoardOrderDTO", () => {
   it("uses the table's own code as the label for a dine-in board order", () => {
     const dto = toBoardOrderDTO({ ...baseOrder(), table: { code: "M-04" }, payments: [] } as never);
     expect(dto.tableLabel).toBe("M-04");
+  });
+
+  it("reads printStatus from the most recent kitchen ticket", () => {
+    const dto = toBoardOrderDTO({
+      ...baseOrder(),
+      payments: [],
+      printJobs: [{ status: "SENT" }],
+    } as never);
+    expect(dto.printStatus).toBe("SENT");
+  });
+
+  it("reads null printStatus when no ticket was ever enqueued", () => {
+    const dto = toBoardOrderDTO(boardOrder([]));
+    expect(dto.printStatus).toBeNull();
   });
 });
 

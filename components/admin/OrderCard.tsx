@@ -5,10 +5,12 @@ import { formatMoney } from "@/lib/dto/money";
 import type { BoardOrderDTO } from "@/lib/orders/dto";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import { advanceOrderStatusAction, collectCashPaymentAction } from "@/lib/orders/board-actions";
+import { reprintKitchenTicketAction } from "@/lib/printing/actions";
 import { getNextStatus } from "@/lib/orders/state-machine";
 import { AgingIndicator } from "./AgingIndicator";
 import { AllergyIcon } from "./icons";
 import type { PaymentReading } from "@/lib/orders/dto";
+import type { JobStatus } from "@/lib/generated/prisma/client";
 
 /**
  * The board's two surfaces are the same data, read from two different
@@ -105,6 +107,25 @@ const READING_LABEL_KEY: Record<PaymentReading, keyof AdminDictionary["orders"]>
   NONE: "paymentNone",
 };
 
+// "did order 142 print" answered right where staff already are, per this
+// module's own justification for a queue over a fire-and-forget signal —
+// see lib/printing/queue.ts's header comment.
+const PRINT_STYLE: Record<JobStatus, string> = {
+  QUEUED: "text-on-surface-muted",
+  PROCESSING: "text-info",
+  SENT: "text-success",
+  FAILED: "text-error",
+  CANCELLED: "text-on-surface-muted",
+};
+
+const PRINT_LABEL_KEY: Record<JobStatus, keyof AdminDictionary["orders"]> = {
+  QUEUED: "printQueued",
+  PROCESSING: "printProcessing",
+  SENT: "printSent",
+  FAILED: "printFailed",
+  CANCELLED: "printCancelled",
+};
+
 export function OrderCard({
   order,
   dict,
@@ -125,6 +146,7 @@ export function OrderCard({
   const [pending, startTransition] = useTransition();
   const [isNew, setIsNew] = useState(() => isRecent(order.placedAt));
   const [collectError, setCollectError] = useState<string | null>(null);
+  const [reprintPending, startReprintTransition] = useTransition();
   const s = SCALE[density];
 
   useEffect(() => {
@@ -138,6 +160,12 @@ export function OrderCard({
   function advance() {
     startTransition(async () => {
       await advanceOrderStatusAction(order.id);
+    });
+  }
+
+  function reprint() {
+    startReprintTransition(async () => {
+      await reprintKitchenTicketAction(order.id);
     });
   }
 
@@ -212,6 +240,30 @@ export function OrderCard({
         <span className={`font-semibold tabular-nums text-on-surface-muted ${s.price}`}>
           {formatMoney(order.total, order.currency, lang)}
         </span>
+      </div>
+
+      <div className="mb-sm flex items-center justify-between gap-sm text-[12px]">
+        <span className={`font-medium ${order.printStatus ? PRINT_STYLE[order.printStatus] : "text-on-surface-muted"}`}>
+          {order.printStatus ? dict[PRINT_LABEL_KEY[order.printStatus]] : ""}
+        </span>
+        <div className="flex items-center gap-sm">
+          <a
+            href={`/admin/pedidos/${order.id}/imprimir`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-on-surface-muted underline decoration-border/50 underline-offset-2 transition-colors hover:text-on-surface"
+          >
+            {dict.viewPrintable}
+          </a>
+          <button
+            type="button"
+            onClick={reprint}
+            disabled={reprintPending}
+            className="font-medium text-on-surface-muted underline decoration-border/50 underline-offset-2 transition-colors hover:text-on-surface disabled:opacity-50"
+          >
+            {dict.reprintTicket}
+          </button>
+        </div>
       </div>
 
       {isDelivered ? (

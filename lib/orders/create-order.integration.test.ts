@@ -230,4 +230,32 @@ describe("createOrderFromCart", () => {
     const jobCount = await prisma.notificationJob.count({ where: { businessId: business.id } });
     expect(jobCount).toBe(0);
   });
+
+  it("enqueues a kitchen PrintJob even for a guest who left no email", async () => {
+    const business = await makeBusiness();
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id);
+    const cart = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cart.id, menuItemId: item.id, quantity: 1 } });
+
+    const order = await checkout(cart, business, { ...guest, guestEmail: undefined });
+
+    const printJob = await prisma.printJob.findFirst({ where: { relatedOrderId: order.id } });
+    expect(printJob).not.toBeNull();
+    expect(printJob?.kind).toBe("KITCHEN_TICKET");
+    expect(printJob?.status).toBe("QUEUED");
+  });
+
+  it("leaves no orphaned PrintJob when the order fails to create", async () => {
+    const business = await makeBusiness();
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id, { deletedAt: new Date() });
+    const cart = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cart.id, menuItemId: item.id, quantity: 1 } });
+
+    await expect(checkout(cart, business, guest)).rejects.toMatchObject({ code: "item_unavailable" });
+
+    const printJobCount = await prisma.printJob.count({ where: { businessId: business.id } });
+    expect(printJobCount).toBe(0);
+  });
 });

@@ -22,6 +22,15 @@ const BOARD_INCLUDE = {
       refunds: { select: { status: true, amount: true } },
     },
   },
+  // Latest kitchen ticket only — "did it print" answered per order, right
+  // where staff already are, per the module's own justification for a
+  // queue over a fire-and-forget signal.
+  printJobs: {
+    where: { kind: "KITCHEN_TICKET" },
+    orderBy: { createdAt: "desc" as const },
+    take: 1,
+    select: { status: true },
+  },
 } satisfies Prisma.OrderInclude;
 
 // Live statuses (PENDING/PREPARING/READY) show regardless of age — an order

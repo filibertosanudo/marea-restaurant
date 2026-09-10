@@ -43,7 +43,9 @@ export default defineConfig({
           // `npm run build` before testing double-counts them. e2e/**'s
           // own *.spec.ts files (Playwright, not vitest) would otherwise
           // match vitest's default include pattern too.
-          exclude: ["**/node_modules/**", "**/.next/**", "**/*.integration.test.ts", "e2e/**"],
+          // agent/** is its own package with its own node:test runner —
+          // see agent/README.md — not a vitest suite.
+          exclude: ["**/node_modules/**", "**/.next/**", "**/*.integration.test.ts", "e2e/**", "agent/**"],
         },
       },
       {
@@ -52,7 +54,7 @@ export default defineConfig({
           name: "integration",
           environment: "node",
           include: ["**/*.integration.test.ts"],
-          exclude: ["**/node_modules/**", "**/.next/**"],
+          exclude: ["**/node_modules/**", "**/.next/**", "agent/**"],
           setupFiles: ["./test/setup.integration.ts"],
           // Every worker's first file (per worker, not per whole run — see
           // test/db.ts) shells out to `prisma migrate deploy`, and Prisma's

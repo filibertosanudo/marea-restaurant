@@ -2,10 +2,12 @@ import { decimalToString } from "@/lib/dto/money";
 import { computePaymentSummary, type PaymentSummary } from "@/lib/payments/summary";
 import { Prisma } from "@/lib/generated/prisma/client";
 import type {
+  JobStatus,
   Order,
   OrderItem,
   OrderItemModifier,
   Payment,
+  PrintJob,
   Refund,
   RestaurantTable,
 } from "@/lib/generated/prisma/client";
@@ -84,6 +86,8 @@ export type BoardOrderDTO = {
   paymentReading: PaymentReading;
   /** An open (PENDING) cash-register payment exists on this order and it isn't already settled — the one condition the board's "Cobrar" button needs. */
   canCollectCash: boolean;
+  /** Status of the most recent kitchen ticket, null if none was ever enqueued (shouldn't happen post-module-13, but older seeded orders have none). */
+  printStatus: JobStatus | null;
   items: {
     id: string;
     name: string;
@@ -102,6 +106,7 @@ type RawBoardOrder = Order & {
   payments: (Pick<Payment, "status" | "amount" | "provider"> & {
     refunds: Pick<Refund, "status" | "amount">[];
   })[];
+  printJobs: Pick<PrintJob, "status">[];
 };
 
 export function toBoardOrderDTO(order: RawBoardOrder): BoardOrderDTO {
@@ -119,6 +124,7 @@ export function toBoardOrderDTO(order: RawBoardOrder): BoardOrderDTO {
     paymentReading: derivePaymentReading(order.status, summary),
     canCollectCash:
       !summary.isSettled && order.payments.some((p) => p.provider === "CASH_REGISTER" && p.status === "PENDING"),
+    printStatus: order.printJobs[0]?.status ?? null,
     items: order.items.map((item) => ({
       id: item.id,
       name: item.nameSnapshot,

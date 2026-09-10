@@ -8,6 +8,8 @@ import { toPublicModifierGroup } from "@/lib/menu/public-menu";
 import { validateModifierSelection } from "@/lib/cart/modifier-validation";
 import { formatMoney } from "@/lib/dto/money";
 import { appOrigin } from "@/lib/env";
+import { enqueueKitchenTicket } from "@/lib/printing/queue";
+import { buildKitchenTicketDocument } from "@/lib/printing/kitchen-ticket";
 
 export class CheckoutError extends Error {
   code: "empty_cart" | "item_unavailable" | "modifier_unavailable" | "modifier_invalid";
@@ -57,6 +59,7 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
     const cart = await tx.cart.findUniqueOrThrow({
       where: { id: cartId },
       include: {
+        table: true,
         items: {
           include: {
             menuItem: {
@@ -187,7 +190,7 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
     const business = await tx.business.update({
       where: { id: businessId },
       data: { orderSequence: { increment: 1 } },
-      select: { orderSequence: true, taxRate: true, currency: true },
+      select: { orderSequence: true, taxRate: true, currency: true, timezone: true },
     });
 
     const taxTotal = subtotal.mul(business.taxRate).toDecimalPlaces(2);
@@ -237,6 +240,30 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
           },
         },
       },
+    });
+
+    // Unconditional, unlike the confirmation email above: every order needs
+    // a kitchen ticket, guest email or not. A printer with no paper must
+    // never be a reason this transaction fails — see lib/printing/queue.ts's
+    // own header comment — so this only ever enqueues, never blocks.
+    await enqueueKitchenTicket(tx, {
+      businessId,
+      orderId: createdOrder.id,
+      document: buildKitchenTicketDocument({
+        orderNumber: createdOrder.orderNumber,
+        tableLabel: cart.table?.code ?? null,
+        guestCount: createdOrder.guestCount,
+        placedAt: createdOrder.placedAt,
+        timezone: business.timezone,
+        lang,
+        orderNote: guest.notes ?? null,
+        items: lineInputs.map((l) => ({
+          quantity: l.quantity,
+          name: l.nameSnapshot,
+          notes: l.notes ?? null,
+          modifiers: l.modifiers.map((m) => m.nameSnapshot),
+        })),
+      }),
     });
 
     if (guest.guestEmail) {
