@@ -192,6 +192,28 @@ parciales y múltiples.
 mismo evento cuando tu endpoint tarda o falla. Inserta `eventId` (único) en la
 misma transacción que aplica el efecto; si el insert choca, ya lo procesaste.
 
+### 1.8b Corte de caja
+
+`CashSession` es un turno de caja: de la apertura con fondo fijo al arqueo
+del cierre. Sólo puede haber una sesión abierta por negocio a la vez —
+un índice único parcial (`WHERE "closedAt" IS NULL`) lo garantiza a nivel de
+base de datos, agregado a mano en la migración porque el DSL de Prisma no
+tiene forma de expresar un índice parcial. `expectedAmount`,
+`countedAmount` y `difference` se congelan al cerrar, igual que los totales
+de `Order`: si mañana se corrige un pago viejo, el corte ya cerrado no debe
+moverse.
+
+`Payment.cashSessionId` ata cada cobro en efectivo al turno que lo recibió
+— es el join contra el que reconcilia el corte. Nulo para cualquier otro
+`provider`: un pago con tarjeta nunca toca el cajón físico.
+
+`CashMovement` son entradas/salidas de efectivo que no son un pedido: un
+depósito a la bóveda, el pago a un proveedor, un reembolso en efectivo. Sin
+esto el esperado del cierre nunca cuadra con lo que un turno real hizo.
+`CashMovement.refundId` (único, opcional) marca el retiro automático que
+genera un reembolso en efectivo — así el corte puede mostrar "reembolso del
+pedido A-0123" en vez de depender de un texto libre.
+
 ### 1.9 Promociones
 
 Cuatro promociones del landing, cuatro formas del mismo modelo:
