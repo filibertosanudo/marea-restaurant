@@ -1,0 +1,61 @@
+/* The browser backup for when the agent (or the printer) is down — same
+   isolate-and-print technique as qr-sheet.css and cash-session-receipt.css.
+   Monospace and colorless on purpose: this stands in for a thermal printer
+   that has no bold-but-not-really and no color at all. */
+.ticket-paper {
+  background: #ffffff;
+  color: #111111;
+  max-width: 320px;
+  margin: 0 auto;
+  padding: 22px 18px;
+  border-radius: 4px;
+  box-shadow: 0 24px 60px -30px rgb(35 44 59 / 0.35);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.ticket-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ticket-line.bold {
+  font-weight: 700;
+}
+.ticket-line.large {
+  font-size: 17px;
+}
+.ticket-line.center {
+  text-align: center;
+}
+.ticket-rule {
+  border: none;
+  border-top: 2px solid #111111;
+  margin: 8px 0;
+}
+.ticket-note {
+  background: #111111;
+  color: #ffffff;
+  font-weight: 700;
+  padding: 4px 7px;
+  margin: 2px 0;
+  display: block;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .ticket-print-area,
+  .ticket-print-area * {
+    visibility: visible;
+  }
+  .ticket-print-area {
+    position: absolute;
+    inset: 0;
+  }
+  .ticket-paper {
+    box-shadow: none;
+    max-width: none;
+    margin: 0;
+  }
+}
