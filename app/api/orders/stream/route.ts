@@ -45,7 +45,7 @@ async function getSignature(scope: Scope): Promise<string | null> {
     return `${order.status}:${order.updatedAt.getTime()}:${order.payments[0]?.updatedAt.getTime() ?? "-"}`;
   }
 
-  const [latestEvent, latestPayment] = await Promise.all([
+  const [latestEvent, latestPayment, latestCashSession, latestCashMovement] = await Promise.all([
     prisma.orderStatusEvent.findFirst({
       where: { order: { businessId: scope.businessId } },
       orderBy: { createdAt: "desc" },
@@ -56,8 +56,29 @@ async function getSignature(scope: Scope): Promise<string | null> {
       orderBy: { updatedAt: "desc" },
       select: { id: true, updatedAt: true },
     }),
+    // The cash-register widget on the board (open/close a shift, record a
+    // movement) has no OrderStatusEvent or Payment write of its own to key
+    // off — without these, a second device watching the same board would
+    // never see another cashier's shift open or close.
+    prisma.cashSession.findFirst({
+      where: { businessId: scope.businessId },
+      orderBy: [{ closedAt: "desc" }, { openedAt: "desc" }],
+      select: { id: true, closedAt: true },
+    }),
+    prisma.cashMovement.findFirst({
+      where: { cashSession: { businessId: scope.businessId } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    }),
   ]);
-  return `${latestEvent?.id ?? "-"}:${latestPayment?.id ?? "-"}:${latestPayment?.updatedAt.getTime() ?? "-"}`;
+  return [
+    latestEvent?.id ?? "-",
+    latestPayment?.id ?? "-",
+    latestPayment?.updatedAt.getTime() ?? "-",
+    latestCashSession?.id ?? "-",
+    latestCashSession?.closedAt?.getTime() ?? "-",
+    latestCashMovement?.id ?? "-",
+  ].join(":");
 }
 
 /**
