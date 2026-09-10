@@ -135,6 +135,11 @@ enum RefundStatus {
   CANCELLED
 }
 
+enum CashMovementType {
+  DEPOSIT // cash added to the drawer outside a customer payment
+  WITHDRAWAL // cash removed from the drawer — a supplier payment, a bank drop, a cash refund
+}
+
 enum ReservationStatus {
   PENDING // solicitada, sin confirmar
   CONFIRMED
@@ -206,10 +211,10 @@ enum JobStatus {
 /// resolverla por slug o por env var. Todo lo demás cuelga de aquí, así que
 /// activar multi-tenant después es agregar el filtro, no rehacer tablas.
 model Business {
-  id           String       @id @default(cuid())
-  slug         String       @unique // "marea" → usado en rutas /[business]/...
-  name         String
-  type         BusinessType @default(RESTAURANT)
+  id   String       @id @default(cuid())
+  slug String       @unique // "marea" → usado en rutas /[business]/...
+  name String
+  type BusinessType @default(RESTAURANT)
 
   // i18n del negocio
   defaultLocale    String   @default("es") @db.VarChar(10)
@@ -217,8 +222,8 @@ model Business {
 
   // Dinero y tiempo: viven en el negocio, no hardcodeados en la app,
   // porque el segundo tenant puede facturar en otra moneda / zona horaria.
-  currency String @default("MXN") @db.VarChar(3)
-  timezone String @default("America/Hermosillo")
+  currency String  @default("MXN") @db.VarChar(3)
+  timezone String  @default("America/Hermosillo")
   taxRate  Decimal @default(0) @db.Decimal(5, 4) // 0.1600 = IVA 16%
 
   // Contacto público (lo que hoy vive en el footer de content.ts)
@@ -227,17 +232,17 @@ model Business {
   addressLine1 String?
   addressLine2 String?
   city         String?
-  country      String? @db.VarChar(2)
+  country      String?  @db.VarChar(2)
   latitude     Decimal? @db.Decimal(9, 6)
   longitude    Decimal? @db.Decimal(9, 6)
 
   // Stripe: cada negocio cobra a su propia cuenta (Stripe Connect en v2).
-  stripeAccountId       String?
-  stripePublishableKey  String?
+  stripeAccountId      String?
+  stripePublishableKey String?
 
   // Ajustes de operación usados por reservaciones y pedidos
-  defaultReservationMinutes Int @default(90)
-  maxPartySize              Int @default(12)
+  defaultReservationMinutes Int     @default(90)
+  maxPartySize              Int     @default(12)
   acceptsOnlinePayment      Boolean @default(true)
   acceptsPayAtCounter       Boolean @default(true)
 
@@ -271,6 +276,7 @@ model Business {
   carts          Cart[]
   orders         Order[]
   payments       Payment[]
+  cashSessions   CashSession[]
   reservations   Reservation[]
   promotions     Promotion[]
   testimonials   Testimonial[]
@@ -288,11 +294,11 @@ model BusinessTranslation {
   businessId String
   locale     String @db.VarChar(10)
 
-  tagline      String? // "Frescura del océano, todos los días."
-  shortBlurb   String? // texto del footer
-  aboutTitle   String?
-  aboutBody    String? @db.Text
-  metaTitle    String? // SEO por idioma
+  tagline         String? // "Frescura del océano, todos los días."
+  shortBlurb      String? // texto del footer
+  aboutTitle      String?
+  aboutBody       String? @db.Text
+  metaTitle       String? // SEO por idioma
   metaDescription String?
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -355,16 +361,16 @@ model User {
   /// base de datos, obliga a `session: { strategy: "jwt" }`. La tabla
   /// `Session` queda sin usar hasta que agregues un provider OAuth — no la
   /// borres, es parte del adaptador.
-  passwordHash        String?
+  passwordHash       String?
   /// Fuerza el cambio de contraseña en el primer login, cuando el admin creó
   /// la cuenta del empleado con una contraseña temporal.
-  mustChangePassword  Boolean   @default(false)
+  mustChangePassword Boolean   @default(false)
   /// Timestamp of the last password change. The `jwt` callback compares this
   /// against the token's issuance (`token.iat`): anything issued before it is
   /// revoked. The only way to kick a JWT session for someone who's still a
   /// valid user — `revoked` only covers account/membership deactivation.
-  passwordChangedAt   DateTime?
-  lastLoginAt         DateTime?
+  passwordChangedAt  DateTime?
+  lastLoginAt        DateTime?
 
   /// Rol de plataforma. v1 lee esto directo en el middleware.
   /// El rol por-negocio vive en BusinessMembership; SUPER_ADMIN siempre gana.
@@ -374,19 +380,22 @@ model User {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime? // baja de cuenta sin romper pedidos históricos
 
-  accounts     Account[]
-  sessions     Session[]
-  memberships  BusinessMembership[]
-  carts        Cart[]
-  orders       Order[]              @relation("OrderCustomer")
-  servedOrders Order[]              @relation("OrderStaff")
-  statusEvents OrderStatusEvent[]
-  reservations Reservation[]
-  testimonials Testimonial[]
-  refunds      Refund[]
-  notifications NotificationJob[]
+  accounts            Account[]
+  sessions            Session[]
+  memberships         BusinessMembership[]
+  carts               Cart[]
+  orders              Order[]              @relation("OrderCustomer")
+  servedOrders        Order[]              @relation("OrderStaff")
+  statusEvents        OrderStatusEvent[]
+  reservations        Reservation[]
+  testimonials        Testimonial[]
+  refunds             Refund[]
+  notifications       NotificationJob[]
   passwordResetTokens PasswordResetToken[]
-  membershipEvents MembershipEvent[]
+  membershipEvents    MembershipEvent[]
+  openedCashSessions  CashSession[]        @relation("CashSessionOpenedBy")
+  closedCashSessions  CashSession[]        @relation("CashSessionClosedBy")
+  cashMovements       CashMovement[]
 
   @@index([role])
 }
@@ -474,8 +483,8 @@ model BusinessMembership {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
   events   MembershipEvent[]
 
   @@unique([userId, businessId])
@@ -546,7 +555,7 @@ model MenuCategoryTranslation {
 /// menú pero conserva la fila para que los OrderItem históricos sigan
 /// pudiendo apuntar a él (aunque el nombre y precio ya estén copiados ahí).
 model MenuItem {
-  id         String @id @default(cuid())
+  id         String  @id @default(cuid())
   businessId String
   categoryId String
   slug       String // "lobster-thermidor"
@@ -555,7 +564,7 @@ model MenuItem {
   /// Precio base, sin modificadores. El precio final de una línea de pedido
   /// se calcula como basePrice + suma de priceDelta de los modificadores,
   /// y se congela en OrderItem.unitPrice al momento de ordenar.
-  basePrice Decimal @db.Decimal(10, 2)
+  basePrice      Decimal  @db.Decimal(10, 2)
   /// Precio tachado ("antes $X"). Null = sin precio de lista.
   compareAtPrice Decimal? @db.Decimal(10, 2)
 
@@ -571,17 +580,17 @@ model MenuItem {
   trackInventory Boolean @default(false)
   stockQuantity  Int     @default(0)
 
-  isFeatured        Boolean @default(false) // "platillo insignia"
-  preparationMinutes Int?   @default(15) // para estimar tiempo de entrega
-  calories          Int?
-  sortOrder         Int     @default(0)
+  isFeatured         Boolean @default(false) // "platillo insignia"
+  preparationMinutes Int?    @default(15) // para estimar tiempo de entrega
+  calories           Int?
+  sortOrder          Int     @default(0)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  business       Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  category       MenuCategory              @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  business       Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category       MenuCategory            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   translations   MenuItemTranslation[]
   modifierGroups MenuItemModifierGroup[]
   tags           MenuItemTag[]
@@ -615,7 +624,7 @@ model MenuItemTranslation {
 /// Tabla propia (y no un String[] en MenuItem) porque necesitan traducción,
 /// icono, y filtrar por ellas con un join barato.
 model Tag {
-  id         String  @id @default(cuid())
+  id         String   @id @default(cuid())
   businessId String
   slug       String
   icon       String?
@@ -686,10 +695,10 @@ model ModifierGroup {
 }
 
 model ModifierGroupTranslation {
-  id      String @id @default(cuid())
-  groupId String
-  locale  String @db.VarChar(10)
-  name    String
+  id       String  @id @default(cuid())
+  groupId  String
+  locale   String  @db.VarChar(10)
+  name     String
   helpText String?
 
   group ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -714,9 +723,9 @@ model ModifierOption {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  group        ModifierGroup               @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  translations ModifierOptionTranslation[]
-  cartItemMods CartItemModifier[]
+  group         ModifierGroup               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  translations  ModifierOptionTranslation[]
+  cartItemMods  CartItemModifier[]
   orderItemMods OrderItemModifier[]
 
   @@unique([groupId, slug])
@@ -739,7 +748,7 @@ model ModifierOptionTranslation {
 model MenuItemModifierGroup {
   menuItemId String
   groupId    String
-  sortOrder  Int     @default(0)
+  sortOrder  Int      @default(0)
   isRequired Boolean? // override del isRequired del grupo para este platillo
 
   menuItem MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
@@ -758,16 +767,16 @@ model MenuItemModifierGroup {
 /// el código y sigue ordenando desde su casa, sin perder el historial de la
 /// mesa ni reimprimir su identidad interna.
 model RestaurantTable {
-  id         String      @id @default(cuid())
-  businessId String
-  code       String // etiqueta visible: "M-04", "Terraza 2"
-  zone       String? // "Terraza", "Barra", "Salón principal"
-  seats      Int         @default(2)
-  qrToken    String      @unique @default(cuid(2))
+  id          String      @id @default(cuid())
+  businessId  String
+  code        String // etiqueta visible: "M-04", "Terraza 2"
+  zone        String? // "Terraza", "Barra", "Salón principal"
+  seats       Int         @default(2)
+  qrToken     String      @unique @default(cuid(2))
   qrRotatedAt DateTime?
-  status     TableStatus @default(AVAILABLE)
-  isActive   Boolean     @default(true)
-  sortOrder  Int         @default(0)
+  status      TableStatus @default(AVAILABLE)
+  isActive    Boolean     @default(true)
+  sortOrder   Int         @default(0)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -794,10 +803,10 @@ model RestaurantTable {
 ///   3. Order tiene invariantes fuertes (totales cerrados, folio, pago). Un
 ///      carrito medio armado violaría todas ellas y ensuciaría los reportes.
 model Cart {
-  id           String  @id @default(cuid())
+  id           String    @id @default(cuid())
   businessId   String
   userId       String? // null = invitado
-  sessionToken String? @unique // cookie del invitado
+  sessionToken String?   @unique // cookie del invitado
   tableId      String? // si escaneó el QR de una mesa
   orderType    OrderType @default(TAKEAWAY)
   notes        String?
@@ -816,10 +825,10 @@ model Cart {
 }
 
 model CartItem {
-  id         String @id @default(cuid())
+  id         String  @id @default(cuid())
   cartId     String
   menuItemId String
-  quantity   Int    @default(1)
+  quantity   Int     @default(1)
   notes      String? // "sin cebolla"
 
   createdAt DateTime @default(now())
@@ -894,9 +903,9 @@ model Order {
   /// never guess.
   locale String? @db.VarChar(10)
 
-  notes         String? @db.Text
-  scheduledFor  DateTime? // preorder: "lo recojo a las 8pm"
-  guestCount    Int?      // comensales en mesa
+  notes        String?   @db.Text
+  scheduledFor DateTime? // preorder: "lo recojo a las 8pm"
+  guestCount   Int? // comensales en mesa
 
   /// Totales congelados. Se guardan calculados y no se recalculan al vuelo
   /// porque impuestos, promociones y precios cambian; un ticket de hace un
@@ -948,12 +957,12 @@ model OrderItem {
   /// SNAPSHOT — el corazón del requisito. Nombre y precio se copian al
   /// momento de ordenar. Si mañana la langosta sube de $42 a $55, este ticket
   /// sigue diciendo $42 y el reporte de ventas no se corrompe.
-  nameSnapshot     String
-  unitPrice        Decimal @db.Decimal(10, 2) // base + modificadores, ya resuelto
-  quantity         Int     @default(1)
-  lineTotal        Decimal @db.Decimal(10, 2) // unitPrice * quantity - descuento de línea
-  lineDiscount     Decimal @default(0) @db.Decimal(10, 2)
-  notes            String?
+  nameSnapshot String
+  unitPrice    Decimal @db.Decimal(10, 2) // base + modificadores, ya resuelto
+  quantity     Int     @default(1)
+  lineTotal    Decimal @db.Decimal(10, 2) // unitPrice * quantity - descuento de línea
+  lineDiscount Decimal @default(0) @db.Decimal(10, 2)
+  notes        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -990,7 +999,7 @@ model OrderItemModifier {
 model OrderStatusEvent {
   id          String       @id @default(cuid())
   orderId     String
-  fromStatus  OrderStatus?  // null en el evento inicial
+  fromStatus  OrderStatus? // null en el evento inicial
   toStatus    OrderStatus
   changedById String?
   note        String?
@@ -1035,16 +1044,24 @@ model Payment {
   /// Quién cobró en caja (para cortes de turno) cuando provider = CASH_REGISTER.
   collectedByUserId String?
 
+  /// Set only for provider = CASH_REGISTER, to the CashSession open at the
+  /// moment it was collected — this is the join a corte de caja actually
+  /// reconciles against. Null for every other provider; a card payment
+  /// never touches the physical drawer.
+  cashSessionId String?
+
   paidAt    DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  refunds  Refund[]
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  cashSession CashSession? @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
+  refunds     Refund[]
 
   @@index([orderId])
   @@index([businessId, status, createdAt])
+  @@index([cashSessionId])
 }
 
 /// Reembolsos separados de Payment: pueden ser parciales y múltiples sobre
@@ -1064,10 +1081,79 @@ model Refund {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  payment      Payment       @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  createdBy    User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  cashMovement CashMovement?
 
   @@index([paymentId])
+}
+
+// ============================================================================
+//  CORTE DE CAJA
+// ============================================================================
+
+/// A cash-register shift, from opening with a starting float to the closing
+/// count. Only one may be open per a given business at a time — enforced by
+/// a partial unique index on (businessId) WHERE closedAt IS NULL, added by
+/// hand in this model's migration (Prisma's schema DSL has no way to express
+/// a partial index). Without that constraint two concurrent open shifts
+/// could each claim the same CASH_REGISTER payments, and neither corte would
+/// reconcile against what's really in the one physical drawer.
+model CashSession {
+  id         String @id @default(cuid())
+  businessId String
+
+  openedById   String
+  openedAt     DateTime @default(now())
+  openingFloat Decimal  @db.Decimal(10, 2)
+
+  closedById     String?
+  closedAt       DateTime?
+  /// What the system says should be in the drawer: float + cash collected +
+  /// deposits - withdrawals. Frozen at close, same reasoning as Order's own
+  /// totals — a payment corrected after the fact must never move a shift
+  /// that's already closed.
+  expectedAmount Decimal?  @db.Decimal(10, 2)
+  countedAmount  Decimal?  @db.Decimal(10, 2)
+  /// countedAmount - expectedAmount, stored rather than derived for the same reason.
+  difference     Decimal?  @db.Decimal(10, 2)
+  /// Required once `difference` is non-zero — enforced in the close action,
+  /// not the schema, so a clean close never has to carry an empty string.
+  notes          String?
+
+  business  Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  openedBy  User           @relation("CashSessionOpenedBy", fields: [openedById], references: [id])
+  closedBy  User?          @relation("CashSessionClosedBy", fields: [closedById], references: [id])
+  movements CashMovement[]
+  payments  Payment[]
+
+  @@index([businessId, openedAt])
+}
+
+/// Cash in or out of the drawer that isn't a customer payment: a deposit to
+/// the safe, paying a produce supplier, a cash refund. Without this, the
+/// expected total at close can never match what a real shift actually did.
+model CashMovement {
+  id            String           @id @default(cuid())
+  cashSessionId String
+  type          CashMovementType
+  amount        Decimal          @db.Decimal(10, 2)
+  /// Required, always — an unexplained withdrawal is a shortfall with a
+  /// different name.
+  reason        String
+  createdById   String
+  createdAt     DateTime         @default(now())
+
+  /// Set only when this movement is the automatic withdrawal a cash refund
+  /// creates (see lib/payments/refund-actions.ts) — lets the corte screen
+  /// show "refund of order A-0123" instead of relying on free-text reason.
+  refundId String? @unique
+
+  cashSession CashSession @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+  createdBy   User        @relation(fields: [createdById], references: [id])
+  refund      Refund?     @relation(fields: [refundId], references: [id], onDelete: SetNull)
+
+  @@index([cashSessionId])
 }
 
 /// Bitácora de webhooks de Stripe. Stripe reenvía el mismo evento varias
@@ -1091,7 +1177,7 @@ model StripeWebhookEvent {
 // ============================================================================
 
 model Reservation {
-  id         String @id @default(cuid())
+  id         String  @id @default(cuid())
   businessId String
   customerId String? // null si reservó sin cuenta
   // Se asigna desde la creación, no al confirmar: en la EXCLUDE constraint
@@ -1099,7 +1185,7 @@ model Reservation {
   // nada, así que una reservación sin mesa no reservaría nada en absoluto —
   // dos huéspedes podrían tomar el mismo horario sin que la constraint lo
   // note. Confirmar puede *reasignar* a otra mesa, nunca asignar desde cero.
-  tableId String?
+  tableId    String?
 
   // Contacto congelado, igual que en Order y por la misma razón.
   guestName  String
@@ -1113,16 +1199,16 @@ model Reservation {
   partySize Int
 
   /// Inicio de la reservación.
-  reservedFor DateTime
-  durationMinutes Int @default(90)
+  reservedFor     DateTime
+  durationMinutes Int      @default(90)
   /// Fin calculado (reservedFor + durationMinutes). Se GUARDA en vez de
   /// calcularse porque la consulta clave —"¿esta mesa está libre entre A y B?"—
   /// es un solapamiento de rangos, y sólo es indexable si ambos extremos son
   /// columnas reales:  WHERE tableId = ? AND reservedFor < B AND endsAt > A
-  endsAt DateTime
+  endsAt          DateTime
 
   status ReservationStatus @default(PENDING)
-  notes  String? @db.Text // "alergias, ocasión especial, preferencia de mesa"
+  notes  String?           @db.Text // "alergias, ocasión especial, preferencia de mesa"
 
   /// Código que se le manda al cliente para consultar o cancelar sin cuenta —
   /// toda la autenticación de esa pantalla, y la única que además puede
@@ -1133,25 +1219,18 @@ model Reservation {
   /// al mismo tiempo.
   confirmationCode String @unique @default(cuid(2))
 
-  confirmedAt DateTime?
-  seatedAt    DateTime?
-  cancelledAt DateTime?
+  confirmedAt        DateTime?
+  seatedAt           DateTime?
+  cancelledAt        DateTime?
   cancellationReason String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  business      Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  customer      User?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  table         RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  business      Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer      User?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  table         RestaurantTable?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
   notifications NotificationJob[]
-
-  // Disponibilidad de una mesa en un rango: este es EL índice del módulo.
-  @@index([tableId, reservedFor, endsAt])
-  // Agenda del día en el panel de staff.
-  @@index([businessId, reservedFor])
-  @@index([businessId, status, reservedFor])
-  @@index([customerId, reservedFor])
 
   // NOTA: para impedir de verdad dos reservaciones solapadas sobre la misma
   // mesa hace falta una EXCLUDE constraint de Postgres, que Prisma no genera.
@@ -1162,6 +1241,13 @@ model Reservation {
   //       "tableId" WITH =,
   //       tsrange("reservedFor", "endsAt") WITH &&
   //     ) WHERE (status IN ('PENDING','CONFIRMED','SEATED'));
+
+  // Disponibilidad de una mesa en un rango: este es EL índice del módulo.
+  @@index([tableId, reservedFor, endsAt])
+  // Agenda del día en el panel de staff.
+  @@index([businessId, reservedFor])
+  @@index([businessId, status, reservedFor])
+  @@index([customerId, reservedFor])
 }
 
 // ============================================================================
@@ -1190,12 +1276,12 @@ model Promotion {
   maxDiscount   Decimal? @db.Decimal(10, 2) // tope para los porcentajes
 
   // Vigencia
-  startsAt DateTime?
-  endsAt   DateTime?
+  startsAt    DateTime?
+  endsAt      DateTime?
   /// Días de la semana en que aplica (0=domingo … 6=sábado). Vacío = todos.
   /// Array de enteros en vez de siete booleanos: se lee y se filtra igual de
   /// fácil y no obliga a migrar si mañana quieres "días del mes".
-  daysOfWeek Int[] @default([])
+  daysOfWeek  Int[]     @default([])
   /// Ventana horaria dentro del día, en minutos desde medianoche (happy hour).
   startMinute Int?
   endMinute   Int?
@@ -1208,10 +1294,10 @@ model Promotion {
   /// Sólo aplica a los pedidos de este tipo (ej. promo exclusiva de mesa).
   appliesToOrderType OrderType?
 
-  imageUrl  String?
-  isActive  Boolean @default(true)
+  imageUrl   String?
+  isActive   Boolean @default(true)
   isFeatured Boolean @default(false) // se muestra en la sección de ofertas
-  sortOrder Int     @default(0) // el "left/right" del landing es presentación, no dato
+  sortOrder  Int     @default(0) // el "left/right" del landing es presentación, no dato
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -1236,7 +1322,7 @@ model PromotionTranslation {
   /// La etiqueta visible ("50% OFF" / "50% DESC.", "$59 (for 2)"). Es texto
   /// de mercadotecnia y por eso vive en la traducción, separado de `value`,
   /// que es el número con el que se calcula el descuento.
-  badgeLabel String?
+  badgeLabel  String?
 
   promotion Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
 
@@ -1283,11 +1369,11 @@ model Testimonial {
   id         String @id @default(cuid())
   businessId String
 
-  authorId   String? // si la dejó un usuario registrado
-  authorName String // congelado: la reseña se firma con el nombre de entonces
+  authorId    String? // si la dejó un usuario registrado
+  authorName  String // congelado: la reseña se firma con el nombre de entonces
   authorTitle String?
-  avatarUrl  String?
-  rating     Int? // 1–5, opcional
+  avatarUrl   String?
+  rating      Int? // 1–5, opcional
 
   orderId String? // reseña verificada: vino de un pedido real
 
@@ -1342,7 +1428,7 @@ model NotificationJob {
   id         String @id @default(cuid())
   businessId String
 
-  channel NotificationChannel @default(EMAIL)
+  channel     NotificationChannel @default(EMAIL)
   /// Clave de plantilla ("order.ready", "reservation.confirmed"). String y no
   /// enum a propósito: agregar una plantilla nueva no debería ser migración.
   templateKey String
@@ -1350,7 +1436,7 @@ model NotificationJob {
   recipientUserId String?
   recipientEmail  String?
   recipientPhone  String?
-  locale          String @default("es") @db.VarChar(10)
+  locale          String  @default("es") @db.VarChar(10)
 
   /// Variables de la plantilla ya resueltas al momento de encolar.
   payload Json @default("{}")
@@ -1409,13 +1495,13 @@ model PasswordResetToken {
 
 /// Suscriptores del footer ("Let's connect with us").
 model NewsletterSubscriber {
-  id           String    @id @default(cuid())
-  businessId   String
-  email        String
-  locale       String    @default("es") @db.VarChar(10)
-  confirmedAt  DateTime?
+  id             String    @id @default(cuid())
+  businessId     String
+  email          String
+  locale         String    @default("es") @db.VarChar(10)
+  confirmedAt    DateTime?
   unsubscribedAt DateTime?
-  createdAt    DateTime  @default(now())
+  createdAt      DateTime  @default(now())
 
   /// Capability token for the no-session unsubscribe link in every email
   /// footer — same reasoning and same cuid(2) as Order.publicToken: a
