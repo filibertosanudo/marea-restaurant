@@ -63,6 +63,15 @@ export async function listBoardOrdersRaw(businessId: string, filters: BoardFilte
   });
 }
 
+/** The kitchen screen's own read: Pendiente · En preparación · Listo, and nothing else — no Entregado, no Cancelados. It has no tabs and no history to show, so it has no reason to fetch either. */
+export async function listKitchenBoardOrdersRaw(businessId: string) {
+  return prisma.order.findMany({
+    where: { businessId, status: { in: ["PENDING", "PREPARING", "READY"] } },
+    orderBy: { placedAt: "asc" },
+    include: BOARD_INCLUDE,
+  });
+}
+
 /** The Cancelados tab — same recent window, its own query since it's a different tab, not a board column. */
 export async function listCancelledOrdersRaw(businessId: string, filters: BoardFilters = {}) {
   return prisma.order.findMany({
