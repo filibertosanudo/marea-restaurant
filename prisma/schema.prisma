@@ -282,6 +282,8 @@ model Business {
   testimonials   Testimonial[]
   notifications  NotificationJob[]
   subscribers    NewsletterSubscriber[]
+  devices        Device[]
+  printJobs      PrintJob[]
 
   @@index([isActive])
 }
@@ -937,6 +939,7 @@ model Order {
   promotions    OrderPromotion[]
   testimonials  Testimonial[]
   notifications NotificationJob[]
+  printJobs     PrintJob[]
 
   @@unique([businessId, orderNumber])
   @@index([businessId, status, placedAt]) // tablero de cocina
@@ -1471,6 +1474,96 @@ model NotificationJob {
   @@index([businessId, createdAt])
   @@index([relatedOrderId])
   @@index([relatedReservationId])
+}
+
+// ============================================================================
+//  IMPRESIÓN (módulo 13) — dispositivos del local y su cola de trabajo
+// ============================================================================
+
+enum DeviceKind {
+  PRINTER
+}
+
+/// Un aparato dentro de la red del propio restaurante que jala trabajo del
+/// servidor en vez de que el servidor le hable a él — la impresora vive
+/// detrás del NAT del local, sin IP pública, y el servidor nunca la ve.
+/// Solo PRINTER existe hoy; ver PrintJob para la cola que consulta.
+model Device {
+  id         String     @id @default(cuid())
+  businessId String
+  name       String // "Impresora cocina", "Caja 1"
+  kind       DeviceKind @default(PRINTER)
+
+  /// sha256(token), nunca el token — mismo razonamiento que
+  /// PasswordResetToken.tokenHash: un secreto de 256 bits generado por
+  /// CSPRNG no tiene adivinanzas de baja entropía que frenar, así que un
+  /// hash rápido y una búsqueda por índice único bastan. A diferencia de un
+  /// token de reset, este es de larga duración y se reutiliza en cada
+  /// consulta del agente: no hay expiresAt/usedAt, solo tokenRotatedAt, que
+  /// se actualiza al sobrescribir el hash — el mismo patrón de "reemitir en
+  /// el lugar" que RestaurantTable.qrRotatedAt.
+  tokenHash      String   @unique
+  tokenRotatedAt DateTime @default(now())
+
+  /// Se actualiza en cada consulta del agente, haya o no trabajo — es el
+  /// latido que permite al panel avisar "la impresora lleva N minutos sin
+  /// responder" independientemente del volumen de pedidos.
+  lastSeenAt DateTime?
+  isActive   Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+enum PrintJobKind {
+  KITCHEN_TICKET // sin precios
+  CUSTOMER_RECEIPT // con precios — reservado, no se encola todavía
+}
+
+/// Cola de comandas, mismo diseño que NotificationJob (mismo JobStatus,
+/// mismo lease-por-lockedAt, mismo backoff): un pedido rechazado porque no
+/// hay papel es peor que un pedido sin comanda, así que esto nunca bloquea
+/// createOrderFromCart, solo espera a que algún dispositivo lo reclame.
+///
+/// La diferencia con NotificationJob es el transporte, no la forma: nada
+/// dentro de esta app reclama estas filas directamente — el agente vive
+/// fuera de esta infraestructura y no tiene credenciales de Postgres, así
+/// que reclamar/marcar-enviado pasa por app/api/agent/print-jobs/*,
+/// autenticado por el token del Device, no por Prisma directo.
+model PrintJob {
+  id         String       @id @default(cuid())
+  businessId String
+  kind       PrintJobKind @default(KITCHEN_TICKET)
+
+  /// El documento ya resuelto (líneas, negritas, comando de corte) — el
+  /// agente solo lo convierte a bytes ESC/POS. La comanda se genera en el
+  /// servidor: corregir un formato es un despliegue, nunca una visita al
+  /// local. Ver lib/printing/document.ts.
+  payload Json
+
+  status      JobStatus @default(QUEUED)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  runAfter    DateTime  @default(now())
+  lockedAt    DateTime?
+  lockedBy    String? // id del Device que reclamó el job, mismo patrón que NotificationJob.lockedBy
+  lastError   String?   @db.Text
+  printedAt   DateTime?
+
+  relatedOrderId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  order    Order?   @relation(fields: [relatedOrderId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, status, runAfter])
+  @@index([relatedOrderId])
 }
 
 /// One reset link, one use. The raw token only ever exists in the emailed
