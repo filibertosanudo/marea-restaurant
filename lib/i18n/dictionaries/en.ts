@@ -46,6 +46,7 @@ export const en = {
       promotions: "Promotions",
       tables: "Tables & QR",
       testimonials: "Testimonials",
+      reports: "Reports",
       team: "Team",
       settings: "Settings",
       comingSoon: "Coming soon",
