@@ -2,11 +2,20 @@
 
 import { useEffect, useState } from "react";
 
-const WARN_AFTER_MIN = 10;
-const HOT_AFTER_MIN = 20;
+// Exported so the kitchen screen's own card-wide "hot" pulse (module 13)
+// alarms at the exact same age this pill does — one definition of "stuck
+// too long", not two thresholds that can drift apart.
+export const WARN_AFTER_MIN = 10;
+export const HOT_AFTER_MIN = 20;
 
-function elapsedMinutes(placedAt: string): number {
+export function elapsedMinutes(placedAt: string): number {
   return Math.max(0, Math.floor((Date.now() - new Date(placedAt).getTime()) / 60000));
+}
+
+export type AgingTier = "calm" | "warn" | "hot";
+
+export function agingTier(minutes: number): AgingTier {
+  return minutes >= HOT_AFTER_MIN ? "hot" : minutes >= WARN_AFTER_MIN ? "warn" : "calm";
 }
 
 /**
@@ -35,7 +44,7 @@ export function AgingIndicator({
     return () => clearInterval(id);
   }, [placedAt]);
 
-  const tier = minutes >= HOT_AFTER_MIN ? "hot" : minutes >= WARN_AFTER_MIN ? "warn" : "calm";
+  const tier = agingTier(minutes);
   const tierClasses = {
     calm: "bg-info/12 text-info",
     warn: "bg-warning/14 text-warning",
