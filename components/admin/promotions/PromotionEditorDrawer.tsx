@@ -43,6 +43,8 @@ type PromotionEditorDrawerProps = {
   onClose: () => void;
   dict: AdminDictionary;
   defaultLocale: Lang;
+  /** The admin panel's own display language — drives the preview sentence. Distinct from `locale` below, which only picks which translation tab is being edited. */
+  lang: Lang;
   promotion: PromotionListDTO | null;
   menuItems: { id: string; name: string }[];
 };
@@ -51,6 +53,7 @@ export function PromotionEditorDrawer({
   onClose,
   dict,
   defaultLocale,
+  lang,
   promotion,
   menuItems,
 }: PromotionEditorDrawerProps) {
@@ -91,9 +94,9 @@ export function PromotionEditorDrawer({
           maxDiscount: maxDiscount || null,
         },
         dict,
-        locale
+        lang
       ),
-    [type, value, code, selectedDays, startTime, endTime, minOrderTotal, maxDiscount, dict, locale]
+    [type, value, code, selectedDays, startTime, endTime, minOrderTotal, maxDiscount, dict, lang]
   );
 
   function toggleDay(day: number) {

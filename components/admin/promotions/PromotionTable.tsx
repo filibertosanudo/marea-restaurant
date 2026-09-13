@@ -171,6 +171,7 @@ export function PromotionTable({ promotions, menuItems, dict, defaultLocale, lan
           onClose={() => setEditing(null)}
           dict={dict}
           defaultLocale={defaultLocale}
+          lang={lang}
           promotion={editingDTO}
           menuItems={menuItems}
         />
