@@ -34,7 +34,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   // the kitchen screen itself never renders this sidebar back.
   { key: "kitchen", href: "/admin/cocina", roles: STAFF_UP, enabled: true },
   { key: "reservations", href: "/admin/reservaciones", roles: STAFF_UP, enabled: true },
-  { key: "promotions", href: "/admin/promociones", roles: ADMIN_ONLY, enabled: false },
+  { key: "promotions", href: "/admin/promociones", roles: ADMIN_ONLY, enabled: true },
   { key: "tables", href: "/admin/mesas", roles: ADMIN_ONLY, enabled: true },
   { key: "testimonials", href: "/admin/testimonios", roles: ADMIN_ONLY, enabled: false },
   { key: "reports", href: "/admin/reportes", roles: ADMIN_ONLY, enabled: true },
