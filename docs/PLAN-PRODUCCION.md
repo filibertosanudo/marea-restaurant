@@ -108,6 +108,21 @@ mano — el protocolo, el corte de papel, los acentos y la nota en negativo
 quedaron verificados igual, pero falta la prueba contra hardware real antes
 de instalarlo en un restaurante de verdad.
 
+### Verificaciones pendientes de infraestructura
+
+Las dos vienen de fases ya cerradas y ninguna bloquea el desarrollo — las dos
+bloquean la instalación en un restaurante de verdad. No se resuelven
+escribiendo código, así que se dejan aquí en su propia lista para que no se
+pierdan dentro de la prosa de una fase que ya se dio por terminada.
+
+- [ ] **Envío SMTP contra un proveedor real**, con SPF, DKIM y DMARC
+      configurados en el dominio propio, comprobando que el correo llega a
+      Gmail sin caer en spam. Abierta desde el módulo 11 (fase 3).
+- [ ] **Impresión contra una impresora térmica física.** El módulo 13 (fase 4)
+      se verificó de punta a punta contra un emulador ESC/POS
+      (`agent/dev/mock-printer.ts`), que no reproduce el atasco de papel, la
+      página de códigos real ni el corte.
+
 ---
 
 ## Cómo se usa este documento
