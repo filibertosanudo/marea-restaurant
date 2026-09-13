@@ -12,6 +12,7 @@ import { IllegalPaymentTransitionError } from "@/lib/payments/state-machine";
 import { lockOpenCashSessionForUpdate } from "@/lib/cash-register/queries";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { appOrigin } from "@/lib/env";
+import { syncAvailabilityFromStock } from "@/lib/menu/inventory";
 
 export type BoardActionState = { error?: string } | undefined;
 
@@ -169,23 +170,33 @@ export async function cancelOrderAction(
         (quantityByMenuItem.get(item.menuItemId) ?? 0) + item.quantity
       );
     }
+    const restockedMovements: { menuItemId: string; delta: number }[] = [];
     for (const [menuItemId, quantity] of quantityByMenuItem) {
       const restocked = await tx.menuItem.updateMany({
-        where: { id: menuItemId, businessId: business.id, trackInventory: true },
+        where: { id: menuItemId, businessId: business.id, deletedAt: null, trackInventory: true },
         data: { stockQuantity: { increment: quantity } },
       });
       if (restocked.count > 0) {
+        restockedMovements.push({ menuItemId, delta: quantity });
         // Symmetric with the decrement's auto-hide: stock crossing back
         // above zero auto-restores visibility too. A manual re-disable an
         // admin applied for an unrelated reason after the auto-hide is
         // indistinguishable from the auto-hide itself once isAvailable is
         // just a boolean, so this can't tell the two apart — same
         // limitation the decrement path already has in the other direction.
-        await tx.menuItem.updateMany({
-          where: { id: menuItemId, businessId: business.id, stockQuantity: { gt: 0 } },
-          data: { isAvailable: true },
-        });
+        await syncAvailabilityFromStock(tx, { menuItemId, businessId: business.id, direction: "up" });
       }
+    }
+    if (restockedMovements.length > 0) {
+      await tx.stockMovement.createMany({
+        data: restockedMovements.map(({ menuItemId, delta }) => ({
+          menuItemId,
+          delta,
+          reason: "CANCELLATION",
+          orderId: order.id,
+          createdById: session.user.id,
+        })),
+      });
     }
 
     await tx.orderStatusEvent.create({
@@ -222,6 +233,10 @@ export async function cancelOrderAction(
 
   if (result?.error) return result;
   revalidatePath("/admin/pedidos");
+  // The restock above can flip a tracked dish's isAvailable back on —
+  // same two paths every other availability-changing mutation revalidates.
+  revalidatePath("/admin/menu");
+  revalidatePath("/");
 }
 
 /** "Cobrar en efectivo" — STAFF and up, per the matrix. Only ever touches this order's own CASH_REGISTER/PENDING payment. */
