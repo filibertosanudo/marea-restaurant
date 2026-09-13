@@ -26,6 +26,9 @@ function readMenuItemForm(formData: FormData) {
     imageUrl: String(formData.get("imageUrl") ?? ""),
     isAvailable: formData.get("isAvailable") === "on",
     isFeatured: formData.get("isFeatured") === "on",
+    trackInventory: formData.get("trackInventory") === "on",
+    stockQuantity: String(formData.get("stockQuantity") ?? "0"),
+    minStockQuantity: String(formData.get("minStockQuantity") ?? "0"),
     translations: {
       en: {
         name: String(formData.get("en.name") ?? ""),
@@ -83,6 +86,13 @@ export async function createMenuItemAction(
       imageUrl: data.imageUrl || null,
       isAvailable: data.isAvailable,
       isFeatured: data.isFeatured,
+      trackInventory: data.trackInventory,
+      // The only place stockQuantity is ever set outside a StockMovement:
+      // a brand-new row has no prior count to reconcile against, so there's
+      // nothing for a ledger entry to explain yet. Every change after this
+      // one goes through adjustMenuItemStockAction instead.
+      stockQuantity: data.trackInventory ? data.stockQuantity : 0,
+      minStockQuantity: data.minStockQuantity,
       translations: {
         create: (["en", "es"] as const)
           .filter((l) => data.translations[l]?.name)
@@ -134,6 +144,13 @@ export async function updateMenuItemAction(
   // first one just made current. Locking makes the second transaction
   // block until the first commits, so it reads what the first one actually
   // left behind.
+  // Tracking just turned on for a dish that never had it: there's no
+  // concurrent writer to race yet (nothing could have sold or adjusted a
+  // count that didn't exist), so this is an initialization, same as
+  // createMenuItemAction's, not the kind of counter update that must go
+  // through adjustMenuItemStockAction.
+  const startingToTrack = data.trackInventory && !existing.trackInventory;
+
   const oldImageUrl = await prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ imageUrl: string | null }[]>`
       SELECT "imageUrl" FROM "MenuItem" WHERE id = ${id} FOR UPDATE
@@ -148,6 +165,15 @@ export async function updateMenuItemAction(
         imageUrl: data.imageUrl || null,
         isAvailable: data.isAvailable,
         isFeatured: data.isFeatured,
+        trackInventory: data.trackInventory,
+        minStockQuantity: data.minStockQuantity,
+        // Every other case leaves stockQuantity untouched: it's a counter
+        // with concurrent writers (a sale, a cancellation, the quick-adjust
+        // stepper), and this form submission carries whatever value was on
+        // the page when the drawer opened. Writing it here would silently
+        // undo any adjustment that landed in between — see
+        // adjustMenuItemStockAction, the only other place that changes it.
+        ...(startingToTrack ? { stockQuantity: data.stockQuantity } : {}),
       },
     });
     await Promise.all(
