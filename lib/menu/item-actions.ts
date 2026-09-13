@@ -9,6 +9,7 @@ import { UserRole } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
 import { slugify } from "@/lib/menu/slugify";
 import { getStorageDriver } from "@/lib/storage";
+import { syncAvailabilityFromStock } from "@/lib/menu/inventory";
 
 const ADMIN_ROLES = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
 const STAFF_UP_ROLES = [UserRole.STAFF, UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
@@ -246,6 +247,76 @@ export async function toggleAvailabilityAction(id: string, isAvailable: boolean)
   });
   revalidatePath("/admin/menu");
   revalidatePath("/");
+}
+
+export type AdjustStockState =
+  | { success: true; stockQuantity: number; isAvailable: boolean }
+  | { error: "invalid_delta" | "not_found" | "not_tracked" | "insufficient_stock" };
+
+/**
+ * The one place stockQuantity changes for a dish that already exists — the
+ * quick +/- in ItemTable and the equivalent stepper in ItemEditorDrawer both
+ * call this instead of going through the create/update form, so the
+ * "sin excepciones" ledger rule (docs/prompts/14) has exactly one writer to
+ * hold to it. Same atomic-guard pattern as createOrderFromCart's decrement:
+ * the `gte` in the where clause makes the update itself the concurrency
+ * check, never a prior read.
+ */
+export async function adjustMenuItemStockAction(
+  menuItemId: string,
+  delta: number
+): Promise<AdjustStockState> {
+  const session = await requireRole(...STAFF_UP_ROLES);
+  const business = await getCurrentBusiness();
+  if (!Number.isInteger(delta) || delta === 0) return { error: "invalid_delta" };
+
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.menuItem.updateMany({
+      where: {
+        id: menuItemId,
+        businessId: business.id,
+        deletedAt: null,
+        trackInventory: true,
+        ...(delta < 0 ? { stockQuantity: { gte: -delta } } : {}),
+      },
+      data: { stockQuantity: { increment: delta } },
+    });
+    if (updated.count === 0) {
+      const current = await tx.menuItem.findFirst({
+        where: { id: menuItemId, businessId: business.id, deletedAt: null },
+        select: { trackInventory: true },
+      });
+      if (!current) return { error: "not_found" } as const;
+      return { error: current.trackInventory ? "insufficient_stock" : "not_tracked" } as const;
+    }
+
+    await Promise.all([
+      tx.stockMovement.create({
+        data: {
+          menuItemId,
+          delta,
+          reason: "MANUAL_ADJUSTMENT",
+          createdById: session.user.id,
+        },
+      }),
+      syncAvailabilityFromStock(tx, {
+        menuItemId,
+        businessId: business.id,
+        direction: delta < 0 ? "down" : "up",
+      }),
+    ]);
+
+    const item = await tx.menuItem.findUniqueOrThrow({
+      where: { id: menuItemId },
+      select: { stockQuantity: true, isAvailable: true },
+    });
+    return { success: true, ...item } as const;
+  });
+
+  if ("error" in result) return result;
+  revalidatePath("/admin/menu");
+  revalidatePath("/");
+  return result;
 }
 
 export async function softDeleteMenuItemAction(id: string) {
