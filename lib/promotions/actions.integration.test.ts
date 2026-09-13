@@ -125,6 +125,21 @@ describe("createPromotionAction", () => {
 
     expect(result).toEqual({ error: "code_taken", fieldErrors: { code: "code_taken" } });
   });
+
+  it("normalizes code casing, so a differently-cased duplicate is still caught", async () => {
+    await makeBusiness({ slug: "marea", defaultLocale: "en" });
+    await loginAsAdmin();
+    await createPromotionAction(undefined, promotionForm(baseFields({ code: "welcome15" })));
+
+    const result = await createPromotionAction(
+      undefined,
+      promotionForm(baseFields({ code: "WELCOME15", "en.title": "Another One" }))
+    );
+
+    expect(result).toEqual({ error: "code_taken", fieldErrors: { code: "code_taken" } });
+    const stored = await prisma.promotion.findFirstOrThrow({ where: { slug: "weekend-special" } });
+    expect(stored.code).toBe("WELCOME15");
+  });
 });
 
 describe("updatePromotionAction", () => {

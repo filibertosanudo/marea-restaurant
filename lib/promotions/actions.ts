@@ -51,6 +51,16 @@ function readPromotionForm(formData: FormData) {
   };
 }
 
+// The businessId+code unique constraint is case-sensitive at the database
+// level, but engine.ts matches an entered code against a stored one
+// case-insensitively — without normalizing here, "WELCOME15" and
+// "welcome15" would pass as two distinct, non-colliding rows that then
+// redeem identically and non-deterministically at checkout.
+function normalizeCode(code: string | undefined): string | null {
+  const trimmed = code?.trim();
+  return trimmed ? trimmed.toUpperCase() : null;
+}
+
 function timeToMinutes(value: string | undefined): number | null {
   const match = value ? /^(\d{2}):(\d{2})$/.exec(value) : null;
   if (!match) return null;
@@ -142,7 +152,7 @@ export async function createPromotionAction(
           businessId: business.id,
           slug,
           type: data.type,
-          code: data.code || null,
+          code: normalizeCode(data.code),
           value: data.value,
           minOrderTotal: data.minOrderTotal || null,
           maxDiscount: data.maxDiscount || null,
@@ -212,7 +222,7 @@ export async function updatePromotionAction(
         where: { id },
         data: {
           type: data.type,
-          code: data.code || null,
+          code: normalizeCode(data.code),
           value: data.value,
           minOrderTotal: data.minOrderTotal || null,
           maxDiscount: data.maxDiscount || null,
