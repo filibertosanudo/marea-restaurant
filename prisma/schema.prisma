@@ -398,6 +398,7 @@ model User {
   openedCashSessions  CashSession[]        @relation("CashSessionOpenedBy")
   closedCashSessions  CashSession[]        @relation("CashSessionClosedBy")
   cashMovements       CashMovement[]
+  stockMovements      StockMovement[]
 
   @@index([role])
 }
@@ -578,9 +579,13 @@ model MenuItem {
   // trackInventory es false, stockQuantity se ignora. Se separan porque la
   // mayoría de los platillos NO llevan inventario y forzar stock a 0 los
   // ocultaría por accidente.
-  isAvailable    Boolean @default(true)
-  trackInventory Boolean @default(false)
-  stockQuantity  Int     @default(0)
+  isAvailable      Boolean @default(true)
+  trackInventory   Boolean @default(false)
+  stockQuantity    Int     @default(0)
+  /// Panel warning once stockQuantity crosses this threshold going down.
+  /// 0 = don't warn, the existing default behavior for every row already
+  /// in the table.
+  minStockQuantity Int     @default(0)
 
   isFeatured         Boolean @default(false) // "platillo insignia"
   preparationMinutes Int?    @default(15) // para estimar tiempo de entrega
@@ -599,6 +604,7 @@ model MenuItem {
   cartItems      CartItem[]
   orderItems     OrderItem[]
   promotions     PromotionMenuItem[]
+  stockMovements StockMovement[]
 
   @@unique([businessId, slug])
   // El índice que resuelve la consulta más común del sitio:
@@ -664,6 +670,38 @@ model MenuItemTag {
 
   @@id([menuItemId, tagId])
   @@index([tagId])
+}
+
+/// Every stock change, with its cause. Without this, `stockQuantity` is a
+/// number with no history and nobody trusts it: an order lowers it, a
+/// cancellation raises it, a manual adjustment moves it, and with no ledger
+/// the three are indistinguishable. Written inside the same transaction that
+/// changes `stockQuantity`, at the three sites that touch it — never apart.
+model StockMovement {
+  id          String              @id @default(cuid())
+  menuItemId  String
+  /// Negative on a sale, positive on a restock or a cancellation.
+  delta       Int
+  reason      StockMovementReason
+  /// The order that caused it, when there is one (sale or cancellation).
+  orderId     String?
+  createdById String?
+  note        String?
+  createdAt   DateTime            @default(now())
+
+  menuItem  MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([menuItemId, createdAt])
+}
+
+enum StockMovementReason {
+  SALE
+  CANCELLATION
+  MANUAL_ADJUSTMENT
+  RESTOCK
+  WASTE
 }
 
 // ----------------------------------------------------------------------------
@@ -929,17 +967,18 @@ model Order {
   updatedAt DateTime @updatedAt
   // Sin deletedAt a propósito: un pedido se CANCELA, no se borra.
 
-  business      Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  customer      User?              @relation("OrderCustomer", fields: [customerId], references: [id], onDelete: SetNull)
-  staff         User?              @relation("OrderStaff", fields: [staffId], references: [id], onDelete: SetNull)
-  table         RestaurantTable?   @relation(fields: [tableId], references: [id], onDelete: SetNull)
-  items         OrderItem[]
-  statusEvents  OrderStatusEvent[]
-  payments      Payment[]
-  promotions    OrderPromotion[]
-  testimonials  Testimonial[]
-  notifications NotificationJob[]
-  printJobs     PrintJob[]
+  business       Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer       User?              @relation("OrderCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+  staff          User?              @relation("OrderStaff", fields: [staffId], references: [id], onDelete: SetNull)
+  table          RestaurantTable?   @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+  statusEvents   OrderStatusEvent[]
+  payments       Payment[]
+  promotions     OrderPromotion[]
+  testimonials   Testimonial[]
+  notifications  NotificationJob[]
+  printJobs      PrintJob[]
+  stockMovements StockMovement[]
 
   @@unique([businessId, orderNumber])
   @@index([businessId, status, placedAt]) // tablero de cocina
