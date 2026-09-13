@@ -9,7 +9,11 @@ import { ItemEditorDrawer } from "./ItemEditorDrawer";
 import type { Lang } from "@/lib/i18n/lang";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import type { CategoryListDTO, MenuItemListDTO, ModifierGroupDTO, TagDTO } from "@/lib/dto/menu";
-import { toggleAvailabilityAction, softDeleteMenuItemAction } from "@/lib/menu/item-actions";
+import {
+  toggleAvailabilityAction,
+  softDeleteMenuItemAction,
+  adjustMenuItemStockAction,
+} from "@/lib/menu/item-actions";
 
 type ItemTableProps = {
   items: MenuItemListDTO[];
@@ -42,15 +46,30 @@ export function ItemTable({
   const pathname = usePathname();
   const [, startNav] = useTransition();
 
-  const [optimisticItems, setOptimisticAvailability] = useOptimistic(
+  type OptimisticAction =
+    | { type: "availability"; id: string }
+    | { type: "stock"; id: string; stockQuantity: number; isAvailable: boolean };
+
+  const [optimisticItems, dispatchOptimistic] = useOptimistic(
     items,
-    (state, id: string) =>
-      state.map((i) => (i.id === id ? { ...i, isAvailable: !i.isAvailable } : i))
+    (state, action: OptimisticAction) => {
+      if (action.type === "availability") {
+        return state.map((i) => (i.id === action.id ? { ...i, isAvailable: !i.isAvailable } : i));
+      }
+      return state.map((i) =>
+        i.id === action.id
+          ? { ...i, stockQuantity: action.stockQuantity, isAvailable: action.isAvailable }
+          : i
+      );
+    }
   );
 
   const [editing, setEditing] = useState<MenuItemListDTO | "new" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MenuItemListDTO | null>(null);
   const [deletePending, setDeletePending] = useState(false);
+  // Ids currently mid-adjustment — disables that row's +/- so a fast
+  // double-click can't fire two calls off the same stale optimistic base.
+  const [stockPendingIds, setStockPendingIds] = useState<Set<string>>(new Set());
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function updateQuery(next: Partial<{ q: string; category: string; availability: string; page: string }>) {
@@ -73,8 +92,42 @@ export function ItemTable({
   }
 
   async function handleToggle(item: MenuItemListDTO) {
-    startTransition(() => setOptimisticAvailability(item.id));
+    startTransition(() => dispatchOptimistic({ type: "availability", id: item.id }));
     await toggleAvailabilityAction(item.id, !item.isAvailable);
+  }
+
+  async function handleStockAdjust(item: MenuItemListDTO, delta: number) {
+    if (stockPendingIds.has(item.id)) return;
+    setStockPendingIds((prev) => new Set(prev).add(item.id));
+    startTransition(() =>
+      dispatchOptimistic({
+        type: "stock",
+        id: item.id,
+        stockQuantity: Math.max(0, item.stockQuantity + delta),
+        isAvailable: item.isAvailable,
+      })
+    );
+    const result = await adjustMenuItemStockAction(item.id, delta);
+    setStockPendingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(item.id);
+      return next;
+    });
+    if ("success" in result) {
+      startTransition(() =>
+        dispatchOptimistic({
+          type: "stock",
+          id: item.id,
+          stockQuantity: result.stockQuantity,
+          isAvailable: result.isAvailable,
+        })
+      );
+    } else {
+      // The optimistic guess above was wrong (a concurrent adjustment beat
+      // it to zero, most likely) — force a fresh read instead of leaving a
+      // number on screen nobody can act on.
+      router.refresh();
+    }
   }
 
   async function handleConfirmDelete() {
@@ -144,6 +197,9 @@ export function ItemTable({
                 {dict.menu.columnPrice}
               </th>
               <th className="px-md py-[10px] text-[11px] font-medium uppercase tracking-[0.04em] text-on-surface-muted">
+                {dict.menu.columnStock}
+              </th>
+              <th className="px-md py-[10px] text-[11px] font-medium uppercase tracking-[0.04em] text-on-surface-muted">
                 {dict.menu.columnAvailable}
               </th>
               <th className="px-md py-[10px] text-[11px] font-medium uppercase tracking-[0.04em] text-on-surface-muted">
@@ -155,7 +211,7 @@ export function ItemTable({
           <tbody>
             {optimisticItems.length === 0 && (
               <tr>
-                <td colSpan={canManage ? 7 : 6} className="px-md py-xl text-center text-on-surface-muted">
+                <td colSpan={canManage ? 8 : 7} className="px-md py-xl text-center text-on-surface-muted">
                   {dict.menu.noResults}
                 </td>
               </tr>
@@ -192,6 +248,40 @@ export function ItemTable({
                 </td>
                 <td className="px-md py-[8px] text-on-surface-muted">{item.categoryName}</td>
                 <td className="px-md py-[8px] text-on-surface">${item.basePrice}</td>
+                <td className="px-md py-[8px]">
+                  {!item.trackInventory ? (
+                    <span className="text-on-surface-muted">—</span>
+                  ) : (
+                    <div className="flex items-center gap-[6px]">
+                      <span className="inline-flex items-center gap-[4px]">
+                        <button
+                          type="button"
+                          aria-label={dict.menu.stockDecrease}
+                          disabled={stockPendingIds.has(item.id) || item.stockQuantity <= 0}
+                          onClick={() => handleStockAdjust(item, -1)}
+                          className="flex h-5 w-5 items-center justify-center rounded-sm border border-border text-[12px] text-on-surface disabled:opacity-40"
+                        >
+                          −
+                        </button>
+                        <span className="min-w-[18px] text-center font-medium text-on-surface">
+                          {item.stockQuantity}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={dict.menu.stockIncrease}
+                          disabled={stockPendingIds.has(item.id)}
+                          onClick={() => handleStockAdjust(item, 1)}
+                          className="flex h-5 w-5 items-center justify-center rounded-sm border border-border text-[12px] text-on-surface disabled:opacity-40"
+                        >
+                          +
+                        </button>
+                      </span>
+                      {item.minStockQuantity > 0 && item.stockQuantity <= item.minStockQuantity && (
+                        <StatusBadge variant="warning">{dict.menu.stockLow}</StatusBadge>
+                      )}
+                    </div>
+                  )}
+                </td>
                 <td className="px-md py-[8px]">
                   <button
                     type="button"
