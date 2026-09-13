@@ -119,6 +119,33 @@ describe("createOrderFromCart", () => {
     const final = await prisma.menuItem.findUniqueOrThrow({ where: { id: item.id } });
     expect(final.stockQuantity).toBe(0);
     expect(final.isAvailable).toBe(false);
+
+    // Exactly one SALE movement — the loser of the race never decremented
+    // anything, so it must not have left a ledger row either.
+    const movements = await prisma.stockMovement.findMany({ where: { menuItemId: item.id } });
+    expect(movements).toHaveLength(1);
+    expect(movements[0]).toMatchObject({ delta: -1, reason: "SALE" });
+  });
+
+  it("records a SALE stock movement attached to the order for each tracked dish sold", async () => {
+    const business = await makeBusiness();
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id, {
+      basePrice: "10.00",
+      trackInventory: true,
+      stockQuantity: 5,
+    });
+    const untracked = await makeMenuItem(business.id, category.id, { basePrice: "5.00" });
+    const cart = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cart.id, menuItemId: item.id, quantity: 2 } });
+    await prisma.cartItem.create({ data: { cartId: cart.id, menuItemId: untracked.id, quantity: 1 } });
+
+    const order = await checkout(cart, business);
+
+    const movement = await prisma.stockMovement.findFirstOrThrow({ where: { menuItemId: item.id } });
+    expect(movement).toMatchObject({ delta: -2, reason: "SALE", orderId: order.id });
+    const untrackedMovements = await prisma.stockMovement.count({ where: { menuItemId: untracked.id } });
+    expect(untrackedMovements).toBe(0);
   });
 
   it("rejects a discontinued dish", async () => {
