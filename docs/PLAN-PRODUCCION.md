@@ -41,7 +41,7 @@
 depende de esas dos.
 
 ---
-## Estado (10 de septiembre de 2026, tras el módulo 13)
+## Estado (13 de septiembre de 2026, tras el módulo 14)
 
 Actualiza esta tabla al cerrar cada módulo. Es lo primero que se lee al volver
 al proyecto después de un tiempo fuera.
@@ -54,7 +54,7 @@ al proyecto después de un tiempo fuera.
 | 2 · Endurecimiento de seguridad | 10 | **Terminada salvo el segundo factor**, que se pospuso a un módulo propio |
 | 3 · Notificaciones reales | 11 | **Terminada**, fases apiladas (PRs #41–#47) sin fusionar. SMTP contra un proveedor real sin probar de punta a punta por falta de credenciales |
 | 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | **Terminada.** Reportes y corte de caja (módulo 12, fusionado en `main`) y comanda impresa + KDS (módulo 13, fases apiladas PRs #54–#57, sin fusionar). No probado contra una impresora térmica física — verificado contra un emulador ESC/POS, ver el módulo 13 |
-| 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | Prompt del 14 escrito, sin aplicar |
+| 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | Módulo 14 (inventario y promociones) **terminado**, fases apiladas (PRs #60–#63) sin fusionar. Módulo 15 (testimonios y landing dinámico) sin empezar |
 | 6 · Rendimiento y tiempo real | 16 | Sin empezar |
 | 7 · Multi-sucursal | 17 | Sin empezar |
 | 8 · Producto vendible | 18 | Sin empezar |
@@ -75,11 +75,10 @@ al proyecto después de un tiempo fuera.
 
 ### Lo que bloquea la venta, hoy
 
-En orden. Ninguno es técnico: son las cosas que un restaurante toca a diario y
-que todavía no existen.
-
-1. **Inventario usable** (fase 5). La lógica existe desde el módulo 2; no hay
-   pantalla para activarla.
+Ningún bloqueador técnico activo por el momento. Lo que queda de la fase 5
+(testimonios conectados a la base, landing dinámico desde `content.ts`) es
+módulo 15, sin empezar — ver las verificaciones pendientes de infraestructura
+más abajo para lo que sí sigue abierto.
 
 Notificaciones (fase 3) se cerró: el worker manda correo real en los seis
 eventos que ya encolaba, en el idioma del invitado. **Verificación pendiente
@@ -107,6 +106,14 @@ desarrollo:** todo se probó de punta a punta contra un emulador ESC/POS
 mano — el protocolo, el corte de papel, los acentos y la nota en negativo
 quedaron verificados igual, pero falta la prueba contra hardware real antes
 de instalarlo en un restaurante de verdad.
+
+Inventario y promociones (módulo 14) se cerró: existencia por platillo con
+decremento atómico contra ventas simultáneas y un ledger de movimientos con
+causa; CRUD de promociones en `/admin/promociones` con cuatro tipos de
+descuento y vista previa en lenguaje natural; y, la pieza que faltaba, el
+enganche real al checkout — impuesto sobre el monto ya descontado, límite de
+uso redimido de forma atómica, y `OrderPromotion` con el descuento congelado
+por pedido. Sin verificaciones pendientes fuera del código.
 
 ### Verificaciones pendientes de infraestructura
 
@@ -1455,11 +1462,11 @@ mandas nada: es lo que separa un boletín de un problema legal.
 
 ## Criterio de terminado — Fase 5
 
-- [ ] Un platillo con `trackInventory` baja existencias al venderse, las repone
+- [x] Un platillo con `trackInventory` baja existencias al venderse, las repone
       al cancelarse, y cada movimiento aparece en la bitácora con su causa.
-- [ ] Cada tipo de promoción tiene test de integración, incluidos los límites de
+- [x] Cada tipo de promoción tiene test de integración, incluidos los límites de
       uso bajo concurrencia.
-- [ ] Un pedido con promoción guarda su `OrderPromotion` con el descuento
+- [x] Un pedido con promoción guarda su `OrderPromotion` con el descuento
       congelado, y el ticket cuadra.
 - [ ] `content.ts` no contiene ni un dato del negocio.
 - [ ] La landing muestra el horario real y cambia al editarlo en el panel.
