@@ -1,23 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { createOrderFromCart, CheckoutError } from "./create-order";
+import { CheckoutError } from "./create-order";
 import { makeBusiness, makeMenuCategory, makeMenuItem, makeCart } from "@/test/factories";
-import { runWithCookies } from "@/test/stubs/next-headers";
-import { CART_COOKIE } from "@/lib/cart/cookie";
 import { runConcurrently, partitionSettled } from "@/test/concurrency";
-import type { Business } from "@/lib/generated/prisma/client";
-
-const guest: { guestName: string; guestPhone: string; guestEmail?: string } = {
-  guestName: "Ana Ruiz",
-  guestPhone: "+52 555 000 0000",
-};
-
-/** Runs createOrderFromCart as if the request carried `cart`'s own session cookie — each call gets its own isolated cookie jar, so two different carts' checkouts never see each other's token. */
-function checkout(cart: { sessionToken: string | null }, business: Pick<Business, "id">, guestInfo = guest) {
-  return runWithCookies({ [CART_COOKIE]: cart.sessionToken! }, () =>
-    createOrderFromCart(business.id, "en", guestInfo)
-  );
-}
+import { checkout, defaultGuest as guest } from "@/test/checkout";
 
 describe("createOrderFromCart", () => {
   it("freezes the order's price at the moment it's created, immune to later basePrice changes", async () => {
