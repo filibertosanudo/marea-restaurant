@@ -22,6 +22,8 @@ export type OrderConfirmedPayload = {
   orderNumber: string;
   orderUrl: string;
   items: OrderLineSummary[];
+  /** Only set when a promotion actually discounted this order — otherwise the line items already sum to `total` (plus tax) with nothing to explain. */
+  discountTotal?: string;
   total: string;
   currency: string;
 };
