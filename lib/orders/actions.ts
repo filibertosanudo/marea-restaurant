@@ -7,6 +7,7 @@ import { createOrderFromCart, CheckoutError } from "@/lib/orders/create-order";
 import { checkoutSchema } from "@/lib/orders/schemas";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import type { Lang } from "@/lib/i18n/lang";
+import type { PromotionRejectionReason } from "@/lib/promotions/engine";
 
 const CREATE_SCOPE = "order:create";
 const CREATE_MAX_ATTEMPTS = 5;
@@ -14,8 +15,15 @@ const CREATE_WINDOW_MS = 15 * 60 * 1000;
 
 export type CheckoutState =
   | { error: "invalid_input"; fieldErrors: Record<string, string> }
+  | { error: "invalid_promo_code"; promoReason?: PromotionRejectionReason }
   | {
-      error: "empty_cart" | "item_unavailable" | "modifier_unavailable" | "modifier_invalid" | "rate_limited";
+      error:
+        | "empty_cart"
+        | "item_unavailable"
+        | "modifier_unavailable"
+        | "modifier_invalid"
+        | "promotion_exhausted"
+        | "rate_limited";
       dishName?: string;
     }
   | undefined;
@@ -30,6 +38,7 @@ export async function createOrderAction(
     guestPhone: formData.get("guestPhone"),
     guestEmail: formData.get("guestEmail") ?? "",
     notes: formData.get("notes") || undefined,
+    promoCode: formData.get("promoCode") || undefined,
   });
 
   if (!parsed.success) {
@@ -50,6 +59,9 @@ export async function createOrderAction(
     order = await createOrderFromCart(business.id, lang, parsed.data);
   } catch (err) {
     if (err instanceof CheckoutError) {
+      if (err.code === "invalid_promo_code") {
+        return { error: err.code, promoReason: err.promoReason };
+      }
       return { error: err.code, dishName: err.dishName };
     }
     throw err;
