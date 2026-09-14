@@ -10,6 +10,7 @@ import type { Lang } from "@/lib/i18n/lang";
 import { slugify } from "@/lib/menu/slugify";
 import { localWallClockToUtc } from "@/lib/reservations/availability";
 import { flattenZodError } from "@/lib/forms/flatten-zod-error";
+import { normalizePromotionCode } from "@/lib/promotions/engine";
 
 const ADMIN_ROLES = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
 
@@ -49,16 +50,6 @@ function readPromotionForm(formData: FormData) {
       },
     },
   };
-}
-
-// The businessId+code unique constraint is case-sensitive at the database
-// level, but engine.ts matches an entered code against a stored one
-// case-insensitively — without normalizing here, "WELCOME15" and
-// "welcome15" would pass as two distinct, non-colliding rows that then
-// redeem identically and non-deterministically at checkout.
-function normalizeCode(code: string | undefined): string | null {
-  const trimmed = code?.trim();
-  return trimmed ? trimmed.toUpperCase() : null;
 }
 
 function timeToMinutes(value: string | undefined): number | null {
@@ -152,7 +143,7 @@ export async function createPromotionAction(
           businessId: business.id,
           slug,
           type: data.type,
-          code: normalizeCode(data.code),
+          code: normalizePromotionCode(data.code),
           value: data.value,
           minOrderTotal: data.minOrderTotal || null,
           maxDiscount: data.maxDiscount || null,
@@ -222,7 +213,7 @@ export async function updatePromotionAction(
         where: { id },
         data: {
           type: data.type,
-          code: normalizeCode(data.code),
+          code: normalizePromotionCode(data.code),
           value: data.value,
           minOrderTotal: data.minOrderTotal || null,
           maxDiscount: data.maxDiscount || null,
