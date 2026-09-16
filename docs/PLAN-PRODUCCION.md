@@ -54,7 +54,7 @@ al proyecto después de un tiempo fuera.
 | 2 · Endurecimiento de seguridad | 10 | **Terminada salvo el segundo factor**, que se pospuso a un módulo propio |
 | 3 · Notificaciones reales | 11 | **Terminada**, fases apiladas (PRs #41–#47) sin fusionar. SMTP contra un proveedor real sin probar de punta a punta por falta de credenciales |
 | 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | **Terminada.** Reportes y corte de caja (módulo 12, fusionado en `main`) y comanda impresa + KDS (módulo 13, fases apiladas PRs #54–#57, sin fusionar). No probado contra una impresora térmica física — verificado contra un emulador ESC/POS, ver el módulo 13 |
-| 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | Sin empezar |
+| 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | Prompt del 14 escrito, sin aplicar |
 | 6 · Rendimiento y tiempo real | 16 | Sin empezar |
 | 7 · Multi-sucursal | 17 | Sin empezar |
 | 8 · Producto vendible | 18 | Sin empezar |
@@ -107,6 +107,21 @@ desarrollo:** todo se probó de punta a punta contra un emulador ESC/POS
 mano — el protocolo, el corte de papel, los acentos y la nota en negativo
 quedaron verificados igual, pero falta la prueba contra hardware real antes
 de instalarlo en un restaurante de verdad.
+
+### Verificaciones pendientes de infraestructura
+
+Las dos vienen de fases ya cerradas y ninguna bloquea el desarrollo — las dos
+bloquean la instalación en un restaurante de verdad. No se resuelven
+escribiendo código, así que se dejan aquí en su propia lista para que no se
+pierdan dentro de la prosa de una fase que ya se dio por terminada.
+
+- [ ] **Envío SMTP contra un proveedor real**, con SPF, DKIM y DMARC
+      configurados en el dominio propio, comprobando que el correo llega a
+      Gmail sin caer en spam. Abierta desde el módulo 11 (fase 3).
+- [ ] **Impresión contra una impresora térmica física.** El módulo 13 (fase 4)
+      se verificó de punta a punta contra un emulador ESC/POS
+      (`agent/dev/mock-printer.ts`), que no reproduce el atasco de papel, la
+      página de códigos real ni el corte.
 
 ---
 
