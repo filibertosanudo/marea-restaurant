@@ -54,7 +54,7 @@ al proyecto después de un tiempo fuera.
 | 2 · Endurecimiento de seguridad | 10 | **Terminada salvo el segundo factor**, que se pospuso a un módulo propio |
 | 3 · Notificaciones reales | 11 | **Terminada**, fases apiladas (PRs #41–#47) sin fusionar. SMTP contra un proveedor real sin probar de punta a punta por falta de credenciales |
 | 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | **Terminada.** Reportes y corte de caja (módulo 12, fusionado en `main`) y comanda impresa + KDS (módulo 13, fases apiladas PRs #54–#57, sin fusionar). No probado contra una impresora térmica física — verificado contra un emulador ESC/POS, ver el módulo 13 |
-| 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | Módulo 14 (inventario y promociones) **terminado**, fases apiladas (PRs #60–#63) sin fusionar. Módulo 15 (testimonios y landing dinámico) sin empezar |
+| 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | **Inventario y promociones terminados** (módulo 14, fusionado en `main`). Testimonios y landing desde la base: prompt del 15 escrito, sin aplicar |
 | 6 · Rendimiento y tiempo real | 16 | Sin empezar |
 | 7 · Multi-sucursal | 17 | Sin empezar |
 | 8 · Producto vendible | 18 | Sin empezar |
