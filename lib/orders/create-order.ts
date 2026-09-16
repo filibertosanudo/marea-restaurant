@@ -256,8 +256,10 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
     // automatic promotion re-applies on every attempt.)
     const redeemedDiscounts: typeof promoResult.discounts = [];
     for (const discount of promoResult.discounts) {
-      const promo = promotionById.get(discount.promotionId);
-      if (!promo) continue;
+      // Never undefined: every discount.promotionId came from applyPromotions
+      // evaluating exactly this same businessPromotions array, so the id is
+      // always a key in the map built from it.
+      const promo = promotionById.get(discount.promotionId)!;
       const guardedWhere =
         promo.usageLimit !== null
           ? { id: promo.id, usageCount: { lt: promo.usageLimit } }

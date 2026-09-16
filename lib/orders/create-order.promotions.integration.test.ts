@@ -8,8 +8,9 @@ import {
   makeCart,
   makePromotion,
 } from "@/test/factories";
-import { runConcurrently, partitionSettled } from "@/test/concurrency";
+import { runConcurrently, partitionSettled, waitForLockWaitOn } from "@/test/concurrency";
 import { checkout, defaultGuest as guest } from "@/test/checkout";
+import { testSchema } from "@/test/db";
 import { businessLocalDateParts, businessLocalMinutesOfDay, dayOfWeekFor } from "@/lib/reservations/availability";
 import { buildSalesSummary, type ReportOrderRow } from "@/lib/reports/aggregate";
 
@@ -343,6 +344,81 @@ describe("createOrderFromCart — promotion usage limits", () => {
     const orderPromoCount = await prisma.orderPromotion.count({ where: { promotionId: promo.id } });
     expect(orderPromoCount).toBe(1);
   });
+
+  // The two tests above race two equivalent checkouts against each other —
+  // realistic, but which of the two defenses (the eligibility check's own
+  // stale-read rejection, or the atomic usageCount guard) actually catches
+  // the loser depends on how far each transaction happened to get before
+  // the other committed. In practice `business.update`'s row lock earlier
+  // in checkout fully serializes the two before either reaches the
+  // promotion step, so the eligibility check reliably wins that race and
+  // the atomic guard's own branch below never fires. These two tests force
+  // the atomic guard specifically: a real, uncommitted transaction holds
+  // the promotion's row lock after already claiming its only slot, which
+  // is invisible to the checkout's own eligibility read (MVCC) but blocks
+  // its guarded UPDATE outright — deterministically exercising the guard
+  // itself rather than hoping for a lucky interleaving.
+  it("an automatic promotion's slot claimed mid-flight by another transaction is dropped, not aborted", async () => {
+    const business = await makeBusiness({ timezone: TZ });
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id, { basePrice: "20.00" });
+    const cart = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cart.id, menuItemId: item.id, quantity: 1 } });
+    const promo = await makePromotion(business.id, {
+      type: "PERCENTAGE",
+      value: "10",
+      code: null,
+      usageLimit: 1,
+    });
+
+    let releaseBlocker!: () => void;
+    const blockerCanCommit = new Promise<void>((resolve) => {
+      releaseBlocker = resolve;
+    });
+    const blockerTx = prisma.$transaction(async (tx) => {
+      await tx.promotion.update({ where: { id: promo.id }, data: { usageCount: { increment: 1 } } });
+      await blockerCanCommit;
+    });
+
+    const checkoutPromise = checkout(cart, business);
+    await waitForLockWaitOn(prisma, testSchema, "Promotion");
+    releaseBlocker();
+    await blockerTx;
+
+    const order = await checkoutPromise;
+    expect(order.discountTotal.toString()).toBe("0");
+    const final = await prisma.promotion.findUniqueOrThrow({ where: { id: promo.id } });
+    expect(final.usageCount).toBe(1);
+    const orderPromoCount = await prisma.orderPromotion.count({ where: { promotionId: promo.id } });
+    expect(orderPromoCount).toBe(0);
+  });
+
+  it("a guest-entered code's slot claimed mid-flight by another transaction rejects with promotion_exhausted", async () => {
+    const business = await makeBusiness({ timezone: TZ });
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id, { basePrice: "20.00" });
+    const cart = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cart.id, menuItemId: item.id, quantity: 1 } });
+    const promo = await makePromotion(business.id, { code: "RACE", usageLimit: 1 });
+
+    let releaseBlocker!: () => void;
+    const blockerCanCommit = new Promise<void>((resolve) => {
+      releaseBlocker = resolve;
+    });
+    const blockerTx = prisma.$transaction(async (tx) => {
+      await tx.promotion.update({ where: { id: promo.id }, data: { usageCount: { increment: 1 } } });
+      await blockerCanCommit;
+    });
+
+    const checkoutPromise = checkout(cart, business, { ...guest, promoCode: "RACE" });
+    await waitForLockWaitOn(prisma, testSchema, "Promotion");
+    releaseBlocker();
+    await blockerTx;
+
+    await expect(checkoutPromise).rejects.toMatchObject({ code: "promotion_exhausted" });
+    const final = await prisma.promotion.findUniqueOrThrow({ where: { id: promo.id } });
+    expect(final.usageCount).toBe(1);
+  });
 });
 
 describe("createOrderFromCart — combining several promotions", () => {
@@ -362,6 +438,23 @@ describe("createOrderFromCart — combining several promotions", () => {
     const orderPromos = await prisma.orderPromotion.findMany({ where: { orderId: order.id } });
     expect(orderPromos).toHaveLength(2);
     expect(orderPromos.map((p) => p.discountAmount.toString()).sort()).toEqual(["10", "5"]);
+  });
+});
+
+describe("createOrderFromCart — confirmation email", () => {
+  it("includes the discount line when the order actually redeemed a promotion", async () => {
+    const business = await makeBusiness({ timezone: TZ });
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id, { basePrice: "50.00" });
+    const cart = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cart.id, menuItemId: item.id, quantity: 1 } });
+    await makePromotion(business.id, { type: "PERCENTAGE", value: "20", code: null });
+
+    const order = await checkout(cart, business, { ...guest, guestEmail: "ana@example.com" });
+
+    const job = await prisma.notificationJob.findFirstOrThrow({ where: { relatedOrderId: order.id } });
+    const payload = job.payload as { discountTotal?: string };
+    expect(payload.discountTotal).toBeDefined();
   });
 });
 
