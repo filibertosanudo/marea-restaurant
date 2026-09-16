@@ -81,6 +81,15 @@ export async function getMenuItemByIdRaw(businessId: string, id: string) {
   });
 }
 
+/** The lightweight {id, translations} shape a picker (promotions' item scope, etc.) needs — never the full item-editor include. */
+export async function listMenuItemNamesRaw(businessId: string) {
+  return prisma.menuItem.findMany({
+    where: { businessId, deletedAt: null },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, translations: { select: { locale: true, name: true } } },
+  });
+}
+
 export async function listTagsRaw(businessId: string) {
   return prisma.tag.findMany({
     where: { businessId },
