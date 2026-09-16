@@ -88,3 +88,18 @@ export function makeStaff(role: UserRole, overrides: Partial<Prisma.UserUnchecke
     },
   });
 }
+
+export function makePromotion(
+  businessId: string,
+  overrides: Partial<Prisma.PromotionUncheckedCreateInput> = {}
+) {
+  return prisma.promotion.create({
+    data: {
+      businessId,
+      slug: `promo-${createId()}`,
+      type: "PERCENTAGE",
+      value: "10.00",
+      ...overrides,
+    },
+  });
+}

@@ -6,6 +6,7 @@ import type {
   OrderType,
   PromotionType,
 } from "@/lib/generated/prisma/client";
+import type { PromotionRule } from "@/lib/promotions/engine";
 
 const LOCALES: Lang[] = ["en", "es"];
 
@@ -89,5 +90,33 @@ export function toPromotionListDTO(promo: PromotionWithRelations, lang: Lang): P
         badgeLabel: map.es?.badgeLabel ?? "",
       },
     },
+  };
+}
+
+/**
+ * The checkout-side mapping, unlike toPromotionListDTO above: stays
+ * server-side (never crosses to a Client Component) so amounts keep
+ * Prisma.Decimal instead of being stringified, matching what
+ * lib/promotions/engine.ts's pure arithmetic expects.
+ */
+export function toPromotionRule(promo: PromotionWithRelations): PromotionRule {
+  return {
+    id: promo.id,
+    type: promo.type,
+    code: promo.code,
+    value: promo.value,
+    minOrderTotal: promo.minOrderTotal,
+    maxDiscount: promo.maxDiscount,
+    startsAt: promo.startsAt,
+    endsAt: promo.endsAt,
+    daysOfWeek: promo.daysOfWeek,
+    startMinute: promo.startMinute,
+    endMinute: promo.endMinute,
+    usageLimit: promo.usageLimit,
+    perUserLimit: promo.perUserLimit,
+    appliesToOrderType: promo.appliesToOrderType,
+    isActive: promo.isActive,
+    createdAt: promo.createdAt,
+    menuItemIds: promo.menuItems.map((m) => m.menuItemId),
   };
 }

@@ -10,6 +10,7 @@ const STRINGS = {
     preview: "Tu pedido fue recibido",
     heading: "Tu pedido fue recibido",
     order: (orderNumber: string) => `Folio ${orderNumber}`,
+    discount: "Descuento",
     total: "Total",
     button: "Ver mi pedido",
   },
@@ -18,6 +19,7 @@ const STRINGS = {
     preview: "Your order was received",
     heading: "Your order was received",
     order: (orderNumber: string) => `Order ${orderNumber}`,
+    discount: "Discount",
     total: "Total",
     button: "View my order",
   },
@@ -45,7 +47,17 @@ function html(payload: OrderConfirmedPayload, locale: Lang, business: TemplateBu
           </Column>
         </Row>
       ))}
-      <Row style={{ marginTop: "12px" }}>
+      {payload.discountTotal && (
+        <Row style={{ marginTop: "12px" }}>
+          <Column>
+            <Text style={{ ...emailStyles.paragraph, margin: 0 }}>{t.discount}</Text>
+          </Column>
+          <Column align="right">
+            <Text style={{ ...emailStyles.paragraph, margin: 0 }}>-{payload.discountTotal}</Text>
+          </Column>
+        </Row>
+      )}
+      <Row style={{ marginTop: payload.discountTotal ? "4px" : "12px" }}>
         <Column>
           <Text style={{ ...emailStyles.paragraph, margin: 0, fontWeight: 600 }}>{t.total}</Text>
         </Column>
@@ -63,10 +75,12 @@ function html(payload: OrderConfirmedPayload, locale: Lang, business: TemplateBu
 function text(payload: OrderConfirmedPayload, locale: Lang, business: TemplateBusiness): string {
   const t = STRINGS[locale];
   const lines = payload.items.map(lineText).join("\n");
+  const discountLine = payload.discountTotal ? `${t.discount}: -${payload.discountTotal}\n` : "";
   return (
     `${t.heading}\n\n` +
     `${t.order(payload.orderNumber)}\n\n` +
     `${lines}\n\n` +
+    discountLine +
     `${t.total}: ${payload.total}\n\n` +
     `${t.button}: ${payload.orderUrl}` +
     textFooter(business)

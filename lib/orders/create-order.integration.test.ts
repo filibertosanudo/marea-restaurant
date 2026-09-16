@@ -1,23 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { createOrderFromCart, CheckoutError } from "./create-order";
+import { CheckoutError } from "./create-order";
 import { makeBusiness, makeMenuCategory, makeMenuItem, makeCart } from "@/test/factories";
-import { runWithCookies } from "@/test/stubs/next-headers";
-import { CART_COOKIE } from "@/lib/cart/cookie";
 import { runConcurrently, partitionSettled } from "@/test/concurrency";
-import type { Business } from "@/lib/generated/prisma/client";
-
-const guest: { guestName: string; guestPhone: string; guestEmail?: string } = {
-  guestName: "Ana Ruiz",
-  guestPhone: "+52 555 000 0000",
-};
-
-/** Runs createOrderFromCart as if the request carried `cart`'s own session cookie — each call gets its own isolated cookie jar, so two different carts' checkouts never see each other's token. */
-function checkout(cart: { sessionToken: string | null }, business: Pick<Business, "id">, guestInfo = guest) {
-  return runWithCookies({ [CART_COOKIE]: cart.sessionToken! }, () =>
-    createOrderFromCart(business.id, "en", guestInfo)
-  );
-}
+import { checkout, defaultGuest as guest } from "@/test/checkout";
 
 describe("createOrderFromCart", () => {
   it("freezes the order's price at the moment it's created, immune to later basePrice changes", async () => {
@@ -70,6 +56,58 @@ describe("createOrderFromCart", () => {
     await expect(checkout({ sessionToken: null }, business)).rejects.toMatchObject({
       code: "empty_cart",
     });
+  });
+
+  it("rejects checkout with a session token that matches no cart at all", async () => {
+    // Distinct from "no cookie at all" above: a cookie is present, but no
+    // Cart row was ever created for it (a forged value, or one left over
+    // from a cart that no longer exists) — the locked-cart lookup itself
+    // comes back empty, not the cart's own item count.
+    const business = await makeBusiness();
+
+    await expect(checkout({ sessionToken: "does-not-exist" }, business)).rejects.toMatchObject({
+      code: "empty_cart",
+    });
+  });
+
+  it("completes checkout with a modifier-bearing item, freezing each modifier's translated name or falling back to its slug", async () => {
+    const business = await makeBusiness();
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id, { basePrice: "10.00" });
+    const group = await prisma.modifierGroup.create({
+      data: { businessId: business.id, slug: "extras", selectionType: "MULTIPLE", maxSelections: 2 },
+    });
+    const translatedOption = await prisma.modifierOption.create({
+      data: { groupId: group.id, slug: "large", priceDelta: "2.00" },
+    });
+    await prisma.modifierOptionTranslation.create({
+      data: { optionId: translatedOption.id, locale: "en", name: "Large" },
+    });
+    // No translation row at all — the order must fall back to the slug
+    // instead of leaving the modifier's name blank.
+    const untranslatedOption = await prisma.modifierOption.create({
+      data: { groupId: group.id, slug: "extra-spicy", priceDelta: "0.50" },
+    });
+    await prisma.menuItemModifierGroup.create({ data: { menuItemId: item.id, groupId: group.id } });
+    const cart = await makeCart(business.id);
+    const cartItem = await prisma.cartItem.create({
+      data: { cartId: cart.id, menuItemId: item.id, quantity: 1 },
+    });
+    await prisma.cartItemModifier.create({
+      data: { cartItemId: cartItem.id, modifierOptionId: translatedOption.id },
+    });
+    await prisma.cartItemModifier.create({
+      data: { cartItemId: cartItem.id, modifierOptionId: untranslatedOption.id },
+    });
+
+    const order = await checkout(cart, business);
+
+    const orderItem = await prisma.orderItem.findFirstOrThrow({
+      where: { orderId: order.id },
+      include: { modifiers: true },
+    });
+    expect(orderItem.unitPrice.toString()).toBe("12.5");
+    expect(orderItem.modifiers.map((m) => m.nameSnapshot).sort()).toEqual(["Large", "extra-spicy"]);
   });
 
   it("two simultaneous checkouts on the same cart produce exactly one order", async () => {

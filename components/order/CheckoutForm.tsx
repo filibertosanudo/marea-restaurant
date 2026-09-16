@@ -5,6 +5,22 @@ import Link from "next/link";
 import { createOrderAction, type CheckoutState } from "@/lib/orders/actions";
 import type { OrderDictionary } from "@/lib/i18n/dictionaries";
 import type { Lang } from "@/lib/i18n/lang";
+import type { PromotionRejectionReason } from "@/lib/promotions/engine";
+
+const PROMO_REASON_KEY: Record<PromotionRejectionReason, keyof OrderDictionary> = {
+  not_found: "promoErrorNotFound",
+  not_active: "promoErrorNotActive",
+  not_yet_active: "promoErrorNotYetActive",
+  expired: "promoErrorExpired",
+  wrong_day: "promoErrorWrongDay",
+  wrong_time: "promoErrorWrongTime",
+  wrong_order_type: "promoErrorWrongOrderType",
+  min_order_not_met: "promoErrorMinOrderNotMet",
+  no_matching_items: "promoErrorNoMatchingItems",
+  no_discount: "promoErrorNoDiscount",
+  usage_limit_reached: "promoErrorUsageLimitReached",
+  per_user_limit_reached: "promoErrorPerUserLimitReached",
+};
 
 function errorMessage(state: CheckoutState, dict: OrderDictionary): string | null {
   if (!state?.error) return null;
@@ -17,6 +33,10 @@ function errorMessage(state: CheckoutState, dict: OrderDictionary): string | nul
       return dict.errorModifierUnavailableNamed.replace("{dish}", state.dishName ?? "");
     case "modifier_invalid":
       return dict.errorModifierInvalidNamed.replace("{dish}", state.dishName ?? "");
+    case "promotion_exhausted":
+      return dict.errorPromotionExhausted;
+    case "invalid_promo_code":
+      return dict[PROMO_REASON_KEY[state.promoReason ?? "not_found"]];
     case "rate_limited":
       return dict.errorRateLimited;
     case "invalid_input":
@@ -87,6 +107,20 @@ export function CheckoutForm({ dict, lang }: { dict: OrderDictionary; lang: Lang
           rows={2}
           placeholder={dict.orderNotesPlaceholder}
           className="w-full resize-none rounded-md border border-border/50 bg-surface px-md py-[12px] text-[14px] text-on-surface outline-none focus:border-primary"
+        />
+      </div>
+      <div>
+        <label htmlFor="promoCode" className="mb-[6px] block text-[13px] font-medium text-on-surface">
+          {dict.promoCode}
+        </label>
+        <input
+          id="promoCode"
+          name="promoCode"
+          type="text"
+          autoCapitalize="characters"
+          placeholder={dict.promoCodePlaceholder}
+          aria-invalid={state?.error === "invalid_promo_code" || state?.error === "promotion_exhausted"}
+          className="w-full rounded-md border border-border/50 bg-surface px-md py-[12px] text-[14px] uppercase text-on-surface outline-none focus:border-primary"
         />
       </div>
 

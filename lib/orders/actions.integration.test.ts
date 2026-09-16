@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { createOrderAction } from "./actions";
-import { makeBusiness, makeMenuCategory, makeMenuItem, makeCart } from "@/test/factories";
+import { makeBusiness, makeMenuCategory, makeMenuItem, makeCart, makePromotion } from "@/test/factories";
 import { runWithCookies } from "@/test/stubs/next-headers";
 import { CART_COOKIE } from "@/lib/cart/cookie";
 
@@ -50,6 +50,44 @@ describe("createOrderAction", () => {
 
     const order = await prisma.order.findFirstOrThrow({ where: { businessId: business.id } });
     expect(order.guestName).toBe("Ana Ruiz");
+  });
+
+  it("translates an invalid promo code, carrying the specific rejection reason through", async () => {
+    const business = await makeBusiness({ slug: "marea" }); // createOrderAction calls getCurrentBusiness(), which looks up by this fixed slug
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id);
+    const cart = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cart.id, menuItemId: item.id, quantity: 1 } });
+
+    const result = await checkout(cart, business, {
+      guestName: "Ana Ruiz",
+      guestPhone: "+52 555 000 0000",
+      promoCode: "NOPE",
+    });
+
+    expect(result).toEqual({ error: "invalid_promo_code", promoReason: "not_found" });
+  });
+
+  it("translates an exhausted promotion into promotion_exhausted", async () => {
+    const business = await makeBusiness({ slug: "marea" }); // createOrderAction calls getCurrentBusiness(), which looks up by this fixed slug
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id);
+    const cart = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cart.id, menuItemId: item.id, quantity: 1 } });
+    await makePromotion(business.id, { code: "GONE", usageLimit: 1, usageCount: 1 });
+
+    const result = await checkout(cart, business, {
+      guestName: "Ana Ruiz",
+      guestPhone: "+52 555 000 0000",
+      promoCode: "GONE",
+    });
+
+    // usageLimit already at capacity surfaces as the more specific
+    // invalid_promo_code/usage_limit_reached at the eligibility-check stage,
+    // not the generic promotion_exhausted the atomic guard throws when a
+    // race is actually lost mid-transaction — see
+    // create-order.promotions.integration.test.ts for that race itself.
+    expect(result).toEqual({ error: "invalid_promo_code", promoReason: "usage_limit_reached" });
   });
 
   it("reports rate_limited once this IP's order-creation attempts exceed the cap", async () => {

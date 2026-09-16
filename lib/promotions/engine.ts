@@ -211,10 +211,23 @@ function computeDiscountAmount(
  * subtotal), not 75% via compounding. Addition being commutative also means
  * there's no "which one applies first" to get wrong.
  */
+/**
+ * The one place code casing gets normalized for matching — both this
+ * engine's checkout-time lookup and the admin CRUD form that saves
+ * `Promotion.code` (lib/promotions/actions.ts) call this, so the two can
+ * never drift into two different rules. Without a single shared function,
+ * "WELCOME15" and "welcome15" risk becoming two distinct, silently
+ * non-colliding codes if either side's normalization ever changes alone.
+ */
+export function normalizePromotionCode(code: string | null | undefined): string | null {
+  const trimmed = code?.trim();
+  return trimmed ? trimmed.toUpperCase() : null;
+}
+
 export function applyPromotions(input: ApplyPromotionsInput): ApplyPromotionsResult {
   const orderSubtotal = sumLines(input.lines);
   const perUserUsage = input.perUserUsageByPromotion ?? {};
-  const normalizedCode = input.code?.trim().toUpperCase() || undefined;
+  const normalizedCode = normalizePromotionCode(input.code) ?? undefined;
 
   function evaluate(promo: PromotionRule) {
     const scoped = applicableLines(promo, input.lines);
@@ -251,7 +264,7 @@ export function applyPromotions(input: ApplyPromotionsInput): ApplyPromotionsRes
   // the promotion whose own `code` equals it.
   let codeResult: ApplyPromotionsResult["codeResult"];
   if (normalizedCode) {
-    const promo = input.promotions.find((p) => p.code?.trim().toUpperCase() === normalizedCode);
+    const promo = input.promotions.find((p) => normalizePromotionCode(p.code) === normalizedCode);
     if (!promo) {
       codeResult = { ok: false, reason: "not_found" };
     } else {

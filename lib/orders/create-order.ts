@@ -10,22 +10,35 @@ import { formatMoney } from "@/lib/dto/money";
 import { appOrigin } from "@/lib/env";
 import { enqueueKitchenTicket } from "@/lib/printing/queue";
 import { buildKitchenTicketDocument } from "@/lib/printing/kitchen-ticket";
+import { applyPromotions, type PromotionRejectionReason } from "@/lib/promotions/engine";
+import { toPromotionRule } from "@/lib/dto/promotions";
 
 export class CheckoutError extends Error {
-  code: "empty_cart" | "item_unavailable" | "modifier_unavailable" | "modifier_invalid";
+  code:
+    | "empty_cart"
+    | "item_unavailable"
+    | "modifier_unavailable"
+    | "modifier_invalid"
+    | "invalid_promo_code"
+    | "promotion_exhausted";
   dishName?: string;
-  constructor(code: CheckoutError["code"], dishName?: string) {
+  /** Only set for invalid_promo_code — the specific rule the code failed, not a bare "invalid code". */
+  promoReason?: PromotionRejectionReason;
+  constructor(code: CheckoutError["code"], dishName?: string, promoReason?: PromotionRejectionReason) {
     super(code);
     this.code = code;
     this.dishName = dishName;
+    this.promoReason = promoReason;
   }
 }
 
-type GuestInfo = {
+export type GuestInfo = {
   guestName: string;
   guestPhone: string;
   guestEmail?: string;
   notes?: string;
+  /** Entered at checkout, matched case-insensitively against a Promotion.code — see lib/promotions/engine.ts. */
+  promoCode?: string;
 };
 
 /**
@@ -193,8 +206,92 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
       select: { orderSequence: true, taxRate: true, currency: true, timezone: true },
     });
 
-    const taxTotal = subtotal.mul(business.taxRate).toDecimalPlaces(2);
-    const total = subtotal.add(taxTotal).toDecimalPlaces(2);
+    // Not filtered to isActive here on purpose: an entered code matching a
+    // deactivated promotion should reject with "not_active", not the more
+    // opaque "not_found" a query-level filter would produce. Automatic
+    // (code: null) promotions that are inactive simply fail eligibility
+    // below and never enter `discounts`. Named for what it actually holds —
+    // this business's whole non-deleted promotion history, not just the
+    // currently-active ones.
+    const businessPromotions = await tx.promotion.findMany({
+      where: { businessId, deletedAt: null },
+      // Every locale, not just `lang`: pickTranslation's fallback (any
+      // translation beats none) needs the other locale's row on hand for a
+      // promotion an admin only ever translated into one language.
+      include: { menuItems: { select: { menuItemId: true } }, translations: true },
+    });
+    const promotionById = new Map(businessPromotions.map((p) => [p.id, p]));
+    const promoResult = applyPromotions({
+      lines: lineInputs.map((l) => ({
+        menuItemId: l.menuItemId,
+        unitPrice: l.unitPrice,
+        quantity: l.quantity,
+      })),
+      promotions: businessPromotions.map(toPromotionRule),
+      code: guest.promoCode || undefined,
+      orderType: cart.orderType,
+      now: new Date(),
+      timezone: business.timezone,
+      usageByPromotion: Object.fromEntries(businessPromotions.map((p) => [p.id, p.usageCount])),
+      // perUserUsageByPromotion omitted: every order today is a guest order
+      // (no customerId is ever set), and perUserLimit only means something
+      // against a real account.
+    });
+    if (promoResult.codeResult?.ok === false) {
+      throw new CheckoutError("invalid_promo_code", undefined, promoResult.codeResult.reason);
+    }
+
+    // Redeem every discount BEFORE the order exists, mirroring where the
+    // stock guard runs above: a race lost here is resolved before any
+    // order-shaped row is created, never by rolling one back afterward. An
+    // AUTOMATIC promotion that loses this race to another order placed in
+    // the same instant isn't something this guest did — it's dropped
+    // silently and checkout proceeds without it, same as a promotion that
+    // was simply never eligible. A guest-entered CODE losing the race is
+    // different: they explicitly asked for that one, so it surfaces as a
+    // real rejection instead of a silently smaller discount they didn't ask
+    // for. (Getting this backwards — aborting the whole order over an
+    // automatic promotion's exhausted usageLimit — would leave the guest
+    // stuck retrying an order that can never succeed, since the same
+    // automatic promotion re-applies on every attempt.)
+    const redeemedDiscounts: typeof promoResult.discounts = [];
+    for (const discount of promoResult.discounts) {
+      // Never undefined: every discount.promotionId came from applyPromotions
+      // evaluating exactly this same businessPromotions array, so the id is
+      // always a key in the map built from it.
+      const promo = promotionById.get(discount.promotionId)!;
+      const guardedWhere =
+        promo.usageLimit !== null
+          ? { id: promo.id, usageCount: { lt: promo.usageLimit } }
+          : { id: promo.id };
+      const incremented = await tx.promotion.updateMany({
+        where: guardedWhere,
+        data: { usageCount: { increment: 1 } },
+      });
+      if (incremented.count === 0) {
+        const isCodeMatch =
+          promoResult.codeResult?.ok === true && promoResult.codeResult.promotionId === promo.id;
+        if (isCodeMatch) throw new CheckoutError("promotion_exhausted");
+        continue;
+      }
+      redeemedDiscounts.push(discount);
+    }
+
+    const discountTotal = redeemedDiscounts
+      .reduce((sum, d) => sum.add(d.amount), new Prisma.Decimal(0))
+      .toDecimalPlaces(2);
+    // Floored at 0, defensively: engine.ts's own overflow scaling already
+    // guarantees discountTotal never exceeds the subtotal it computed from
+    // these same lines, so this floor should never actually engage — it's
+    // here so a negative taxable base can't happen even if that guarantee
+    // and this function's own `subtotal` (computed independently, a few
+    // lines up) ever drift apart.
+    const taxableBase = Prisma.Decimal.max(
+      subtotal.minus(discountTotal),
+      new Prisma.Decimal(0)
+    ).toDecimalPlaces(2);
+    const taxTotal = taxableBase.mul(business.taxRate).toDecimalPlaces(2);
+    const total = taxableBase.add(taxTotal).toDecimalPlaces(2);
     const orderNumber = `A-${String(business.orderSequence).padStart(4, "0")}`;
 
     const createdOrder = await tx.order.create({
@@ -209,6 +306,7 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
         locale: lang,
         notes: guest.notes,
         subtotal,
+        discountTotal,
         taxTotal,
         total,
         currency: business.currency,
@@ -256,6 +354,26 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
       });
     }
 
+    if (redeemedDiscounts.length > 0) {
+      // The usageCount increments already happened above, before the order
+      // existed — this only freezes the audit trail (which promotions, and
+      // for how much) now that there's an orderId to attach it to.
+      await tx.orderPromotion.createMany({
+        data: redeemedDiscounts.map((d) => {
+          const promo = promotionById.get(d.promotionId)!;
+          const isCodeMatch =
+            promoResult.codeResult?.ok === true && promoResult.codeResult.promotionId === promo.id;
+          return {
+            orderId: createdOrder.id,
+            promotionId: promo.id,
+            codeSnapshot: isCodeMatch ? promo.code : null,
+            titleSnapshot: pickTranslation(promo.translations, lang)?.title ?? promo.slug,
+            discountAmount: d.amount,
+          };
+        }),
+      });
+    }
+
     // Unconditional, unlike the confirmation email above: every order needs
     // a kitchen ticket, guest email or not. A printer with no paper must
     // never be a reason this transaction fails — see lib/printing/queue.ts's
@@ -296,6 +414,9 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
               quantity: l.quantity,
               lineTotal: formatMoney(l.lineTotal.toString(), business.currency, lang),
             })),
+            discountTotal: discountTotal.greaterThan(0)
+              ? formatMoney(discountTotal.toString(), business.currency, lang)
+              : undefined,
             total: formatMoney(total.toString(), business.currency, lang),
             currency: business.currency,
           },

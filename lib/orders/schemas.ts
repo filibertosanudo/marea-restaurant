@@ -8,4 +8,10 @@ export const checkoutSchema = z.object({
     .optional()
     .transform((v) => (v ? v : undefined)),
   notes: z.string().trim().max(500).optional(),
+  promoCode: z
+    .string()
+    .trim()
+    .max(40)
+    .optional()
+    .transform((v) => (v ? v : undefined)),
 });
