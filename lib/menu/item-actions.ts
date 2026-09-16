@@ -9,6 +9,7 @@ import { UserRole } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
 import { slugify } from "@/lib/menu/slugify";
 import { getStorageDriver } from "@/lib/storage";
+import { syncAvailabilityFromStock } from "@/lib/menu/inventory";
 
 const ADMIN_ROLES = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
 const STAFF_UP_ROLES = [UserRole.STAFF, UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
@@ -26,6 +27,9 @@ function readMenuItemForm(formData: FormData) {
     imageUrl: String(formData.get("imageUrl") ?? ""),
     isAvailable: formData.get("isAvailable") === "on",
     isFeatured: formData.get("isFeatured") === "on",
+    trackInventory: formData.get("trackInventory") === "on",
+    stockQuantity: String(formData.get("stockQuantity") ?? "0"),
+    minStockQuantity: String(formData.get("minStockQuantity") ?? "0"),
     translations: {
       en: {
         name: String(formData.get("en.name") ?? ""),
@@ -83,6 +87,13 @@ export async function createMenuItemAction(
       imageUrl: data.imageUrl || null,
       isAvailable: data.isAvailable,
       isFeatured: data.isFeatured,
+      trackInventory: data.trackInventory,
+      // The only place stockQuantity is ever set outside a StockMovement:
+      // a brand-new row has no prior count to reconcile against, so there's
+      // nothing for a ledger entry to explain yet. Every change after this
+      // one goes through adjustMenuItemStockAction instead.
+      stockQuantity: data.trackInventory ? data.stockQuantity : 0,
+      minStockQuantity: data.minStockQuantity,
       translations: {
         create: (["en", "es"] as const)
           .filter((l) => data.translations[l]?.name)
@@ -134,6 +145,13 @@ export async function updateMenuItemAction(
   // first one just made current. Locking makes the second transaction
   // block until the first commits, so it reads what the first one actually
   // left behind.
+  // Tracking just turned on for a dish that never had it: there's no
+  // concurrent writer to race yet (nothing could have sold or adjusted a
+  // count that didn't exist), so this is an initialization, same as
+  // createMenuItemAction's, not the kind of counter update that must go
+  // through adjustMenuItemStockAction.
+  const startingToTrack = data.trackInventory && !existing.trackInventory;
+
   const oldImageUrl = await prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ imageUrl: string | null }[]>`
       SELECT "imageUrl" FROM "MenuItem" WHERE id = ${id} FOR UPDATE
@@ -148,6 +166,15 @@ export async function updateMenuItemAction(
         imageUrl: data.imageUrl || null,
         isAvailable: data.isAvailable,
         isFeatured: data.isFeatured,
+        trackInventory: data.trackInventory,
+        minStockQuantity: data.minStockQuantity,
+        // Every other case leaves stockQuantity untouched: it's a counter
+        // with concurrent writers (a sale, a cancellation, the quick-adjust
+        // stepper), and this form submission carries whatever value was on
+        // the page when the drawer opened. Writing it here would silently
+        // undo any adjustment that landed in between — see
+        // adjustMenuItemStockAction, the only other place that changes it.
+        ...(startingToTrack ? { stockQuantity: data.stockQuantity } : {}),
       },
     });
     await Promise.all(
@@ -220,6 +247,76 @@ export async function toggleAvailabilityAction(id: string, isAvailable: boolean)
   });
   revalidatePath("/admin/menu");
   revalidatePath("/");
+}
+
+export type AdjustStockState =
+  | { success: true; stockQuantity: number; isAvailable: boolean }
+  | { error: "invalid_delta" | "not_found" | "not_tracked" | "insufficient_stock" };
+
+/**
+ * The one place stockQuantity changes for a dish that already exists — the
+ * quick +/- in ItemTable and the equivalent stepper in ItemEditorDrawer both
+ * call this instead of going through the create/update form, so the
+ * "sin excepciones" ledger rule (docs/prompts/14) has exactly one writer to
+ * hold to it. Same atomic-guard pattern as createOrderFromCart's decrement:
+ * the `gte` in the where clause makes the update itself the concurrency
+ * check, never a prior read.
+ */
+export async function adjustMenuItemStockAction(
+  menuItemId: string,
+  delta: number
+): Promise<AdjustStockState> {
+  const session = await requireRole(...STAFF_UP_ROLES);
+  const business = await getCurrentBusiness();
+  if (!Number.isInteger(delta) || delta === 0) return { error: "invalid_delta" };
+
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.menuItem.updateMany({
+      where: {
+        id: menuItemId,
+        businessId: business.id,
+        deletedAt: null,
+        trackInventory: true,
+        ...(delta < 0 ? { stockQuantity: { gte: -delta } } : {}),
+      },
+      data: { stockQuantity: { increment: delta } },
+    });
+    if (updated.count === 0) {
+      const current = await tx.menuItem.findFirst({
+        where: { id: menuItemId, businessId: business.id, deletedAt: null },
+        select: { trackInventory: true },
+      });
+      if (!current) return { error: "not_found" } as const;
+      return { error: current.trackInventory ? "insufficient_stock" : "not_tracked" } as const;
+    }
+
+    await Promise.all([
+      tx.stockMovement.create({
+        data: {
+          menuItemId,
+          delta,
+          reason: "MANUAL_ADJUSTMENT",
+          createdById: session.user.id,
+        },
+      }),
+      syncAvailabilityFromStock(tx, {
+        menuItemId,
+        businessId: business.id,
+        direction: delta < 0 ? "down" : "up",
+      }),
+    ]);
+
+    const item = await tx.menuItem.findUniqueOrThrow({
+      where: { id: menuItemId },
+      select: { stockQuantity: true, isAvailable: true },
+    });
+    return { success: true, ...item } as const;
+  });
+
+  if ("error" in result) return result;
+  revalidatePath("/admin/menu");
+  revalidatePath("/");
+  return result;
 }
 
 export async function softDeleteMenuItemAction(id: string) {

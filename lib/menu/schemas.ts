@@ -69,6 +69,11 @@ export function buildMenuItemSchema(defaultLocale: Lang) {
       .or(z.literal("")),
     isAvailable: z.boolean().default(true),
     isFeatured: z.boolean().default(false),
+    trackInventory: z.boolean().default(false),
+    // Only meaningful on create — see createMenuItemAction's own comment for
+    // why updateMenuItemAction never writes this field back.
+    stockQuantity: z.coerce.number().int().min(0).default(0),
+    minStockQuantity: z.coerce.number().int().min(0).default(0),
     translations: localizedTextWithImageAlt(defaultLocale),
     tagIds: z.array(z.string()).default([]),
     modifierGroupIds: z.array(z.string()).default([]),

@@ -113,6 +113,9 @@ export type MenuItemListDTO = {
   imageUrl: string | null;
   isAvailable: boolean;
   isFeatured: boolean;
+  trackInventory: boolean;
+  stockQuantity: number;
+  minStockQuantity: number;
   tags: TagDTO[];
   tagIds: string[];
   modifierGroupIds: string[];
@@ -134,6 +137,9 @@ export function toMenuItemListDTO(item: MenuItemWithRelations, lang: Lang): Menu
     imageUrl: item.imageUrl,
     isAvailable: item.isAvailable,
     isFeatured: item.isFeatured,
+    trackInventory: item.trackInventory,
+    stockQuantity: item.stockQuantity,
+    minStockQuantity: item.minStockQuantity,
     tags: item.tags.map((t) => toTagDTO(t.tag, lang)),
     tagIds: item.tags.map((t) => t.tag.id),
     modifierGroupIds: item.modifierGroups.map((g) => g.groupId),

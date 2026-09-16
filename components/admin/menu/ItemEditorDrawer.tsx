@@ -10,6 +10,7 @@ import type { MenuItemListDTO, TagDTO } from "@/lib/dto/menu";
 import {
   createMenuItemAction,
   updateMenuItemAction,
+  adjustMenuItemStockAction,
   type MenuItemFormState,
 } from "@/lib/menu/item-actions";
 
@@ -43,6 +44,44 @@ export function ItemEditorDrawer({
   const [selectedGroups, setSelectedGroups] = useState<string[]>(
     item?.modifierGroupIds ?? []
   );
+  const [trackInventory, setTrackInventory] = useState(item?.trackInventory ?? false);
+  // Whether the dish was already tracked in the database, as opposed to the
+  // checkbox above being freshly checked in this open drawer. Only a dish
+  // that was ALREADY tracked has a live stepper wired to
+  // adjustMenuItemStockAction — one that's only tracking-as-of-this-edit has
+  // no row for that action to find yet (its trackInventory: true hasn't been
+  // saved), so it gets the same plain initial-count input a new dish does.
+  const alreadyTracked = item?.trackInventory ?? false;
+  // For a dish that isn't tracked yet (new, or tracking turned on just now)
+  // this is the initial count the form submits. For one that was already
+  // tracked, it's display-only — every further change goes through
+  // adjustMenuItemStockAction, never this form (see updateMenuItemAction's
+  // own comment on why).
+  const [stockQuantity, setStockQuantity] = useState(item?.stockQuantity ?? 0);
+  // Unlike stockQuantity, this always submits with the form — even while
+  // hidden by trackInventory being unchecked — so toggling tracking off and
+  // back on can't silently reset a threshold the admin already set. A plain
+  // uncontrolled `defaultValue` input would lose that value the moment this
+  // section unmounts.
+  const [minStockQuantity, setMinStockQuantity] = useState(item?.minStockQuantity ?? 0);
+  const [stockPending, setStockPending] = useState(false);
+  const [stockError, setStockError] = useState(false);
+
+  async function adjustStock(delta: number) {
+    if (!isEdit || !item || !alreadyTracked) {
+      setStockQuantity((q) => Math.max(0, q + delta));
+      return;
+    }
+    setStockPending(true);
+    setStockError(false);
+    const result = await adjustMenuItemStockAction(item.id, delta);
+    setStockPending(false);
+    if ("error" in result) {
+      setStockError(true);
+      return;
+    }
+    setStockQuantity(result.stockQuantity);
+  }
 
   useEffect(() => {
     if (state && "success" in state) onClose();
@@ -254,6 +293,107 @@ export function ItemEditorDrawer({
                 defaultChecked={item?.isAvailable ?? true}
               />
             </label>
+
+            <div>
+              <label className="flex items-center justify-between rounded-sm bg-surface-subtle px-md py-[10px]">
+                <span className="text-[13px] font-medium text-on-surface">
+                  {dict.menu.trackInventory}
+                </span>
+                <input
+                  type="checkbox"
+                  name="trackInventory"
+                  checked={trackInventory}
+                  onChange={(e) => setTrackInventory(e.target.checked)}
+                />
+              </label>
+
+              {/* Always submitted, even while the section below is hidden or
+                  showing a different control — see the state's own comment
+                  on why this can't be a plain defaultValue input. */}
+              <input type="hidden" name="minStockQuantity" value={minStockQuantity} />
+
+              {trackInventory && (
+                <div className="ml-[4px] flex flex-col gap-[10px] border-l-2 border-surface-ocean-border px-md pb-[2px] pt-[10px]">
+                  <div className="grid grid-cols-2 gap-md">
+                    <div>
+                      <label className="mb-[4px] block text-[13px] font-medium text-on-surface">
+                        {dict.menu.stockQuantity}
+                      </label>
+                      {alreadyTracked ? (
+                        <div className="flex items-center gap-[8px]">
+                          <button
+                            type="button"
+                            aria-label={dict.menu.stockDecrease}
+                            disabled={stockPending || stockQuantity <= 0}
+                            onClick={() => adjustStock(-1)}
+                            className="flex h-7 w-7 items-center justify-center rounded-sm border border-border text-on-surface disabled:opacity-40"
+                          >
+                            −
+                          </button>
+                          <span className="min-w-[28px] text-center text-[15px] font-semibold text-on-surface">
+                            {stockQuantity}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label={dict.menu.stockIncrease}
+                            disabled={stockPending}
+                            onClick={() => adjustStock(1)}
+                            className="flex h-7 w-7 items-center justify-center rounded-sm border border-border text-on-surface disabled:opacity-40"
+                          >
+                            +
+                          </button>
+                        </div>
+                      ) : (
+                        <input
+                          name="stockQuantity"
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={stockQuantity}
+                          onChange={(e) => setStockQuantity(Math.max(0, Number(e.target.value)))}
+                          className="w-full rounded-sm border border-border bg-surface px-[12px] py-[8px] text-[14px] text-on-surface outline-none focus:border-primary"
+                        />
+                      )}
+                      {isEdit && !alreadyTracked && (
+                        <p className="mt-[3px] text-[12px] text-on-surface-muted">
+                          {dict.menu.stockStartHint}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="mb-[4px] block text-[13px] font-medium text-on-surface">
+                        {dict.menu.minStockQuantity}
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={minStockQuantity}
+                        onChange={(e) => setMinStockQuantity(Math.max(0, Number(e.target.value)))}
+                        className="w-full rounded-sm border border-border bg-surface px-[12px] py-[8px] text-[14px] text-on-surface outline-none focus:border-primary"
+                      />
+                      <p className="mt-[3px] text-[12px] text-on-surface-muted">
+                        {dict.menu.minStockHint}
+                      </p>
+                    </div>
+                  </div>
+                  {alreadyTracked && (
+                    <p
+                      className={`text-[12.5px] ${stockQuantity <= 0 ? "text-warning" : "text-info"}`}
+                    >
+                      {stockQuantity <= 0
+                        ? `${dict.menu.stockOut} — ${dict.menu.stockOutHint}`
+                        : dict.menu.stockAvailableCount.replace("{count}", String(stockQuantity))}
+                    </p>
+                  )}
+                  {stockError && (
+                    <p role="alert" className="text-[12.5px] text-error">
+                      {dict.menu.stockAdjustError}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
 
             {state && "error" in state && (
               <p role="alert" className="text-[13px] text-error">

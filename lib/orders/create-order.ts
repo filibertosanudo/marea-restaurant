@@ -242,6 +242,20 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
       },
     });
 
+    // One ledger row per tracked dish in this order, in the same transaction
+    // as the decrement above — the stock check ran before the order existed,
+    // so orderId wasn't available yet to attach it there.
+    if (stockByMenuItem.size > 0) {
+      await tx.stockMovement.createMany({
+        data: [...stockByMenuItem.entries()].map(([menuItemId, { quantity }]) => ({
+          menuItemId,
+          delta: -quantity,
+          reason: "SALE",
+          orderId: createdOrder.id,
+        })),
+      });
+    }
+
     // Unconditional, unlike the confirmation email above: every order needs
     // a kitchen ticket, guest email or not. A printer with no paper must
     // never be a reason this transaction fails — see lib/printing/queue.ts's

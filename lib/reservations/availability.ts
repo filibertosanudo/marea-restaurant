@@ -162,6 +162,24 @@ export function businessLocalDateParts(instant: Date, timeZone: string): { year:
   return { year: get("year"), month: get("month"), day: get("day") };
 }
 
+/**
+ * An instant's minutes-since-local-midnight in the business's own timezone —
+ * the other half of businessLocalDateParts, needed by anything that resolves
+ * a happy-hour-style window (promotions' startMinute/endMinute) instead of a
+ * whole calendar day. "h23" avoids the 12/24-hour midnight-as-"24" quirk
+ * some locales format with.
+ */
+export function businessLocalMinutesOfDay(instant: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(instant);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return get("hour") * 60 + get("minute");
+}
+
 function rangesOverlap(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
   return aStart < bEnd && bStart < aEnd;
 }
@@ -222,8 +240,8 @@ export function isTableFreeForRange(
   );
 }
 
-/** 0 = domingo … 6 = sábado, matching Date.getDay() and OpeningHour.dayOfWeek — the one place this gets derived from a {year, month, day}. */
-function dayOfWeekFor(date: { year: number; month: number; day: number }): number {
+/** 0 = domingo … 6 = sábado, matching Date.getDay() and OpeningHour.dayOfWeek — the one place this gets derived from a {year, month, day}. Exported for promotions' daysOfWeek, the other feature that needs a business-local day-of-week rather than the server's own. */
+export function dayOfWeekFor(date: { year: number; month: number; day: number }): number {
   return new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay();
 }
 

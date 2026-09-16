@@ -264,6 +264,61 @@ describe("cancelOrderAction", () => {
     const updatedItem = await prisma.menuItem.findUniqueOrThrow({ where: { id: item.id } });
     expect(updatedItem.stockQuantity).toBe(2);
     expect(updatedItem.isAvailable).toBe(true);
+
+    const movement = await prisma.stockMovement.findFirstOrThrow({ where: { menuItemId: item.id } });
+    expect(movement).toMatchObject({ delta: 2, reason: "CANCELLATION", orderId: order.id });
+  });
+
+  it("records one CANCELLATION movement per distinct tracked dish on a multi-item order", async () => {
+    const business = await makeCurrentBusiness();
+    await loginAs("BUSINESS_ADMIN");
+    const category = await makeMenuCategory(business.id);
+    const itemA = await makeMenuItem(business.id, category.id, { trackInventory: true, stockQuantity: 1 });
+    const itemB = await makeMenuItem(business.id, category.id, { trackInventory: true, stockQuantity: 4 });
+    const { order } = await makeOrderWithCashPayment(business.id, { status: "PENDING" });
+    await prisma.orderItem.createMany({
+      data: [
+        { orderId: order.id, menuItemId: itemA.id, nameSnapshot: "A", unitPrice: "10.00", quantity: 1, lineTotal: "10.00" },
+        { orderId: order.id, menuItemId: itemB.id, nameSnapshot: "B", unitPrice: "5.00", quantity: 3, lineTotal: "15.00" },
+      ],
+    });
+
+    await cancelOrderAction(order.id, "guest changed their mind");
+
+    const updatedA = await prisma.menuItem.findUniqueOrThrow({ where: { id: itemA.id } });
+    const updatedB = await prisma.menuItem.findUniqueOrThrow({ where: { id: itemB.id } });
+    expect(updatedA.stockQuantity).toBe(2);
+    expect(updatedB.stockQuantity).toBe(7);
+    const movements = await prisma.stockMovement.findMany({
+      where: { orderId: order.id },
+      orderBy: { delta: "asc" },
+    });
+    expect(movements).toHaveLength(2);
+    expect(movements[0]).toMatchObject({ menuItemId: itemA.id, delta: 1, reason: "CANCELLATION" });
+    expect(movements[1]).toMatchObject({ menuItemId: itemB.id, delta: 3, reason: "CANCELLATION" });
+  });
+
+  it("doesn't leave a stock movement for a dish that isn't inventory-tracked", async () => {
+    const business = await makeCurrentBusiness();
+    await loginAs("BUSINESS_ADMIN");
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id, { trackInventory: false });
+    const { order } = await makeOrderWithCashPayment(business.id, { status: "PENDING" });
+    await prisma.orderItem.create({
+      data: {
+        orderId: order.id,
+        menuItemId: item.id,
+        nameSnapshot: "Test dish",
+        unitPrice: "10.00",
+        quantity: 1,
+        lineTotal: "10.00",
+      },
+    });
+
+    await cancelOrderAction(order.id, "guest changed their mind");
+
+    const movements = await prisma.stockMovement.count({ where: { menuItemId: item.id } });
+    expect(movements).toBe(0);
   });
 
   it("cancels the still-open cash payment along with the order", async () => {
