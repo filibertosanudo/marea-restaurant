@@ -8,6 +8,7 @@ import { TestimonialCard } from "@/components/ui/TestimonialCard";
 import { StatItem } from "@/components/ui/StatItem";
 import { STR, type Lang } from "./content";
 import type { PublicMenuByLang } from "@/lib/menu/public-menu";
+import type { LandingContentByLang, LandingBusinessInfo } from "@/lib/dto/landing";
 import { Controls } from "./Controls";
 import { SectionHead } from "./SectionHead";
 import { Placeholder } from "./Placeholder";
@@ -24,9 +25,13 @@ type Theme = "light" | "dark";
 
 export function MareaLandingPage({
   menuByLang,
+  landingByLang,
+  business,
   maxPartySize,
 }: {
   menuByLang: PublicMenuByLang;
+  landingByLang: LandingContentByLang;
+  business: LandingBusinessInfo;
   maxPartySize: number;
 }) {
   const [cat, setCat] = useState("mains");
@@ -59,6 +64,10 @@ export function MareaLandingPage({
   }, [lang]);
 
   const t = STR[lang];
+  const landing = landingByLang[lang];
+  const hasAbout = landing.about.title !== "" || landing.about.body !== "";
+  const hasOffers = landing.offers.length > 0;
+  const hasTestimonials = landing.testimonials.length > 0;
 
   return (
     <>
@@ -67,9 +76,9 @@ export function MareaLandingPage({
         <Nav
           links={[
             { id: "home", label: t.nav.home },
-            { id: "about", label: t.nav.about },
+            ...(hasAbout ? [{ id: "about", label: t.nav.about }] : []),
             { id: "menu", label: t.nav.menu },
-            { id: "testimonials", label: t.nav.testimonials },
+            ...(hasTestimonials ? [{ id: "testimonials", label: t.nav.testimonials }] : []),
             { id: "contact", label: t.nav.contact },
           ]}
           ctaLabel={t.nav.book}
@@ -112,21 +121,23 @@ export function MareaLandingPage({
       </header>
 
       {/* ABOUT */}
-      <section className="ml-band ml-section" id="about">
-        <div className="ml-wrap ml-about-grid">
-          <div>
-            <SectionHead eyebrow={t.about.eyebrow} title={t.about.title} />
-            <p className="ml-lead" style={{ marginTop: 20 }}>
-              {t.about.body}
-            </p>
+      {hasAbout && (
+        <section className="ml-band ml-section" id="about">
+          <div className="ml-wrap ml-about-grid">
+            <div>
+              <SectionHead eyebrow={t.about.eyebrow} title={landing.about.title} />
+              <p className="ml-lead" style={{ marginTop: 20 }}>
+                {landing.about.body}
+              </p>
+            </div>
+            <div className="ml-stat-grid">
+              {t.stats.map((s) => (
+                <StatItem key={s.l} value={s.v} label={s.l} />
+              ))}
+            </div>
           </div>
-          <div className="ml-stat-grid">
-            {t.stats.map((s) => (
-              <StatItem key={s.l} value={s.v} label={s.l} />
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* MENU */}
       <section className="ml-band subtle ml-section" id="menu">
@@ -151,50 +162,52 @@ export function MareaLandingPage({
       </section>
 
       {/* OFFERS */}
-      <section className="ml-band ocean ml-section" id="offers">
-        <div className="ml-wrap">
-          <SectionHead
-            center
-            eyebrow={t.offers.eyebrow}
-            title={
-              <>
-                {t.offers.titleBefore}
-                <Highlight>{t.offers.titleHighlight}</Highlight>
-                {t.offers.titleAfter}
-              </>
-            }
-          />
-          <div className="ml-offer-stage">
-            <div className="ml-offer-media">
-              <Placeholder label={t.offers.dish} />
-            </div>
-            {[t.offers.left[0], t.offers.right[0], t.offers.left[1], t.offers.right[1]].map(
-              (o, i) => (
+      {hasOffers && (
+        <section className="ml-band ocean ml-section" id="offers">
+          <div className="ml-wrap">
+            <SectionHead
+              center
+              eyebrow={t.offers.eyebrow}
+              title={
+                <>
+                  {t.offers.titleBefore}
+                  <Highlight>{t.offers.titleHighlight}</Highlight>
+                  {t.offers.titleAfter}
+                </>
+              }
+            />
+            <div className="ml-offer-stage">
+              <div className="ml-offer-media">
+                <Placeholder label={t.offers.dish} />
+              </div>
+              {landing.offers.map((o, i) => (
                 <div className={`ml-offer-pos ml-offer-pos-${i + 1}`} key={o.title}>
                   <OfferCard offer={o} onArrowClick={() => scrollToId("reservation")} />
                 </div>
-              )
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* TESTIMONIALS */}
-      <section className="ml-band ml-section" id="testimonials">
-        <div className="ml-wrap">
-          <SectionHead center eyebrow={t.tmls.eyebrow} title={t.tmls.title} />
-          <div className="ml-tmls-media">
-            <Placeholder label={t.tmls.media} />
-          </div>
-          <div className="ml-tmls-track-wrap">
-            <div className="ml-tmls-track">
-              {[...t.tmls.items, ...t.tmls.items].map((it, i) => (
-                <TestimonialCard key={`${it.name}-${i}`} quote={it.quote} name={it.name} />
               ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
+
+      {/* TESTIMONIALS */}
+      {hasTestimonials && (
+        <section className="ml-band ml-section" id="testimonials">
+          <div className="ml-wrap">
+            <SectionHead center eyebrow={t.tmls.eyebrow} title={t.tmls.title} />
+            <div className="ml-tmls-media">
+              <Placeholder label={t.tmls.media} />
+            </div>
+            <div className="ml-tmls-track-wrap">
+              <div className="ml-tmls-track">
+                {[...landing.testimonials, ...landing.testimonials].map((it, i) => (
+                  <TestimonialCard key={`${it.name}-${i}`} quote={it.quote} name={it.name} rating={it.rating} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* RESERVATION */}
       <section className="ml-band subtle ml-section ml-reserve-section" id="reservation">
@@ -220,28 +233,38 @@ export function MareaLandingPage({
           <div className="ml-foot-mid">
             <div>
               <div className="brand">Marea</div>
-              <p>{t.footer.blurb}</p>
+              {landing.footer.blurb && <p>{landing.footer.blurb}</p>}
             </div>
-            <div>
-              <h4>{t.footer.visit}</h4>
-              <p>
-                {t.footer.address}
-                <br />
-                {t.footer.address2}
-              </p>
-              <p>{t.footer.hours}</p>
-            </div>
+            {(business.addressLine1 || landing.footer.hours) && (
+              <div>
+                <h4>{t.footer.visit}</h4>
+                {business.addressLine1 && (
+                  <p>
+                    {business.addressLine1}
+                    {[business.addressLine2, business.city].filter(Boolean).length > 0 && (
+                      <>
+                        <br />
+                        {[business.addressLine2, business.city].filter(Boolean).join(", ")}
+                      </>
+                    )}
+                  </p>
+                )}
+                {landing.footer.hours && <p>{landing.footer.hours}</p>}
+              </div>
+            )}
             <div>
               <h4>{t.footer.contact}</h4>
-              <a href="tel:+15551234567">+1 (555) 123-4567</a>
-              <a href="mailto:hello@marea.com">hello@marea.com</a>
+              {business.phone && (
+                <a href={`tel:${business.phone.replace(/[^\d+]/g, "")}`}>{business.phone}</a>
+              )}
+              {business.email && <a href={`mailto:${business.email}`}>{business.email}</a>}
               <a href="#menu">{t.footer.ourMenu}</a>
               <a href="#reservation">{t.footer.reservations}</a>
             </div>
           </div>
           <div className="ml-foot-bottom">
             <div>{t.footer.copyright}</div>
-            <div>{t.footer.tagline}</div>
+            {landing.footer.tagline && <div>{landing.footer.tagline}</div>}
           </div>
         </div>
       </footer>

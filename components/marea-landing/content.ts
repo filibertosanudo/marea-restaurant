@@ -25,8 +25,6 @@ export const STR = {
     },
     about: {
       eyebrow: "About Us",
-      title: "Fresh from local waters, daily.",
-      body: "Fresh, delicately prepared seafood sourced daily from local waters.",
     },
     stats: [
       { v: "25+", l: "Years of Experience" },
@@ -46,66 +44,11 @@ export const STR = {
       titleHighlight: "Offers",
       titleAfter: " Just for You!",
       dish: "Signature dish",
-      left: [
-        {
-          title: "Champagne & Oysters Set",
-          tag: "$39",
-          desc: "6 fresh oysters paired with a glass of premium champagne.",
-        },
-        {
-          title: "Lobster Night",
-          tag: "50% OFF",
-          desc: "50% off on our signature Lobster Thermidor when you dine in on Thursdays.",
-        },
-      ],
-      right: [
-        {
-          title: "Seafood Lovers' Platter",
-          tag: "$59 (for 2)",
-          desc: "An exquisite mix of lobster, prawns, mussels and calamari, served with garlic butter sauce.",
-        },
-        {
-          title: "Sushi & Sashimi Weekend",
-          tag: "20% OFF",
-          desc: "Enjoy a selection of fresh sushi and sashimi every Friday–Sunday at a special discount.",
-        },
-      ],
     },
     tmls: {
       eyebrow: "Testimonials",
       title: "What our guests are saying",
       media: "Guests dining",
-      items: [
-        {
-          quote:
-            "The freshest seafood I've had — the ambiance matched the flavor perfectly.",
-          name: "Elena Petrenko",
-        },
-        {
-          quote: "Every dish tastes like it came straight from the ocean.",
-          name: "Andriy Kovalenko",
-        },
-        {
-          quote:
-            "This place redefined what I thought seafood could taste like — impeccable freshness in every bite.",
-          name: "Marco Dubois",
-        },
-        {
-          quote:
-            "The lobster thermidor alone is worth the trip. Service was warm and attentive all night.",
-          name: "Sofia Ramirez",
-        },
-        {
-          quote:
-            "A true gem by the water — the paella rivals anything I've had on the coast of Spain.",
-          name: "James Whitfield",
-        },
-        {
-          quote:
-            "From the oysters to the dessert, everything felt thoughtfully crafted. We'll be back.",
-          name: "Nadia Osei",
-        },
-      ],
     },
     reserve: {
       eyebrow: "Reservation",
@@ -155,16 +98,11 @@ export const STR = {
       subscribeError: "Something went wrong. Try again.",
       invalidEmail: "Enter a valid email address.",
       privacyNotice: "Privacy notice",
-      blurb: "Boutique seafood, sourced daily from local waters and served by the sea.",
       visit: "Visit Us",
-      address: "142 Harbour Pier Road",
-      address2: "Marina District, Portside 90210",
-      hours: "Open Tue–Sun · 12pm – 11pm",
       contact: "Contact",
       ourMenu: "Our Menu",
       reservations: "Reservations",
       copyright: "© 2026 Marea. All rights reserved.",
-      tagline: "Fresh from the ocean, every day.",
     },
   },
   es: {
@@ -191,8 +129,6 @@ export const STR = {
     },
     about: {
       eyebrow: "Sobre Nosotros",
-      title: "Frescura de aguas locales, cada día.",
-      body: "Mariscos frescos y delicadamente preparados, obtenidos a diario de aguas locales.",
     },
     stats: [
       { v: "25+", l: "Años de Experiencia" },
@@ -212,66 +148,11 @@ export const STR = {
       titleHighlight: "Ofertas",
       titleAfter: " Exclusivas Solo para Ti!",
       dish: "Platillo insignia",
-      left: [
-        {
-          title: "Set de Champagne y Ostras",
-          tag: "$39",
-          desc: "6 ostras frescas acompañadas de una copa de champagne premium.",
-        },
-        {
-          title: "Noche de Langosta",
-          tag: "50% DESC.",
-          desc: "50% de descuento en nuestra Langosta Thermidor al cenar los jueves.",
-        },
-      ],
-      right: [
-        {
-          title: "Tabla para Amantes del Mar",
-          tag: "$59 (para 2)",
-          desc: "Una exquisita mezcla de langosta, camarón, mejillones y calamar, con salsa de mantequilla de ajo.",
-        },
-        {
-          title: "Fin de Semana de Sushi",
-          tag: "20% DESC.",
-          desc: "Disfruta una selección de sushi y sashimi frescos de viernes a domingo a precio especial.",
-        },
-      ],
     },
     tmls: {
       eyebrow: "Testimonios",
       title: "Lo que dicen nuestros comensales",
       media: "Comensales disfrutando",
-      items: [
-        {
-          quote:
-            "El marisco más fresco que he probado — el ambiente igualó al sabor a la perfección.",
-          name: "Elena Petrenko",
-        },
-        {
-          quote: "Cada platillo sabe como si viniera directo del océano.",
-          name: "Andriy Kovalenko",
-        },
-        {
-          quote:
-            "Este lugar redefinió lo que pensaba que podía saber el marisco — frescura impecable en cada bocado.",
-          name: "Marco Dubois",
-        },
-        {
-          quote:
-            "La langosta thermidor por sí sola vale el viaje. El servicio fue cálido y atento toda la noche.",
-          name: "Sofia Ramirez",
-        },
-        {
-          quote:
-            "Una verdadera joya junto al mar — la paella rivaliza con cualquiera que haya probado en la costa de España.",
-          name: "James Whitfield",
-        },
-        {
-          quote:
-            "Desde las ostras hasta el postre, todo se sintió cuidadosamente elaborado. Volveremos.",
-          name: "Nadia Osei",
-        },
-      ],
     },
     reserve: {
       eyebrow: "Reservación",
@@ -321,16 +202,11 @@ export const STR = {
       subscribeError: "Algo salió mal. Intenta de nuevo.",
       invalidEmail: "Ingresa un correo válido.",
       privacyNotice: "Aviso de privacidad",
-      blurb: "Mariscos boutique, obtenidos a diario de aguas locales y servidos junto al mar.",
       visit: "Visítanos",
-      address: "142 Harbour Pier Road",
-      address2: "Marina District, Portside 90210",
-      hours: "Abierto Mar–Dom · 12pm – 11pm",
       contact: "Contacto",
       ourMenu: "Nuestro Menú",
       reservations: "Reservaciones",
       copyright: "© 2026 Marea. Todos los derechos reservados.",
-      tagline: "Frescura del océano, todos los días.",
     },
   },
 } as const;
