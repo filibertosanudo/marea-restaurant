@@ -18,6 +18,11 @@ export type BusinessSettings = {
   acceptsOnlinePayment: boolean;
   minBookingLeadMinutes: number;
   minCancelLeadMinutes: number;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  city: string | null;
+  phone: string | null;
+  email: string | null;
 };
 
 const inputClass =
@@ -182,6 +187,35 @@ export function BusinessSettingsForm({ dict, business }: { dict: SettingsDict; b
             />
           </button>
           <input type="hidden" name="acceptsOnlinePayment" value={acceptsOnlinePayment ? "on" : ""} />
+        </div>
+      </div>
+
+      <div className={cardClass}>
+        <h2 className="mb-[2px] text-[16px] font-semibold text-on-surface">{dict.contactTitle}</h2>
+        <p className="mb-md text-[12px] text-on-surface-muted">{dict.contactLead}</p>
+
+        <div className="grid grid-cols-1 gap-md sm:grid-cols-2">
+          <div className={fieldClass}>
+            <label className={labelClass}>{dict.addressLine1Label}</label>
+            <input type="text" name="addressLine1" defaultValue={business.addressLine1 ?? ""} className={inputClass} />
+          </div>
+          <div className={fieldClass}>
+            <label className={labelClass}>{dict.addressLine2Label}</label>
+            <input type="text" name="addressLine2" defaultValue={business.addressLine2 ?? ""} className={inputClass} />
+          </div>
+          <div className={fieldClass}>
+            <label className={labelClass}>{dict.cityLabel}</label>
+            <input type="text" name="city" defaultValue={business.city ?? ""} className={inputClass} />
+          </div>
+          <div className={fieldClass}>
+            <label className={labelClass}>{dict.phoneLabel}</label>
+            <input type="tel" name="phone" defaultValue={business.phone ?? ""} className={inputClass} />
+          </div>
+          <div className={fieldClass}>
+            <label className={labelClass}>{dict.emailLabel}</label>
+            <input type="email" name="email" defaultValue={business.email ?? ""} className={inputClass} />
+            {fieldError("email") && <p className="mt-[4px] text-[12px] text-error">{dict.errorInvalid}</p>}
+          </div>
         </div>
       </div>
 
