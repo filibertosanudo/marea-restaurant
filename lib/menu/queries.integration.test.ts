@@ -10,6 +10,7 @@ import {
   getModifierGroupByIdRaw,
   getPublicMenuRaw,
   getPublicMenuItemRaw,
+  getRepresentativeMenuImageUrl,
 } from "./queries";
 import { makeBusiness, makeMenuCategory, makeMenuItem, makeModifierGroup } from "@/test/factories";
 
@@ -96,5 +97,26 @@ describe("menu queries", () => {
     const item = await makeMenuItem(business.id, category.id);
 
     expect(await getPublicMenuItemRaw(business.id, item.id)).toBeNull();
+  });
+
+  it("getRepresentativeMenuImageUrl returns null when nothing has a photo", async () => {
+    const business = await makeBusiness();
+    const category = await makeMenuCategory(business.id);
+    await makeMenuItem(business.id, category.id, { imageUrl: null });
+
+    expect(await getRepresentativeMenuImageUrl(business.id)).toBeNull();
+  });
+
+  it("getRepresentativeMenuImageUrl skips unavailable and deleted items", async () => {
+    const business = await makeBusiness();
+    const category = await makeMenuCategory(business.id);
+    await makeMenuItem(business.id, category.id, { imageUrl: "https://cdn.example.com/hidden.jpg", isAvailable: false });
+    await makeMenuItem(business.id, category.id, {
+      imageUrl: "https://cdn.example.com/deleted.jpg",
+      deletedAt: new Date(),
+    });
+    await makeMenuItem(business.id, category.id, { imageUrl: "https://cdn.example.com/visible.jpg" });
+
+    expect(await getRepresentativeMenuImageUrl(business.id)).toBe("https://cdn.example.com/visible.jpg");
   });
 });

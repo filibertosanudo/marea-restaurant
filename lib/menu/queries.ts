@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/lib/generated/prisma/client";
 
@@ -180,6 +181,23 @@ export async function getPublicMenuRaw(businessId: string) {
     },
   });
 }
+
+/**
+ * One dish photo for Open Graph / Twitter Card sharing — Business has no
+ * cover-photo field of its own (no upload flow exists for one), so a link
+ * shared in WhatsApp uses a real, already-uploaded dish photo instead of
+ * shipping a second image pipeline just for og:image. Picks deterministically
+ * (category then item sortOrder) rather than "whichever came back first" so
+ * the same dish shows every time, not a different one per request.
+ */
+export const getRepresentativeMenuImageUrl = cache(async (businessId: string): Promise<string | null> => {
+  const item = await prisma.menuItem.findFirst({
+    where: { businessId, deletedAt: null, isAvailable: true, imageUrl: { not: null } },
+    orderBy: [{ category: { sortOrder: "asc" } }, { sortOrder: "asc" }],
+    select: { imageUrl: true },
+  });
+  return item?.imageUrl ?? null;
+});
 
 /**
  * A single available dish by id, with the same shape getPublicMenuRaw's
