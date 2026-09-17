@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import { Montserrat_Alternates, Poppins } from "next/font/google";
 import { headers } from "next/headers";
 import { CSP_NONCE_HEADER } from "@/lib/security/csp";
-import { getCurrentBusiness, getBusinessTranslations } from "@/lib/business";
-import { pickTranslation } from "@/lib/i18n/translations";
-import type { Lang } from "@/lib/i18n/lang";
+import { getCurrentBusiness } from "@/lib/business";
+import { resolveSiteMetadataText } from "@/lib/seo/site-metadata";
 import "./globals.css";
 
 const montserratAlternates = Montserrat_Alternates({
@@ -27,14 +26,7 @@ const poppins = Poppins({
  * not a hardcoded string — see this function.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const business = await getCurrentBusiness();
-  const translations = await getBusinessTranslations(business.id);
-  const t = pickTranslation(translations, business.defaultLocale as Lang);
-
-  return {
-    title: t?.metaTitle || business.name,
-    description: t?.metaDescription || t?.tagline || business.name,
-  };
+  return resolveSiteMetadataText();
 }
 
 // Root-level, so it covers every route: without an explicit dynamic API

@@ -63,6 +63,18 @@ describe("buildRestaurantJsonLd", () => {
     expect(result).not.toHaveProperty("openingHours");
   });
 
+  it("resolves a relative image path against the site's own origin", () => {
+    const result = buildRestaurantJsonLd({ ...BASE, image: "/menu/lobster.jpg" });
+
+    expect(result.image).toBe("https://marea.example.com/menu/lobster.jpg");
+  });
+
+  it("leaves an already-absolute image URL untouched", () => {
+    const result = buildRestaurantJsonLd({ ...BASE, image: "https://cdn.example.com/lobster.jpg" });
+
+    expect(result.image).toBe("https://cdn.example.com/lobster.jpg");
+  });
+
   it("includes formatted openingHours when configured", () => {
     const result = buildRestaurantJsonLd({
       ...BASE,
