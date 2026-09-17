@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { getCurrentBusiness } from "@/lib/business";
 import { getOrderForReviewByPublicToken } from "@/lib/orders/queries";
+import { resolveOrderAuthorName } from "@/lib/orders/dto";
 import { getOrderLang } from "@/lib/i18n/cookie";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import { submitTestimonialSchema } from "@/lib/testimonials/schemas";
@@ -50,7 +51,7 @@ export async function submitTestimonialAction(
   await recordScopeAttempt(CREATE_SCOPE, ip);
 
   const lang = await getOrderLang(business.defaultLocale === "en" ? "en" : "es");
-  const authorName = order.customer?.name ?? order.guestName ?? "Guest";
+  const authorName = resolveOrderAuthorName(order);
 
   try {
     await prisma.testimonial.create({
