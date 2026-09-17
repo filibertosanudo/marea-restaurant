@@ -8,7 +8,7 @@ import { getCurrentBusiness } from "@/lib/business";
 import { localWallClockToUtc } from "@/lib/reservations/availability";
 import { parseDateParam } from "@/lib/reservations/schemas";
 import { flattenZodError } from "@/lib/forms/flatten-zod-error";
-import { weeklyScheduleSchema, closureSchema, businessSettingsSchema } from "./schemas";
+import { weeklyScheduleSchema, closureSchema, businessSettingsSchema, businessTranslationSchema } from "./schemas";
 import { validateWeeklySchedule, normalizeBlock, parseTimeToMinutes, type DayScheduleInput } from "./schedule";
 
 export type SettingsFormState =
@@ -143,6 +143,11 @@ export async function updateBusinessSettingsAction(
     acceptsOnlinePayment: formData.get("acceptsOnlinePayment") === "on",
     minBookingLeadMinutes: formData.get("minBookingLeadMinutes"),
     minCancelLeadMinutes: formData.get("minCancelLeadMinutes"),
+    addressLine1: formData.get("addressLine1"),
+    addressLine2: formData.get("addressLine2"),
+    city: formData.get("city"),
+    phone: formData.get("phone"),
+    email: formData.get("email"),
   });
   if (!parsed.success) return { error: "invalid", fieldErrors: flattenZodError(parsed.error) };
 
@@ -152,5 +157,45 @@ export async function updateBusinessSettingsAction(
   });
 
   revalidatePath("/admin/configuracion");
+  revalidatePath("/");
+  return { success: true };
+}
+
+/** Full upsert per locale, same "write both locales at once" shape as the promotion/category editors — the form always submits both language tabs together, whether or not the admin touched one of them. */
+export async function updateBusinessTranslationAction(
+  _prevState: SettingsFormState,
+  formData: FormData
+): Promise<SettingsFormState> {
+  await requireRole(...ADMIN_ROLES);
+  const business = await getCurrentBusiness();
+
+  const parsed = businessTranslationSchema.safeParse({
+    en: {
+      tagline: formData.get("en.tagline"),
+      shortBlurb: formData.get("en.shortBlurb"),
+      aboutTitle: formData.get("en.aboutTitle"),
+      aboutBody: formData.get("en.aboutBody"),
+    },
+    es: {
+      tagline: formData.get("es.tagline"),
+      shortBlurb: formData.get("es.shortBlurb"),
+      aboutTitle: formData.get("es.aboutTitle"),
+      aboutBody: formData.get("es.aboutBody"),
+    },
+  });
+  if (!parsed.success) return { error: "invalid", fieldErrors: flattenZodError(parsed.error) };
+
+  await prisma.$transaction(
+    (["en", "es"] as const).map((locale) =>
+      prisma.businessTranslation.upsert({
+        where: { businessId_locale: { businessId: business.id, locale } },
+        update: parsed.data[locale],
+        create: { businessId: business.id, locale, ...parsed.data[locale] },
+      })
+    )
+  );
+
+  revalidatePath("/admin/configuracion");
+  revalidatePath("/");
   return { success: true };
 }
