@@ -1,34 +1,39 @@
 import { describe, it, expect } from "vitest";
-import { listTestimonialsByStatusRaw, listApprovedTestimonialsRaw, getTestimonialByOrderId } from "./queries";
+import { listTestimonialsByStatusRaw, listFeaturedTestimonialsRaw, getTestimonialByOrderId } from "./queries";
 import { makeBusiness, makeTestimonial, makeOrder } from "@/test/factories";
 
-describe("listApprovedTestimonialsRaw", () => {
-  it("never returns a PENDING or REJECTED testimonial", async () => {
+describe("listFeaturedTestimonialsRaw", () => {
+  it("only returns testimonials that are both APPROVED and featured", async () => {
     const business = await makeBusiness();
-    await makeTestimonial(business.id, { authorName: "Pending Guest", status: "PENDING" });
-    await makeTestimonial(business.id, { authorName: "Rejected Guest", status: "REJECTED" });
-    const approved = await makeTestimonial(business.id, { authorName: "Approved Guest", status: "APPROVED" });
+    await makeTestimonial(business.id, { authorName: "Pending Guest", status: "PENDING", isFeatured: true });
+    await makeTestimonial(business.id, { authorName: "Rejected Guest", status: "REJECTED", isFeatured: true });
+    await makeTestimonial(business.id, { authorName: "Approved Not Featured", status: "APPROVED", isFeatured: false });
+    const featured = await makeTestimonial(business.id, {
+      authorName: "Featured Guest",
+      status: "APPROVED",
+      isFeatured: true,
+    });
 
-    const result = await listApprovedTestimonialsRaw(business.id);
+    const result = await listFeaturedTestimonialsRaw(business.id);
 
-    expect(result.map((t) => t.id)).toEqual([approved.id]);
+    expect(result.map((t) => t.id)).toEqual([featured.id]);
   });
 
   it("orders by sortOrder ascending", async () => {
     const business = await makeBusiness();
-    const second = await makeTestimonial(business.id, { status: "APPROVED", sortOrder: 1 });
-    const first = await makeTestimonial(business.id, { status: "APPROVED", sortOrder: 0 });
+    const second = await makeTestimonial(business.id, { status: "APPROVED", isFeatured: true, sortOrder: 1 });
+    const first = await makeTestimonial(business.id, { status: "APPROVED", isFeatured: true, sortOrder: 0 });
 
-    const result = await listApprovedTestimonialsRaw(business.id);
+    const result = await listFeaturedTestimonialsRaw(business.id);
 
     expect(result.map((t) => t.id)).toEqual([first.id, second.id]);
   });
 
   it("excludes soft-deleted testimonials", async () => {
     const business = await makeBusiness();
-    await makeTestimonial(business.id, { status: "APPROVED", deletedAt: new Date() });
+    await makeTestimonial(business.id, { status: "APPROVED", isFeatured: true, deletedAt: new Date() });
 
-    const result = await listApprovedTestimonialsRaw(business.id);
+    const result = await listFeaturedTestimonialsRaw(business.id);
 
     expect(result).toHaveLength(0);
   });

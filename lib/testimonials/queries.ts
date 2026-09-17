@@ -12,14 +12,14 @@ export async function listTestimonialsByStatusRaw(businessId: string, status: Re
 }
 
 /**
- * Only APPROVED testimonials are eligible for the public landing — written
- * now even though nothing consumes it until the landing is wired to the
- * database, so "what the public can see" is decided here, once, rather than
- * re-derived by whichever page ends up calling it.
+ * The landing's own read: APPROVED and featured, by sortOrder. Approved
+ * alone isn't enough — that's every review the moderation queue let
+ * through, not the curated subset the business chose to actually show (the
+ * "Approved" admin tab's star toggle is exactly that curation step).
  */
-export async function listApprovedTestimonialsRaw(businessId: string) {
+export async function listFeaturedTestimonialsRaw(businessId: string) {
   return prisma.testimonial.findMany({
-    where: { businessId, status: "APPROVED", deletedAt: null },
+    where: { businessId, status: "APPROVED", isFeatured: true, deletedAt: null },
     orderBy: { sortOrder: "asc" },
     include: { translations: true },
   });
