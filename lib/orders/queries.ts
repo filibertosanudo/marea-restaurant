@@ -163,6 +163,7 @@ export async function getOrderForReviewByPublicToken(businessId: string, publicT
     where: { businessId, publicToken },
     select: {
       id: true,
+      orderNumber: true,
       status: true,
       guestName: true,
       locale: true,

@@ -11,6 +11,7 @@ import type {
   Refund,
   RestaurantTable,
 } from "@/lib/generated/prisma/client";
+import type { getOrderForReviewByPublicToken } from "@/lib/orders/queries";
 
 export type TrackedOrderDTO = {
   orderNumber: string;
@@ -205,5 +206,24 @@ export function toOrderPaymentDetailDTO(order: RawPaymentDetailOrder): OrderPaym
         createdAt: r.createdAt.toISOString(),
       })),
     })),
+  };
+}
+
+export type ReviewableOrderDTO = {
+  orderNumber: string;
+  authorName: string;
+  status: Order["status"];
+  alreadyReviewed: boolean;
+};
+
+type RawReviewOrder = NonNullable<Awaited<ReturnType<typeof getOrderForReviewByPublicToken>>>;
+
+/** authorName here must match the fallback chain submitTestimonialAction uses to freeze the row — same order, customer name over guestName over "Guest" — so the greeting the guest sees is never different from the name their review actually gets signed with. */
+export function toReviewableOrderDTO(order: RawReviewOrder): ReviewableOrderDTO {
+  return {
+    orderNumber: order.orderNumber,
+    authorName: order.customer?.name ?? order.guestName ?? "Guest",
+    status: order.status,
+    alreadyReviewed: order.testimonials.length > 0,
   };
 }
