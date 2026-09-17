@@ -86,7 +86,11 @@ export async function advanceOrderStatusAction(orderId: string): Promise<BoardAc
           // existed — falls back to the business's own default locale
           // rather than guessing from unrelated data.
           locale: order.locale ?? business.defaultLocale,
-          payload: { orderNumber: order.orderNumber, orderUrl: `${appOrigin()}/o/${order.publicToken}` },
+          payload: {
+            orderNumber: order.orderNumber,
+            orderUrl: `${appOrigin()}/o/${order.publicToken}`,
+            ...(nextStatus === "DELIVERED" ? { reviewUrl: `${appOrigin()}/review/${order.publicToken}` } : {}),
+          },
           relatedOrderId: order.id,
           dedupeKey: `order:${order.id}:${nextStatus}`,
         },

@@ -4,7 +4,14 @@ import type { Lang } from "@/lib/i18n/lang";
 import { EmailLayout, emailStyles, textFooter } from "@/lib/notifications/templates/layout";
 import type { OrderStatusPayload, Template, TemplateBusiness } from "@/lib/notifications/templates/types";
 
-type StatusCopy = { subject: (orderNumber: string) => string; preview: string; heading: (orderNumber: string) => string; button: string };
+type StatusCopy = {
+  subject: (orderNumber: string) => string;
+  preview: string;
+  heading: (orderNumber: string) => string;
+  button: string;
+  /** Only order.delivered's copy sets this — see OrderStatusPayload.reviewUrl. */
+  reviewButton?: string;
+};
 
 /**
  * order.ready and order.delivered are the same shape — a folio and a link,
@@ -22,13 +29,19 @@ function createOrderStatusTemplate(strings: Record<Lang, StatusCopy>): Template<
         <Button href={payload.orderUrl} style={{ ...emailStyles.button, marginTop: "8px" }}>
           {t.button}
         </Button>
+        {payload.reviewUrl && t.reviewButton && (
+          <Button href={payload.reviewUrl} style={{ ...emailStyles.button, marginTop: "8px" }}>
+            {t.reviewButton}
+          </Button>
+        )}
       </EmailLayout>
     );
   }
 
   function text(payload: OrderStatusPayload, locale: Lang, business: TemplateBusiness): string {
     const t = strings[locale];
-    return `${t.heading(payload.orderNumber)}\n\n${t.button}: ${payload.orderUrl}` + textFooter(business);
+    const reviewLine = payload.reviewUrl && t.reviewButton ? `\n${t.reviewButton}: ${payload.reviewUrl}` : "";
+    return `${t.heading(payload.orderNumber)}\n\n${t.button}: ${payload.orderUrl}${reviewLine}` + textFooter(business);
   }
 
   return {
@@ -63,11 +76,13 @@ export const orderDeliveredTemplate = createOrderStatusTemplate({
     preview: "Tu pedido fue entregado",
     heading: (orderNumber) => `Tu pedido ${orderNumber} fue entregado`,
     button: "Ver mi pedido",
+    reviewButton: "Dejar una reseña",
   },
   en: {
     subject: (orderNumber) => `Order ${orderNumber} delivered`,
     preview: "Your order was delivered",
     heading: (orderNumber) => `Your order ${orderNumber} was delivered`,
     button: "View my order",
+    reviewButton: "Leave a review",
   },
 });
