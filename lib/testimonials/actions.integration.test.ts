@@ -24,10 +24,23 @@ describe("approveTestimonialAction", () => {
     const business = await makeCurrentBusiness();
     const testimonial = await makeTestimonial(business.id, { status: "PENDING" });
 
-    await approveTestimonialAction(testimonial.id);
+    const result = await approveTestimonialAction(testimonial.id);
 
+    expect(result).toEqual({ success: true });
     const updated = await prisma.testimonial.findUniqueOrThrow({ where: { id: testimonial.id } });
     expect(updated.status).toBe("APPROVED");
+  });
+
+  it("reports not_found instead of throwing for a row that's already gone", async () => {
+    // Same shape as two admins racing the same pending row: by the time the
+    // second request's update runs, `where: { id, businessId }` no longer
+    // matches anything.
+    await loginAsAdmin();
+    await makeCurrentBusiness();
+
+    const result = await approveTestimonialAction("not-a-real-id");
+
+    expect(result).toEqual({ error: "not_found" });
   });
 });
 
@@ -74,5 +87,17 @@ describe("reorderTestimonialsAction", () => {
     const updatedSecond = await prisma.testimonial.findUniqueOrThrow({ where: { id: second.id } });
     expect(updatedSecond.sortOrder).toBe(0);
     expect(updatedFirst.sortOrder).toBe(1);
+  });
+
+  it("rolls back the whole batch and reports not_found when one id no longer matches", async () => {
+    await loginAsAdmin();
+    const business = await makeCurrentBusiness();
+    const first = await makeTestimonial(business.id, { status: "APPROVED", sortOrder: 0 });
+
+    const result = await reorderTestimonialsAction([first.id, "not-a-real-id"]);
+
+    expect(result).toEqual({ error: "not_found" });
+    const unchanged = await prisma.testimonial.findUniqueOrThrow({ where: { id: first.id } });
+    expect(unchanged.sortOrder).toBe(0);
   });
 });

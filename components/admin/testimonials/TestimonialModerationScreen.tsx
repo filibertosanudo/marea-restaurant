@@ -53,23 +53,39 @@ export function TestimonialModerationScreen({
   async function handleApprove(item: TestimonialModerationDTO) {
     setPending((prev) => prev.filter((p) => p.id !== item.id));
     setApproved((prev) => [...prev, item]);
-    await approveTestimonialAction(item.id);
+    const result = await approveTestimonialAction(item.id);
+    if ("error" in result) {
+      // Another admin already acted on this row (approved, rejected, or
+      // deleted it) between the click and this response — undo the
+      // optimistic move instead of showing a row that isn't really approved.
+      setApproved((prev) => prev.filter((p) => p.id !== item.id));
+      setPending((prev) => [item, ...prev]);
+    }
   }
 
   async function handleReject(item: TestimonialModerationDTO) {
     setPending((prev) => prev.filter((p) => p.id !== item.id));
-    await rejectTestimonialAction(item.id);
+    const result = await rejectTestimonialAction(item.id);
+    if ("error" in result) {
+      setPending((prev) => [item, ...prev]);
+    }
   }
 
   async function handleToggleFeatured(item: TestimonialModerationDTO) {
     setApproved((prev) =>
       prev.map((p) => (p.id === item.id ? { ...p, isFeatured: !p.isFeatured } : p))
     );
-    await toggleFeaturedTestimonialAction(item.id, !item.isFeatured);
+    const result = await toggleFeaturedTestimonialAction(item.id, !item.isFeatured);
+    if ("error" in result) {
+      setApproved((prev) =>
+        prev.map((p) => (p.id === item.id ? { ...p, isFeatured: item.isFeatured } : p))
+      );
+    }
   }
 
-  function handleDrop(targetId: string) {
+  async function handleDrop(targetId: string) {
     if (!dragId || dragId === targetId) return;
+    const previous = approved;
     const next = [...approved];
     const fromIndex = next.findIndex((a) => a.id === dragId);
     const toIndex = next.findIndex((a) => a.id === targetId);
@@ -77,7 +93,10 @@ export function TestimonialModerationScreen({
     next.splice(toIndex, 0, moved);
     setApproved(next);
     setDragId(null);
-    reorderTestimonialsAction(next.map((a) => a.id));
+    const result = await reorderTestimonialsAction(next.map((a) => a.id));
+    if ("error" in result) {
+      setApproved(previous);
+    }
   }
 
   const tabs: { key: Tab; label: string; count: number }[] = [
