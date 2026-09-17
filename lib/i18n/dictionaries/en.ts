@@ -503,6 +503,7 @@ export const en = {
       title: "Business settings",
       tabHours: "Hours & closures",
       tabBusiness: "Business settings",
+      tabContent: "Website content",
       tabNotifications: "Notifications",
       tabDevices: "Devices",
 
@@ -557,9 +558,26 @@ export const en = {
       onlinePaymentLabel: "Accept online payment",
       onlinePaymentHint: "Card at the time of ordering, via Stripe.",
 
+      contactTitle: "Contact & address",
+      contactLead: "Shown in the footer of your public site — leave blank to hide a field there.",
+      addressLine1Label: "Address line 1",
+      addressLine2Label: "Address line 2",
+      cityLabel: "City",
+      phoneLabel: "Phone",
+      emailLabel: "Email",
+
       saveSettings: "Save settings",
       errorGeneric: "Something went wrong. Try again.",
       errorInvalid: "Check the highlighted fields.",
+
+      contentAboutTitle: "About the business",
+      contentAboutLead: "Shown on the landing page — fill in each language your site supports.",
+      taglineLabel: "Tagline",
+      taglineHint: "A short line shown near the footer, e.g. \"Fresh from the ocean, every day.\"",
+      shortBlurbLabel: "Footer blurb",
+      aboutTitleLabel: "About heading",
+      aboutBodyLabel: "About text",
+      saveContent: "Save content",
 
       notifications: {
         title: "Notification queue",

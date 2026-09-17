@@ -508,6 +508,7 @@ export const es = {
       title: "Configuración del negocio",
       tabHours: "Horario y cierres",
       tabBusiness: "Ajustes del negocio",
+      tabContent: "Contenido del sitio",
       tabNotifications: "Notificaciones",
       tabDevices: "Dispositivos",
 
@@ -562,9 +563,26 @@ export const es = {
       onlinePaymentLabel: "Aceptar pago en línea",
       onlinePaymentHint: "Tarjeta al momento de ordenar, vía Stripe.",
 
+      contactTitle: "Contacto y dirección",
+      contactLead: "Se muestra en el pie de tu sitio público — déjalo en blanco para ocultar ese dato ahí.",
+      addressLine1Label: "Dirección línea 1",
+      addressLine2Label: "Dirección línea 2",
+      cityLabel: "Ciudad",
+      phoneLabel: "Teléfono",
+      emailLabel: "Correo",
+
       saveSettings: "Guardar ajustes",
       errorGeneric: "Algo salió mal. Intenta de nuevo.",
       errorInvalid: "Revisa los campos marcados.",
+
+      contentAboutTitle: "Acerca del negocio",
+      contentAboutLead: "Se muestra en la página principal — completa cada idioma que tu sitio soporte.",
+      taglineLabel: "Frase distintiva",
+      taglineHint: "Línea corta que aparece cerca del pie, ej. \"Frescura del océano, todos los días.\"",
+      shortBlurbLabel: "Texto del pie",
+      aboutTitleLabel: "Encabezado de \"Acerca de\"",
+      aboutBodyLabel: "Texto de \"Acerca de\"",
+      saveContent: "Guardar contenido",
 
       notifications: {
         title: "Cola de notificaciones",
