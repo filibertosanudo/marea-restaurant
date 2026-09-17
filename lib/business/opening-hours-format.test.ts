@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatWeeklyHours } from "./opening-hours-format";
+import { formatWeeklyHours, formatOpeningHoursSchemaOrg } from "./opening-hours-format";
 import type { OpeningHourWindow } from "@/lib/reservations/availability";
 
 function hour(dayOfWeek: number, opensAt: number, closesAt: number): OpeningHourWindow {
@@ -97,5 +97,48 @@ describe("formatWeeklyHours", () => {
     const result = formatWeeklyHours(hours, "en");
 
     expect(result).toBe("Sun–Sat · 11am – 10pm");
+  });
+});
+
+describe("formatOpeningHoursSchemaOrg", () => {
+  it("returns an empty array when every day is closed", () => {
+    expect(formatOpeningHoursSchemaOrg([])).toEqual([]);
+  });
+
+  it("groups consecutive days into one comma-separated entry in 24h time", () => {
+    // Tue(2)-Sun(0), Monday(1) closed — the module's own example.
+    const hours: OpeningHourWindow[] = [0, 2, 3, 4, 5, 6].map((d) => hour(d, 720, 1380));
+
+    const result = formatOpeningHoursSchemaOrg(hours);
+
+    expect(result).toEqual(["Tu,We,Th,Fr,Sa,Su 12:00-23:00"]);
+  });
+
+  it("emits one entry per block for a split lunch/dinner schedule", () => {
+    const hours: OpeningHourWindow[] = [1, 2, 3, 4, 5].flatMap((d) => [
+      hour(d, 720, 900),
+      hour(d, 1080, 1380),
+    ]);
+
+    const result = formatOpeningHoursSchemaOrg(hours);
+
+    expect(result).toEqual(["Mo,Tu,We,Th,Fr 12:00-15:00", "Mo,Tu,We,Th,Fr 18:00-23:00"]);
+  });
+
+  it("wraps a close time past midnight onto the 24-hour clock", () => {
+    const hours: OpeningHourWindow[] = [5, 6].map((d) => hour(d, 1200, 1500));
+
+    const result = formatOpeningHoursSchemaOrg(hours);
+
+    expect(result).toEqual(["Fr,Sa 20:00-01:00"]);
+  });
+
+  it("splits into separate entries when the weekend schedule differs from weekdays", () => {
+    const weekday = [1, 2, 3, 4, 5].map((d) => hour(d, 660, 1260));
+    const weekend = [6, 0].map((d) => hour(d, 600, 1320));
+
+    const result = formatOpeningHoursSchemaOrg([...weekday, ...weekend]);
+
+    expect(result).toEqual(["Mo,Tu,We,Th,Fr 11:00-21:00", "Sa,Su 10:00-22:00"]);
   });
 });
