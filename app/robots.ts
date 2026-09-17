@@ -1,6 +1,12 @@
 import type { MetadataRoute } from "next";
 import { appOrigin } from "@/lib/env";
 
+// Without this, Next tries to statically prerender this route at `npm run
+// build` time — the portable Docker build stage has no real env vars yet
+// (see app/layout.tsx's own comment on the same problem), so appOrigin()'s
+// underlying env validation throws and fails the build.
+export const dynamic = "force-dynamic";
+
 /**
  * /admin is disallowed outright — it's behind a login anyway, nothing there
  * is ever meant to be found by a crawler. The capacity-token routes

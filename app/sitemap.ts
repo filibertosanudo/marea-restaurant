@@ -1,6 +1,12 @@
 import type { MetadataRoute } from "next";
 import { appOrigin } from "@/lib/env";
 
+// Without this, Next tries to statically prerender this route at `npm run
+// build` time — the portable Docker build stage has no real env vars yet
+// (see app/layout.tsx's own comment on the same problem), so appOrigin()'s
+// underlying env validation throws and fails the build.
+export const dynamic = "force-dynamic";
+
 /**
  * Only real, public, shareable pages — never a capacity-token route
  * (/o/<publicToken>, /r/<confirmationCode>, /t/<qrToken>, /review/<publicToken>).
