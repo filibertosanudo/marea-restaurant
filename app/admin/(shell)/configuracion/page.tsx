@@ -1,10 +1,10 @@
 import { UserRole } from "@/lib/generated/prisma/client";
 import { requirePageRole } from "@/lib/auth/permissions";
-import { getCurrentBusiness } from "@/lib/business";
+import { getCurrentBusiness, getBusinessTranslations } from "@/lib/business";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getOpeningHours } from "@/lib/reservations/queries";
-import { getBusinessClosuresForAdmin, getBusinessTranslationsForAdmin } from "@/lib/settings/queries";
+import { getBusinessClosuresForAdmin } from "@/lib/settings/queries";
 import type { BusinessContent } from "@/components/admin/settings/BusinessContentForm";
 import { SettingsShell } from "@/components/admin/settings/SettingsShell";
 import { listRecentNotificationJobs, countDueNotificationJobs } from "@/lib/notifications/queries";
@@ -21,7 +21,7 @@ export default async function SettingsPage() {
   const [openingHours, closures, translations, notificationJobs, notificationsDueCount, devices] = await Promise.all([
     getOpeningHours(business.id),
     getBusinessClosuresForAdmin(business.id),
-    getBusinessTranslationsForAdmin(business.id),
+    getBusinessTranslations(business.id),
     listRecentNotificationJobs(business.id),
     countDueNotificationJobs(business.id),
     listDevicesForAdmin(business.id),
