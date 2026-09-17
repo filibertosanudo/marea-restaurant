@@ -152,6 +152,27 @@ export async function getOrderForPaymentIntentByPublicToken(businessId: string, 
 }
 
 /**
+ * The review form's own read: just enough to decide whether to show the
+ * form (status is DELIVERED, no Testimonial exists for this order yet) and
+ * to freeze authorName at submit time. Same publicToken-is-the-auth model as
+ * getOrderByPublicToken below, kept separate because that one over-fetches
+ * (items, payments) for a page that only ever needs a name and a status.
+ */
+export async function getOrderForReviewByPublicToken(businessId: string, publicToken: string) {
+  return prisma.order.findFirst({
+    where: { businessId, publicToken },
+    select: {
+      id: true,
+      status: true,
+      guestName: true,
+      locale: true,
+      customer: { select: { name: true } },
+      testimonials: { select: { id: true } },
+    },
+  });
+}
+
+/**
  * publicToken is the entire auth model for this page — an unauthenticated
  * guest reaches their order by knowing this token and nothing else (see
  * schema.prisma: cuid(2), not the guessable cuid() default). Never resolve
