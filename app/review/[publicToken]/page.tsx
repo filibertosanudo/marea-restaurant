@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCurrentBusiness } from "@/lib/business";
 import { getOrderForReviewByPublicToken } from "@/lib/orders/queries";
@@ -5,6 +6,9 @@ import { toReviewableOrderDTO } from "@/lib/orders/dto";
 import { getOrderLang } from "@/lib/i18n/cookie";
 import { getReviewDictionary } from "@/lib/i18n/dictionaries";
 import { ReviewForm } from "@/components/review/ReviewForm";
+
+// A capacity token — see app/o/[publicToken]/page.tsx's own metadata comment.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function ReviewPage({
   params,

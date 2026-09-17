@@ -1,9 +1,13 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCurrentBusiness } from "@/lib/business";
 import { getTableByQrToken } from "@/lib/tables/queries";
 import { getMenuPageData } from "@/lib/menu/page-data";
 import { MenuBrowser } from "@/components/order/MenuBrowser";
 import { TableCookieBootstrap } from "@/components/order/TableCookieBootstrap";
+
+// A capacity token — see app/o/[publicToken]/page.tsx's own metadata comment.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function TablePage({
   params,
