@@ -103,3 +103,16 @@ export function makePromotion(
     },
   });
 }
+
+export function makeTestimonial(
+  businessId: string,
+  overrides: Partial<Prisma.TestimonialUncheckedCreateInput> = {}
+) {
+  return prisma.testimonial.create({
+    data: {
+      businessId,
+      authorName: "Test Author",
+      ...overrides,
+    },
+  });
+}
