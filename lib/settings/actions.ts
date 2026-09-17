@@ -143,11 +143,11 @@ export async function updateBusinessSettingsAction(
     acceptsOnlinePayment: formData.get("acceptsOnlinePayment") === "on",
     minBookingLeadMinutes: formData.get("minBookingLeadMinutes"),
     minCancelLeadMinutes: formData.get("minCancelLeadMinutes"),
-    addressLine1: formData.get("addressLine1"),
-    addressLine2: formData.get("addressLine2"),
-    city: formData.get("city"),
-    phone: formData.get("phone"),
-    email: formData.get("email"),
+    addressLine1: String(formData.get("addressLine1") ?? ""),
+    addressLine2: String(formData.get("addressLine2") ?? ""),
+    city: String(formData.get("city") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    email: String(formData.get("email") ?? ""),
   });
   if (!parsed.success) return { error: "invalid", fieldErrors: flattenZodError(parsed.error) };
 
@@ -171,16 +171,16 @@ export async function updateBusinessTranslationAction(
 
   const parsed = businessTranslationSchema.safeParse({
     en: {
-      tagline: formData.get("en.tagline"),
-      shortBlurb: formData.get("en.shortBlurb"),
-      aboutTitle: formData.get("en.aboutTitle"),
-      aboutBody: formData.get("en.aboutBody"),
+      tagline: String(formData.get("en.tagline") ?? ""),
+      shortBlurb: String(formData.get("en.shortBlurb") ?? ""),
+      aboutTitle: String(formData.get("en.aboutTitle") ?? ""),
+      aboutBody: String(formData.get("en.aboutBody") ?? ""),
     },
     es: {
-      tagline: formData.get("es.tagline"),
-      shortBlurb: formData.get("es.shortBlurb"),
-      aboutTitle: formData.get("es.aboutTitle"),
-      aboutBody: formData.get("es.aboutBody"),
+      tagline: String(formData.get("es.tagline") ?? ""),
+      shortBlurb: String(formData.get("es.shortBlurb") ?? ""),
+      aboutTitle: String(formData.get("es.aboutTitle") ?? ""),
+      aboutBody: String(formData.get("es.aboutBody") ?? ""),
     },
   });
   if (!parsed.success) return { error: "invalid", fieldErrors: flattenZodError(parsed.error) };
