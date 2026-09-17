@@ -192,7 +192,7 @@ export function TestimonialModerationScreen({
                     <button
                       type="button"
                       onClick={() => handleToggleFeatured(item)}
-                      aria-label={t.reorderHint}
+                      aria-label={t.toggleFeatured}
                       className={`text-[18px] ${item.isFeatured ? "text-warning" : "text-on-surface-muted"}`}
                     >
                       {item.isFeatured ? "★" : "☆"}

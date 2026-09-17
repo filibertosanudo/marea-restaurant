@@ -682,6 +682,7 @@ export const es = {
       approve: "Aprobar",
       reject: "Rechazar",
       reorderHint: "Arrastra para reordenar, marca la estrella para destacar en la landing",
+      toggleFeatured: "Destacar en la landing",
       errorGeneric: "Algo salió mal. Intenta de nuevo.",
     },
     common: {

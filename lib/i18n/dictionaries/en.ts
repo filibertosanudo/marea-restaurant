@@ -677,6 +677,7 @@ export const en = {
       approve: "Approve",
       reject: "Reject",
       reorderHint: "Drag to reorder, star to feature on the landing page",
+      toggleFeatured: "Feature on the landing page",
       errorGeneric: "Something went wrong. Try again.",
     },
     common: {
