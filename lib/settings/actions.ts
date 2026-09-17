@@ -185,14 +185,24 @@ export async function updateBusinessTranslationAction(
   });
   if (!parsed.success) return { error: "invalid", fieldErrors: flattenZodError(parsed.error) };
 
+  // A locale left entirely blank must not leave (or create) a row at all —
+  // pickTranslation (lib/i18n/translations.ts), which the public landing
+  // relies on for its "requested locale, else whatever exists" fallback,
+  // treats a *present* row for the requested locale as a match even when
+  // every field on it is null. An empty "en" row would then win over a
+  // fully written "es" one instead of falling back to it.
   await prisma.$transaction(
-    (["en", "es"] as const).map((locale) =>
-      prisma.businessTranslation.upsert({
-        where: { businessId_locale: { businessId: business.id, locale } },
-        update: parsed.data[locale],
-        create: { businessId: business.id, locale, ...parsed.data[locale] },
-      })
-    )
+    (["en", "es"] as const).map((locale) => {
+      const data = parsed.data[locale];
+      const isBlank = !data.tagline && !data.shortBlurb && !data.aboutTitle && !data.aboutBody;
+      return isBlank
+        ? prisma.businessTranslation.deleteMany({ where: { businessId: business.id, locale } })
+        : prisma.businessTranslation.upsert({
+            where: { businessId_locale: { businessId: business.id, locale } },
+            update: data,
+            create: { businessId: business.id, locale, ...data },
+          });
+    })
   );
 
   revalidatePath("/admin/configuracion");

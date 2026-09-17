@@ -5,6 +5,7 @@ import {
   createClosureAction,
   deleteClosureAction,
   updateBusinessSettingsAction,
+  updateBusinessTranslationAction,
 } from "./actions";
 import { getBusinessClosuresForAdmin } from "./queries";
 import { makeBusiness, makeStaff } from "@/test/factories";
@@ -143,5 +144,59 @@ describe("updateBusinessSettingsAction", () => {
     );
 
     expect(result).toMatchObject({ error: "invalid" });
+  });
+});
+
+describe("updateBusinessTranslationAction", () => {
+  it("upserts both locales' content", async () => {
+    const business = await makeBusiness({ slug: "marea" });
+    await loginAsAdmin();
+
+    const result = await updateBusinessTranslationAction(
+      undefined,
+      closureForm({
+        "en.tagline": "Fresh every day",
+        "en.shortBlurb": "",
+        "en.aboutTitle": "",
+        "en.aboutBody": "",
+        "es.tagline": "Fresco cada día",
+        "es.shortBlurb": "",
+        "es.aboutTitle": "",
+        "es.aboutBody": "",
+      })
+    );
+
+    expect(result).toEqual({ success: true });
+    const rows = await prisma.businessTranslation.findMany({ where: { businessId: business.id } });
+    expect(rows.map((r) => r.locale).sort()).toEqual(["en", "es"]);
+  });
+
+  it("deletes a locale's row instead of leaving it blank, so the public site still falls back to the other locale", async () => {
+    // Regression: an upserted row with every field null still matches its
+    // own locale in pickTranslation's `find`, which would stop the landing
+    // from ever falling back to the locale that actually has content.
+    const business = await makeBusiness({ slug: "marea" });
+    await prisma.businessTranslation.create({
+      data: { businessId: business.id, locale: "es", tagline: "Frescura del océano" },
+    });
+    await loginAsAdmin();
+
+    const result = await updateBusinessTranslationAction(
+      undefined,
+      closureForm({
+        "en.tagline": "",
+        "en.shortBlurb": "",
+        "en.aboutTitle": "",
+        "en.aboutBody": "",
+        "es.tagline": "Frescura del océano",
+        "es.shortBlurb": "",
+        "es.aboutTitle": "",
+        "es.aboutBody": "",
+      })
+    );
+
+    expect(result).toEqual({ success: true });
+    const rows = await prisma.businessTranslation.findMany({ where: { businessId: business.id } });
+    expect(rows.map((r) => r.locale)).toEqual(["es"]);
   });
 });
