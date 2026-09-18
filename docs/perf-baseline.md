@@ -148,6 +148,12 @@ What the numbers say, and what they don't:
   exceeds Prisma's 5 s default under that latency, which is worth remembering
   for the phase 6 scenario against a hosted database.
 
+Display: the kitchen and board cards and the kitchen ticket show the short form
+(`A-042`, the width the old folio had); the guest page, emails and reports
+show the full folio. The full folio at the card's 30 px wrapped at the hyphen on
+narrow kitchen displays. On the guest page (44 px) it wraps only at a 320 px
+viewport.
+
 Method: `node scripts/perf/checkout-load.mjs 100 20` for the HTTP figures;
 `BENCH_OUT=/tmp/b.txt CONC=4 NN=40 DATABASE_POOL_MAX=25 npx vitest run
 scripts/perf/checkout-db-bench` for the rest, three runs each side.
