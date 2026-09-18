@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentBusiness } from "@/lib/business";
+import { invalidatePublicCache } from "@/lib/cache/public";
 import { createOrderFromCart, CheckoutError } from "@/lib/orders/create-order";
 import { checkoutSchema } from "@/lib/orders/schemas";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
@@ -66,6 +67,12 @@ export async function createOrderAction(
     }
     throw err;
   }
+
+  // Read by the public menu and landing: tell the cache only when this
+  // order actually changed what they show (a dish sold out, a promotion
+  // exhausted), not on every order.
+  if (order.publicCacheStale.menu) invalidatePublicCache("menu", business.id);
+  if (order.publicCacheStale.promotions) invalidatePublicCache("promotions", business.id);
 
   // Charged on success, not on every attempt — a guest who bounces off
   // item_unavailable a few times while sorting out their cart must not burn
