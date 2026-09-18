@@ -1417,7 +1417,14 @@ model Testimonial {
   avatarUrl   String?
   rating      Int? // 1–5, opcional
 
-  orderId String? // reseña verificada: vino de un pedido real
+  /// Reseña verificada: vino de un pedido real. El índice único de abajo
+  /// depende de que Postgres NUNCA considere iguales dos NULL en un índice
+  /// único — el mismo comportamiento que en `OrderPromotion.promotionId` fue
+  /// un descuido (dejó de contar duplicados en cuanto la promoción se
+  /// borraba). Aquí es la característica: constriñe una reseña por pedido
+  /// real y deja pasar sin límite los testimonios "de catálogo" que el
+  /// negocio redacta a mano, que nunca traen `orderId`.
+  orderId String?
 
   /// Idioma en el que la escribió el cliente. Las traducciones a otros
   /// idiomas son opcionales y normalmente sólo existen para los testimonios
@@ -1437,6 +1444,7 @@ model Testimonial {
   order        Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
   translations TestimonialTranslation[]
 
+  @@unique([orderId])
   @@index([businessId, status, isFeatured, sortOrder])
 }
 

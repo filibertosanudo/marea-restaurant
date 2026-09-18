@@ -31,6 +31,8 @@ export type OrderConfirmedPayload = {
 export type OrderStatusPayload = {
   orderNumber: string;
   orderUrl: string;
+  /** Only set on the order.delivered call site — order.ready shares this same payload type and must never get a review prompt for food the guest hasn't eaten yet. */
+  reviewUrl?: string;
 };
 
 export type OrderCancelledPayload = {

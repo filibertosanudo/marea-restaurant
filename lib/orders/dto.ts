@@ -11,6 +11,7 @@ import type {
   Refund,
   RestaurantTable,
 } from "@/lib/generated/prisma/client";
+import type { getOrderForReviewByPublicToken } from "@/lib/orders/queries";
 
 export type TrackedOrderDTO = {
   orderNumber: string;
@@ -205,5 +206,34 @@ export function toOrderPaymentDetailDTO(order: RawPaymentDetailOrder): OrderPaym
         createdAt: r.createdAt.toISOString(),
       })),
     })),
+  };
+}
+
+export type ReviewableOrderDTO = {
+  orderNumber: string;
+  authorName: string;
+  status: Order["status"];
+  alreadyReviewed: boolean;
+};
+
+type RawReviewOrder = NonNullable<Awaited<ReturnType<typeof getOrderForReviewByPublicToken>>>;
+
+/**
+ * The one fallback chain for "whose name goes on this" — customer's account
+ * name, then the guest checkout name, then a plain default. Shared by the
+ * review page's greeting and submitTestimonialAction's frozen authorName so
+ * the two can never drift apart: the guest is never greeted as one name and
+ * signed as another.
+ */
+export function resolveOrderAuthorName(order: Pick<RawReviewOrder, "guestName"> & { customer: { name: string | null } | null }): string {
+  return order.customer?.name ?? order.guestName ?? "Guest";
+}
+
+export function toReviewableOrderDTO(order: RawReviewOrder): ReviewableOrderDTO {
+  return {
+    orderNumber: order.orderNumber,
+    authorName: resolveOrderAuthorName(order),
+    status: order.status,
+    alreadyReviewed: order.testimonials.length > 0,
   };
 }
