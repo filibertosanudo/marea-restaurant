@@ -41,7 +41,7 @@
 depende de esas dos.
 
 ---
-## Estado (13 de septiembre de 2026, tras el módulo 14)
+## Estado (17 de septiembre de 2026, tras el módulo 15)
 
 Actualiza esta tabla al cerrar cada módulo. Es lo primero que se lee al volver
 al proyecto después de un tiempo fuera.
@@ -54,7 +54,7 @@ al proyecto después de un tiempo fuera.
 | 2 · Endurecimiento de seguridad | 10 | **Terminada salvo el segundo factor**, que se pospuso a un módulo propio |
 | 3 · Notificaciones reales | 11 | **Terminada**, fusionada en `main` (PRs #41–#47). SMTP contra un proveedor real sin probar de punta a punta por falta de credenciales |
 | 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | **Terminada.** Reportes y corte de caja (módulo 12, fusionado en `main`) y comanda impresa + KDS (módulo 13, fusionado en `main`, PRs #54, #56–#58). No probado contra una impresora térmica física — verificado contra un emulador ESC/POS, ver el módulo 13 |
-| 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | **Inventario y promociones terminados** (módulo 14, fusionado en `main`). Testimonios y landing desde la base: prompt del 15 escrito, sin aplicar |
+| 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | **Terminada.** Inventario y promociones (módulo 14, fusionado en `main`) y testimonios + landing desde la base (módulo 15, fusionado en `main`, PRs #65, #67, #68, #71) |
 | 6 · Rendimiento y tiempo real | 16 | Sin empezar |
 | 7 · Multi-sucursal | 17 | Sin empezar |
 | 8 · Producto vendible | 18 | Sin empezar |
@@ -75,10 +75,23 @@ al proyecto después de un tiempo fuera.
 
 ### Lo que bloquea la venta, hoy
 
-Ningún bloqueador técnico activo por el momento. Lo que queda de la fase 5
-(testimonios conectados a la base, landing dinámico desde `content.ts`) es
-módulo 15, sin empezar — ver las verificaciones pendientes de infraestructura
-más abajo para lo que sí sigue abierto.
+Ningún bloqueador técnico activo. La fase 5 se cerró con el módulo 15 — ver
+las verificaciones pendientes de infraestructura más abajo para lo único que
+sigue abierto.
+
+Testimonios y landing desde la base (fase 5, módulo 15) se cerró:
+`/admin/testimonios` modera pendientes/aprobados/rechazados con destacar y
+reordenar; el formulario público en `/review/<publicToken>` sólo se abre
+para un pedido `DELIVERED` y una reseña por pedido la garantiza un índice
+único en el esquema, no sólo la interfaz. La landing ya no lee `content.ts`
+para nada del negocio — ofertas, testimonios, "acerca de", contacto y
+horario vienen de la base, y cada sección se oculta entera cuando no hay
+nada que mostrar. De regalo: metadatos por página, JSON-LD `Restaurant` sin
+`aggregateRating` (Google descalifica de resultados con estrellas a quien
+controla sus propias reseñas), `sitemap.xml` y `robots.txt`. Sin
+verificaciones pendientes fuera del código — el JSON-LD se validó contra
+schema.org (cero errores) pero no contra la herramienta de Google, que pide
+una URL pública o una sesión de Google que no se tenía a mano.
 
 Notificaciones (fase 3) se cerró: el worker manda correo real en los seis
 eventos que ya encolaba, en el idioma del invitado. **Verificación pendiente
@@ -1468,9 +1481,13 @@ mandas nada: es lo que separa un boletín de un problema legal.
       uso bajo concurrencia.
 - [x] Un pedido con promoción guarda su `OrderPromotion` con el descuento
       congelado, y el ticket cuadra.
-- [ ] `content.ts` no contiene ni un dato del negocio.
-- [ ] La landing muestra el horario real y cambia al editarlo en el panel.
-- [ ] Darse de baja del boletín funciona desde el enlace del correo.
+- [x] `content.ts` no contiene ni un dato del negocio.
+- [x] La landing muestra el horario real y cambia al editarlo en el panel.
+- [ ] Darse de baja del boletín funciona desde el enlace del correo. *(5.5,
+      fuera del alcance del módulo 15 — el mecanismo de doble opt-in y el
+      token de baja ya existen en `lib/newsletter/` desde el módulo 11; falta
+      confirmar la fase completa de punta a punta y cerrarla explícitamente
+      en un módulo propio.)*
 
 ---
 
