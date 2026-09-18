@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { nextFolio, isDailyFolio } from "./folio";
+import { nextFolio } from "./folio";
+import { isDailyFolio } from "./folio-format";
 import { makeBusiness, makeMenuCategory, makeMenuItem, makeCart, makeOrder } from "@/test/factories";
 import { runConcurrently, partitionSettled } from "@/test/concurrency";
 import { checkout } from "@/test/checkout";

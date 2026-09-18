@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatFolio, isDailyFolio, isLegacyFolio } from "./folio";
+import { formatFolio, isDailyFolio, isLegacyFolio } from "./folio-format";
 
 describe("formatFolio", () => {
   it("puts the business's local date and a zero-padded running number in the folio", () => {
