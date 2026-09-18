@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCurrentBusiness } from "@/lib/business";
 import { getOrderByPublicToken } from "@/lib/orders/queries";
@@ -9,6 +10,12 @@ import { StatusStepper } from "@/components/order/StatusStepper";
 import { OrderStreamListener } from "@/components/order/OrderStreamListener";
 import { PaymentSection } from "@/components/order/PaymentSection";
 import type { OrderDictionary } from "@/lib/i18n/dictionaries";
+
+// A capacity token — see Order.publicToken's own schema comment. Crawlable
+// on purpose (blocking it in robots.txt would stop a crawler from ever
+// reading this noindex tag, per app/robots.ts's own reasoning), just never
+// indexed or followed from.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 const MESSAGE_BY_STATUS: Record<string, { title: keyof OrderDictionary; sub: keyof OrderDictionary }> = {
   PENDING: { title: "trackingMessagePending", sub: "trackingSubPending" },

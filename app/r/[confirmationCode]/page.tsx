@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getCurrentBusiness } from "@/lib/business";
@@ -13,6 +14,9 @@ import { ReservationStatusBadge } from "@/components/reservation/ReservationStat
 // scope — a rate-limited request 404s exactly like a genuinely wrong code,
 // never a distinguishable response.
 const LOOKUP_SCOPE = "reservation:lookup";
+
+// A capacity token — see app/o/[publicToken]/page.tsx's own metadata comment.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function ReservationLookupPage({
   params,
