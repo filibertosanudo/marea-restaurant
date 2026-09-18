@@ -55,7 +55,7 @@ al proyecto después de un tiempo fuera.
 | 3 · Notificaciones reales | 11 | **Terminada**, fusionada en `main` (PRs #41–#47). SMTP contra un proveedor real sin probar de punta a punta por falta de credenciales |
 | 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | **Terminada.** Reportes y corte de caja (módulo 12, fusionado en `main`) y comanda impresa + KDS (módulo 13, fusionado en `main`, PRs #54, #56–#58). No probado contra una impresora térmica física — verificado contra un emulador ESC/POS, ver el módulo 13 |
 | 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | **Terminada.** Inventario y promociones (módulo 14, fusionado en `main`) y testimonios + landing desde la base (módulo 15, fusionado en `main`, PRs #65, #67, #68, #71) |
-| 6 · Rendimiento y tiempo real | 16 | Sin empezar |
+| 6 · Rendimiento y tiempo real | 16 | Prompt escrito, sin aplicar |
 | 7 · Multi-sucursal | 17 | Sin empezar |
 | 8 · Producto vendible | 18 | Sin empezar |
 
