@@ -17,7 +17,9 @@ case".
   locally installed Postgres binaries instead. The comparison between "before"
   and "after" is unaffected; absolute latencies are a floor, because the
   round trip to a database on `localhost` is ~0 ms and a hosted one is
-  30-80 ms. **Query counts are the figure that carries over to production;
+  30-80 ms. (The scratch cluster ran in the machine's local time zone until
+  phase 1, when it was set to UTC to match Docker and CI; query counts are
+  unaffected.) **Query counts are the figure that carries over to production;
   milliseconds on `localhost` are not.**
 - **Counting queries:** `pg_stat_statements_reset()`, run the scenario, then
   `sum(calls)` excluding the script's own bookkeeping. This counts statements
@@ -65,12 +67,30 @@ this, whichever order changed.
 | Response body per event (RSC payload) | 64,773 B raw, 15,571 B gzip | |
 | Full page load of `/admin/pedidos` | 326,025 B raw, 25,695 B gzip, 12 statements | |
 
-### Public pages, no cache
+### Public pages
 
-| Page | First request after start | Warm median | Warm p95 | Statements per request |
-|---|---|---|---|---|
-| `/` (landing) | 772 ms | 18 ms | 92 ms | 20 |
-| `/menu` | 46 ms (server already warm) | 13 ms | 17 ms | 14 |
+Phase 1 puts the landing and menu reads behind a per-business data cache
+(`unstable_cache`, tags `menu:`, `business:`, `promotions:`, `testimonials:`,
+`hours:`, 60 s TTL as a safety net for other replicas).
+
+| Page | | Before | After |
+|---|---|---|---|
+| `/` (landing) | Statements per request | 20 | 0.4 (the one fill, over 50 requests) |
+| | Warm median / p95 | 18 ms / 92 ms | 11 ms / 34 ms |
+| | First request after start | 772 ms | 833 ms (a cold start is dominated by loading, not by these queries) |
+| `/menu` | Statements per request | 14 | 0 |
+| | Warm median / p95 | 13 ms / 17 ms | 8 ms / 11 ms |
+
+`node scripts/perf/cache-invalidation.mjs` (real admin Server Action, real
+HTTP): hiding a dish removes it from `/menu` on the very next request. The
+hit costs 0 statements; the one blocking rebuild after the edit took 36 ms.
+Local milliseconds are a floor, since the database is on `localhost`; against
+a hosted database at 30-80 ms per round trip, the 20 statements the landing no
+longer runs are worth far more than the 7 ms shown here.
+
+`/admin/pedidos` went from 12 to 10 statements per render because
+`getCurrentBusiness` no longer queries. Panel responses are still
+`Cache-Control: private, no-cache, no-store`.
 
 ### Lighthouse, landing (mobile profile, simulated slow 4G, 4x CPU, v12.8.2)
 
