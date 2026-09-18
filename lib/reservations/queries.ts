@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { cachedPublicRead } from "@/lib/cache/public";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { localWallClockToUtc } from "./availability";
 import type { OpeningHourWindow, ClosureWindow, ReservableTable, ExistingReservation } from "./availability";
@@ -10,6 +11,15 @@ export async function getOpeningHours(businessId: string): Promise<OpeningHourWi
     where: { businessId },
     select: { dayOfWeek: true, opensAt: true, closesAt: true, isClosed: true },
   });
+}
+
+/**
+ * getOpeningHours from the data cache, for the public landing only. Booking
+ * availability and the admin editor keep reading live: a slot offered from a
+ * stale schedule is a real double-booking risk, a stale footer is not.
+ */
+export function getPublicOpeningHours(businessId: string): Promise<OpeningHourWindow[]> {
+  return cachedPublicRead("hours", "opening-hours", businessId, () => getOpeningHours(businessId));
 }
 
 /** Every closure the business has on the books — holidays and private events are rare enough that filtering by date here would save nothing worth the extra timezone math. */

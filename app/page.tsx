@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import { MareaLandingPage } from "@/components/marea-landing/MareaLandingPage";
-import { getCurrentBusiness, getBusinessTranslations } from "@/lib/business";
-import { getPublicMenuRaw, getRepresentativeMenuImageUrl } from "@/lib/menu/queries";
-import { toPublicMenuByLang } from "@/lib/menu/public-menu";
-import { listFeaturedPromotionsRaw } from "@/lib/promotions/queries";
-import { listFeaturedTestimonialsRaw } from "@/lib/testimonials/queries";
-import { getOpeningHours } from "@/lib/reservations/queries";
+import { getCurrentBusiness, getPublicBusinessTranslations } from "@/lib/business";
+import { getPublicMenuByLang, getRepresentativeMenuImageUrl } from "@/lib/menu/queries";
+import { listFeaturedPromotionsForLanding } from "@/lib/promotions/queries";
+import { listFeaturedTestimonialsForLanding } from "@/lib/testimonials/queries";
+import { getPublicOpeningHours } from "@/lib/reservations/queries";
 import { toLandingContentByLang } from "@/lib/dto/landing";
 import { resolveSiteMetadataText } from "@/lib/seo/site-metadata";
 import { buildRestaurantJsonLd } from "@/lib/seo/restaurant-jsonld";
@@ -41,18 +40,17 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Home() {
   const business = await getCurrentBusiness();
 
-  const [categories, promotions, testimonials, businessTranslations, openingHours, image, { description }] =
+  const [menuByLang, promotions, testimonials, businessTranslations, openingHours, image, { description }] =
     await Promise.all([
-      getPublicMenuRaw(business.id),
-      listFeaturedPromotionsRaw(business.id),
-      listFeaturedTestimonialsRaw(business.id),
-      getBusinessTranslations(business.id),
-      getOpeningHours(business.id),
+      getPublicMenuByLang(business.id),
+      listFeaturedPromotionsForLanding(business.id),
+      listFeaturedTestimonialsForLanding(business.id),
+      getPublicBusinessTranslations(business.id),
+      getPublicOpeningHours(business.id),
       getRepresentativeMenuImageUrl(business.id),
       resolveSiteMetadataText(),
     ]);
 
-  const menuByLang = toPublicMenuByLang(categories);
   const landingByLang = toLandingContentByLang({
     promotions,
     testimonials,
