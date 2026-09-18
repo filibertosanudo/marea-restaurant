@@ -1,4 +1,5 @@
-// Pure helpers with no server-only import, so client code can share them.
+// Pure helpers, no server-only import: the board and kitchen cards are Client
+// Components and need shortFolio too.
 
 // Old folios are "A-" plus digits ("A-0042"); new ones carry the business's
 // local date and a second hyphen ("A-260918-042"), so no new folio can ever
@@ -21,4 +22,14 @@ export function formatFolio(date: { year: number; month: number; day: number }, 
   const mm = String(date.month).padStart(2, "0");
   const dd = String(date.day).padStart(2, "0");
   return `A-${yy}${mm}${dd}-${String(number).padStart(3, "0")}`;
+}
+
+/**
+ * What the kitchen and the board show: "A-042", the same width a legacy folio
+ * had, so a card sized for "A-0042" does not wrap. The date is on the card's
+ * clock, and the full folio stays on everything a guest or a report reads.
+ */
+export function shortFolio(value: string): string {
+  const match = DAILY_FOLIO.exec(value);
+  return match ? `A-${match[1]}` : value;
 }

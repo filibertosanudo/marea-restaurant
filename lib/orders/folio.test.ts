@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatFolio, isDailyFolio, isLegacyFolio } from "./folio-format";
+import { formatFolio, isDailyFolio, isLegacyFolio, shortFolio } from "./folio-format";
 
 describe("formatFolio", () => {
   it("puts the business's local date and a zero-padded running number in the folio", () => {
@@ -29,5 +29,17 @@ describe("folio namespaces", () => {
   it("gives different days different folios for the same running number", () => {
     expect(formatFolio({ year: 2026, month: 9, day: 18 }, 1)).not.toBe(formatFolio({ year: 2026, month: 9, day: 19 }, 1));
     expect(formatFolio({ year: 2026, month: 9, day: 18 }, 1)).not.toBe(formatFolio({ year: 2027, month: 9, day: 18 }, 1));
+  });
+});
+
+describe("shortFolio", () => {
+  it("drops the date from a daily folio, keeping the running number", () => {
+    expect(shortFolio("A-260918-042")).toBe("A-042");
+    expect(shortFolio("A-260918-1234")).toBe("A-1234");
+  });
+
+  it("leaves a legacy folio, or anything else, untouched", () => {
+    expect(shortFolio("A-0042")).toBe("A-0042");
+    expect(shortFolio("TEST-abc")).toBe("TEST-abc");
   });
 });

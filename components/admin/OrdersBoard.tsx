@@ -12,6 +12,7 @@ import { CancelOrderDialog } from "./CancelOrderDialog";
 import { OrderPaymentDrawer } from "./OrderPaymentDrawer";
 import { BOARD_COLUMNS } from "@/lib/orders/state-machine";
 import { SoundOnIcon, SoundOffIcon } from "./icons";
+import { shortFolio } from "@/lib/orders/folio-format";
 import { useEventStream } from "@/lib/realtime/useEventStream";
 import { playChime, primeAudio } from "@/lib/realtime/chime";
 import { CashRegisterWidget } from "./cash-register/CashRegisterWidget";
@@ -239,7 +240,7 @@ export function OrdersBoard({
                 >
                   <div className="mb-[4px] flex items-center justify-between">
                     <span className="font-display text-[16px] font-bold text-on-surface">
-                      {order.orderNumber}
+                      {shortFolio(order.orderNumber)}
                     </span>
                     <span className="text-[11.5px] font-semibold uppercase text-on-surface-muted">
                       {order.tableLabel ? dict.table.replace("{code}", order.tableLabel) : dict.takeaway}
