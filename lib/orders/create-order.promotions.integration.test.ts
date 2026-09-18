@@ -272,6 +272,24 @@ describe("createOrderFromCart — promotion usage limits", () => {
     expect(order.discountTotal.toString()).toBe("2");
   });
 
+  it("flags the promotions cache as stale only when a capped promotion was redeemed", async () => {
+    const business = await makeBusiness({ timezone: TZ });
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id, { basePrice: "100.00" });
+    await makePromotion(business.id, { code: "CAPPED", usageLimit: 5 });
+    await makePromotion(business.id, { code: "OPEN" });
+
+    const cappedCart = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cappedCart.id, menuItemId: item.id, quantity: 1 } });
+    const capped = await checkout(cappedCart, business, { ...guest, promoCode: "CAPPED" });
+    expect(capped.publicCacheStale.promotions).toBe(true);
+
+    const openCart = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: openCart.id, menuItemId: item.id, quantity: 1 } });
+    const uncapped = await checkout(openCart, business, { ...guest, promoCode: "OPEN" });
+    expect(uncapped.publicCacheStale.promotions).toBe(false);
+  });
+
   it("two concurrent orders redeeming a usageLimit:1 promotion — only one succeeds", async () => {
     const business = await makeBusiness({ timezone: TZ });
     const category = await makeMenuCategory(business.id);

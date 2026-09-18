@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicCache } from "@/lib/cache/public";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
 import { getCurrentBusiness } from "@/lib/business";
@@ -80,6 +81,7 @@ export async function createCategoryAction(
 
   revalidatePath("/admin/menu/categorias");
   revalidatePath("/");
+  invalidatePublicCache("menu", business.id);
   return { success: true };
 }
 
@@ -132,6 +134,7 @@ export async function updateCategoryAction(
 
   revalidatePath("/admin/menu/categorias");
   revalidatePath("/");
+  invalidatePublicCache("menu", business.id);
   return { success: true };
 }
 
@@ -144,6 +147,7 @@ export async function toggleCategoryActiveAction(id: string, isActive: boolean) 
   });
   revalidatePath("/admin/menu/categorias");
   revalidatePath("/");
+  invalidatePublicCache("menu", business.id);
 }
 
 export async function reorderCategoriesAction(orderedIds: string[]) {
@@ -159,6 +163,7 @@ export async function reorderCategoriesAction(orderedIds: string[]) {
   );
   revalidatePath("/admin/menu/categorias");
   revalidatePath("/");
+  invalidatePublicCache("menu", business.id);
 }
 
 export async function deleteCategoryAction(
@@ -180,6 +185,7 @@ export async function deleteCategoryAction(
   });
   revalidatePath("/admin/menu/categorias");
   revalidatePath("/");
+  invalidatePublicCache("menu", business.id);
   return { blocked: false };
 }
 

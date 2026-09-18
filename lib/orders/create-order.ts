@@ -189,11 +189,15 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
         throw new CheckoutError("item_unavailable", dishName);
       }
     }
+    // Only a dish that just ran out changes what the public menu shows; a
+    // plain decrement doesn't, so it doesn't invalidate the menu cache.
+    let menuChanged = false;
     if (stockByMenuItem.size > 0) {
-      await tx.menuItem.updateMany({
+      const soldOut = await tx.menuItem.updateMany({
         where: { id: { in: [...stockByMenuItem.keys()] }, businessId, stockQuantity: { lte: 0 } },
         data: { isAvailable: false },
       });
+      menuChanged = soldOut.count > 0;
     }
 
     const subtotal = lineInputs
@@ -428,7 +432,11 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
 
     await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
 
-    return createdOrder;
+    // A redemption against a capped promotion can be the one that exhausts
+    // it, which changes the offers the landing advertises.
+    const promotionsChanged = redeemedDiscounts.some((d) => promotionById.get(d.promotionId)!.usageLimit !== null);
+
+    return { ...createdOrder, publicCacheStale: { menu: menuChanged, promotions: promotionsChanged } };
   });
 
   return order;

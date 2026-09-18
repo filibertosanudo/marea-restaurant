@@ -26,7 +26,18 @@ vi.mock("next-auth", async () => {
 // Every Server Action in lib/**/*-actions.ts calls this after its mutation
 // to invalidate the admin panel's cache — irrelevant to what these tests
 // assert, and there's no cache to invalidate outside a real request either.
-vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+// unstable_cache is a passthrough that still round-trips the result through
+// JSON, so a loader returning a Date or Decimal is caught here the way the
+// real data cache would mangle it, not only in production. updateTag is a
+// spy the invalidation tests assert against.
+vi.mock("next/cache", () => ({
+  revalidatePath: () => {},
+  updateTag: vi.fn(),
+  unstable_cache:
+    <A extends unknown[], R>(fn: (...args: A) => Promise<R>) =>
+    async (...args: A): Promise<R> =>
+      JSON.parse(JSON.stringify(await fn(...args))),
+}));
 // redirect() throws a special control-flow error Next's own rendering
 // layer catches — outside a real request there's nothing to catch it, so
 // tests that exercise a redirecting action need to assert against this

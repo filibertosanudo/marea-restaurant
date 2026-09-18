@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getCurrentBusiness, invalidateBusinessCache } from "@/lib/business";
+import { invalidatePublicCache } from "@/lib/cache/public";
 import { localWallClockToUtc } from "@/lib/reservations/availability";
 import { parseDateParam } from "@/lib/reservations/schemas";
 import { flattenZodError } from "@/lib/forms/flatten-zod-error";
@@ -71,6 +72,7 @@ export async function updateOpeningHoursAction(days: DayScheduleInput[]): Promis
   });
 
   revalidatePath("/admin/configuracion");
+  invalidatePublicCache("hours", business.id);
   return { success: true };
 }
 
@@ -158,6 +160,7 @@ export async function updateBusinessSettingsAction(
 
   revalidatePath("/admin/configuracion");
   revalidatePath("/");
+  invalidateBusinessCache(business.id);
   return { success: true };
 }
 
@@ -207,5 +210,6 @@ export async function updateBusinessTranslationAction(
 
   revalidatePath("/admin/configuracion");
   revalidatePath("/");
+  invalidateBusinessCache(business.id);
   return { success: true };
 }

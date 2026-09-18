@@ -1,7 +1,6 @@
 import "server-only";
 import { getCurrentBusiness } from "@/lib/business";
-import { getPublicMenuRaw } from "@/lib/menu/queries";
-import { toPublicMenuByLang } from "@/lib/menu/public-menu";
+import { getPublicMenuByLang } from "@/lib/menu/queries";
 import { getCartWithLivePrices } from "@/lib/cart/queries";
 import { getTableIdFromCookie } from "@/lib/cart/cookie";
 import { getTableById } from "@/lib/tables/queries";
@@ -22,13 +21,13 @@ export async function getMenuPageData(explicitTable?: RestaurantTable | null) {
   const lang = await getOrderLang(business.defaultLocale === "en" ? "en" : "es");
   const dict = getOrderDictionary(lang);
 
-  const [categories, cart, table] = await Promise.all([
-    getPublicMenuRaw(business.id),
+  const [menuByLang, cart, table] = await Promise.all([
+    getPublicMenuByLang(business.id),
     getCartWithLivePrices(business.id, lang),
     explicitTable !== undefined ? Promise.resolve(explicitTable) : resolveTableFromCookie(business.id),
   ]);
 
-  const menu = toPublicMenuByLang(categories)[lang];
+  const menu = menuByLang[lang];
 
   return { business, lang, dict, cart, menu, table };
 }
