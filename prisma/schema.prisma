@@ -253,10 +253,10 @@ model Business {
   minBookingLeadMinutes Int @default(30)
   minCancelLeadMinutes  Int @default(120)
 
-  /// Contador del folio de pedidos. Se incrementa con un UPDATE atómico
-  /// (`{ increment: 1 }`) DENTRO de la transacción que crea el pedido — es la
-  /// única forma de que dos cajas simultáneas no generen el mismo A-0042.
-  /// Nunca calcules el folio con un COUNT(*): eso es una condición de carrera.
+  /// LEGACY, no longer read or written since module 16 (2026-09). Orders were
+  /// numbered "A-0001".."A-NNNN" from this counter; new orders use
+  /// OrderCounter and the "A-YYMMDD-NNN" format. Kept, not dropped: existing
+  /// orders keep their old folios, and dropping a column buys nothing.
   orderSequence Int @default(0)
 
   isActive  Boolean   @default(true)
@@ -986,6 +986,24 @@ model Order {
   @@index([customerId, placedAt]) // "mis pedidos"
   @@index([businessId, placedAt]) // reportes por rango de fechas
   @@index([scheduledFor])
+}
+
+/// Per-business, per-day order counter behind the order folio ("A-260918-042").
+/// Replaces Business.orderSequence. One upsert (INSERT ... ON CONFLICT DO
+/// UPDATE ... RETURNING) allocates the next number atomically. The row is
+/// still locked until the order's transaction commits, so orders of the same
+/// day queue on it; what changed is when it is taken (right before the order
+/// insert, not the middle of the transaction), which shrinks the time held.
+/// The date in the key is what keeps the folio unique across days.
+/// Deliberately no relation to Business: a counter is bookkeeping, not data
+/// anyone navigates to, and a foreign key would add a check per new day.
+model OrderCounter {
+  businessId String
+  /// The business's own calendar date, "YYYY-MM-DD" (never the server's).
+  localDate  String
+  lastNumber Int    @default(0)
+
+  @@id([businessId, localDate])
 }
 
 /// Línea del pedido. Tabla aparte de Order porque un pedido tiene N platillos
