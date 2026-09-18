@@ -106,11 +106,62 @@ Three runs, `/`:
 phase has to fix it, not just guard it. The LCP element is the hero `<h1>`, a
 text node, so it is gated by font loading rather than by an image.
 
-### Order folio and checkout
+### Order folio (phase 2)
 
-Measured in phase 2 and phase 6 (not part of this baseline commit).
+`Business.orderSequence` made every order of the business increment one row
+in the middle of its transaction. It is replaced by `OrderCounter` (one row per
+business and day, one upsert) and the number is now taken as the last step
+before the order insert. Folios go from `A-0042` to `A-260918-042`; old
+orders keep their numbers (the two formats cannot collide: the new one has a
+second hyphen).
+
+What the numbers say, and what they don't:
+
+| Measurement | Before | After |
+|---|---|---|
+| Real checkout over HTTP, 100 orders, 20 in flight, local DB (orders/s) | 32.4 / 34.2 / 33.8 | 32.4 / 35.2 / 41.3 |
+| Same, checkout p95 | 1.29-1.34 s | 1.03-1.59 s |
+| DB path only (in-process), local DB, 20 in flight (orders/s) | 100-109 | 80-118 |
+| DB path only, **20 ms round trip**, 4 in flight (orders/s) | 2.7 / 2.7 | 3.7 / 3.6 |
+| Same, checkout p50 | 1.37-1.39 s | 0.99-1.01 s |
+| Duplicate folios, failed orders | 0 / 0 | 0 / 0 |
+
+- **On localhost the change is invisible.** The Node server is the ceiling
+  (about 35-45 orders/s) long before the row lock is, and a local round trip
+  costs nothing, so a lock held for a few statements costs nothing either.
+- **With a database at ~20 ms the folio lock is measurable:** +35% throughput
+  at four checkouts in flight, because the time the counter row is held drops
+  from most of the transaction to its last few statements. That is the
+  situation production is in (the round trip to a hosted database is not
+  zero), so it is the one that counts.
+- **The per-day key alone does not remove the queue.** All orders of one day
+  still update the same row until they commit; the gain comes from taking the
+  number late, not from splitting by day. The day in the key is what makes the
+  folio say something and stay unique across days.
+- **Not gap-free by accident.** The number is taken inside the transaction, so a
+  checkout that rolls back does not burn one (a test covers it). Taking it in a
+  separate statement would shrink the lock further at the price of gaps; it
+  was not done.
+- The 20 ms figure is a TCP proxy that delays each direction by 10 ms
+  (`scripts/perf/delay-proxy.mjs`); `checkout-db-bench.integration.test.ts`
+  runs the in-process measurement. At 8 in flight the checkout transaction
+  exceeds Prisma's 5 s default under that latency, which is worth remembering
+  for the phase 6 scenario against a hosted database.
+
+Display: the kitchen and board cards and the kitchen ticket show the short form
+(`A-042`, the width the old folio had); the guest page, emails and reports
+show the full folio. The full folio at the card's 30 px wrapped at the hyphen on
+narrow kitchen displays. On the guest page (44 px) it wraps only at a 320 px
+viewport.
+
+Method: `node scripts/perf/checkout-load.mjs 100 20` for the HTTP figures;
+`BENCH_OUT=/tmp/b.txt CONC=4 NN=40 DATABASE_POOL_MAX=25 npx vitest run
+scripts/perf/checkout-db-bench` for the rest, three runs each side.
+
+### Checkout under the phase 6 scenario
+
+Measured in phase 6.
 
 | Figure | Before | After |
 |---|---|---|
-| Concurrent checkouts per second | | |
 | Checkout p95 under the phase 6 scenario | | |

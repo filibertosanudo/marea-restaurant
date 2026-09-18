@@ -12,6 +12,7 @@ import { enqueueKitchenTicket } from "@/lib/printing/queue";
 import { buildKitchenTicketDocument } from "@/lib/printing/kitchen-ticket";
 import { applyPromotions, type PromotionRejectionReason } from "@/lib/promotions/engine";
 import { toPromotionRule } from "@/lib/dto/promotions";
+import { nextFolio } from "@/lib/orders/folio";
 
 export class CheckoutError extends Error {
   code:
@@ -204,10 +205,11 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
       .reduce((sum, l) => sum.add(l.lineTotal), new Prisma.Decimal(0))
       .toDecimalPlaces(2);
 
-    const business = await tx.business.update({
+    // A plain read: no lock. The folio counter is taken later, right before
+    // the order insert (see nextFolio).
+    const business = await tx.business.findUniqueOrThrow({
       where: { id: businessId },
-      data: { orderSequence: { increment: 1 } },
-      select: { orderSequence: true, taxRate: true, currency: true, timezone: true },
+      select: { taxRate: true, currency: true, timezone: true },
     });
 
     // Not filtered to isActive here on purpose: an entered code matching a
@@ -296,7 +298,10 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
     ).toDecimalPlaces(2);
     const taxTotal = taxableBase.mul(business.taxRate).toDecimalPlaces(2);
     const total = taxableBase.add(taxTotal).toDecimalPlaces(2);
-    const orderNumber = `A-${String(business.orderSequence).padStart(4, "0")}`;
+    // Last thing before the insert on purpose: the counter row stays locked
+    // until this transaction commits, so every statement that runs after
+    // taking the number is time other orders of the day wait.
+    const orderNumber = await nextFolio(tx, businessId, business.timezone);
 
     const createdOrder = await tx.order.create({
       data: {

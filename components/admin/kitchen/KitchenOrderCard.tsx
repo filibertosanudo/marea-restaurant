@@ -7,6 +7,7 @@ import { advanceOrderStatusAction } from "@/lib/orders/board-actions";
 import { getNextStatus } from "@/lib/orders/state-machine";
 import { AgingIndicator, elapsedMinutes, agingTier } from "@/components/admin/AgingIndicator";
 import { AllergyIcon, SingleTableIcon, TakeawayBagIcon } from "@/components/admin/icons";
+import { shortFolio } from "@/lib/orders/folio-format";
 
 type KitchenDict = AdminDictionary["kitchen"];
 
@@ -79,7 +80,7 @@ export function KitchenOrderCard({ order, dict }: { order: BoardOrderDTO; dict: 
       <div className="flex items-start justify-between gap-sm">
         <div>
           <div className="font-display text-[30px] font-extrabold leading-none tabular-nums text-on-surface">
-            {order.orderNumber}
+            {shortFolio(order.orderNumber)}
           </div>
           <div className="mt-[3px] flex items-center gap-[5px] text-[13px] font-bold uppercase tracking-wide text-on-surface-muted">
             {isDineIn ? <SingleTableIcon className="h-[14px] w-[14px]" /> : <TakeawayBagIcon className="h-[14px] w-[14px]" />}
