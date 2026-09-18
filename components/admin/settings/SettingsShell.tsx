@@ -5,6 +5,7 @@ import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import type { Lang } from "@/lib/i18n/lang";
 import { ScheduleEditor, type OpeningHourRow, type ClosureRow } from "./ScheduleEditor";
 import { BusinessSettingsForm, type BusinessSettings } from "./BusinessSettingsForm";
+import { BusinessContentForm, type BusinessContent } from "./BusinessContentForm";
 import { NotificationQueuePanel } from "./NotificationQueuePanel";
 import { DevicesPanel } from "./DevicesPanel";
 import type { NotificationJobDTO } from "@/lib/notifications/dto";
@@ -19,6 +20,7 @@ export function SettingsShell({
   openingHours,
   closures,
   business,
+  content,
   notificationsDueCount,
   notificationJobs,
   devices,
@@ -29,11 +31,12 @@ export function SettingsShell({
   openingHours: OpeningHourRow[];
   closures: ClosureRow[];
   business: BusinessSettings;
+  content: BusinessContent;
   notificationsDueCount: number;
   notificationJobs: NotificationJobDTO[];
   devices: DeviceDTO[];
 }) {
-  const [tab, setTab] = useState<"hours" | "business" | "notifications" | "devices">("hours");
+  const [tab, setTab] = useState<"hours" | "business" | "content" | "notifications" | "devices">("hours");
 
   return (
     <div className="p-lg">
@@ -62,6 +65,15 @@ export function SettingsShell({
         </button>
         <button
           type="button"
+          onClick={() => setTab("content")}
+          className={`rounded-full px-md py-[6px] text-[12.5px] font-medium ${
+            tab === "content" ? "bg-primary text-on-primary" : "text-on-surface-muted"
+          }`}
+        >
+          {dict.tabContent}
+        </button>
+        <button
+          type="button"
           onClick={() => setTab("notifications")}
           className={`rounded-full px-md py-[6px] text-[12.5px] font-medium ${
             tab === "notifications" ? "bg-primary text-on-primary" : "text-on-surface-muted"
@@ -84,6 +96,7 @@ export function SettingsShell({
         <ScheduleEditor dict={dict} lang={lang} timezone={timezone} openingHours={openingHours} closures={closures} />
       )}
       {tab === "business" && <BusinessSettingsForm dict={dict} business={business} />}
+      {tab === "content" && <BusinessContentForm dict={dict} defaultLocale={lang} content={content} />}
       {tab === "notifications" && (
         <NotificationQueuePanel
           dict={dict.notifications}

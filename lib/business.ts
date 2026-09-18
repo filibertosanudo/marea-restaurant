@@ -17,3 +17,11 @@ export async function getCurrentBusiness() {
   }
   return business;
 }
+
+/** Both locales' rows (or fewer, if a locale was never filled in) — used by the admin content editor and the public landing alike, since both need the same per-locale about/tagline/blurb text. */
+export async function getBusinessTranslations(businessId: string) {
+  return prisma.businessTranslation.findMany({
+    where: { businessId },
+    select: { locale: true, tagline: true, shortBlurb: true, aboutTitle: true, aboutBody: true },
+  });
+}

@@ -8,7 +8,7 @@ import { getCurrentBusiness } from "@/lib/business";
 import { localWallClockToUtc } from "@/lib/reservations/availability";
 import { parseDateParam } from "@/lib/reservations/schemas";
 import { flattenZodError } from "@/lib/forms/flatten-zod-error";
-import { weeklyScheduleSchema, closureSchema, businessSettingsSchema } from "./schemas";
+import { weeklyScheduleSchema, closureSchema, businessSettingsSchema, businessTranslationSchema } from "./schemas";
 import { validateWeeklySchedule, normalizeBlock, parseTimeToMinutes, type DayScheduleInput } from "./schedule";
 
 export type SettingsFormState =
@@ -143,6 +143,11 @@ export async function updateBusinessSettingsAction(
     acceptsOnlinePayment: formData.get("acceptsOnlinePayment") === "on",
     minBookingLeadMinutes: formData.get("minBookingLeadMinutes"),
     minCancelLeadMinutes: formData.get("minCancelLeadMinutes"),
+    addressLine1: String(formData.get("addressLine1") ?? ""),
+    addressLine2: String(formData.get("addressLine2") ?? ""),
+    city: String(formData.get("city") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    email: String(formData.get("email") ?? ""),
   });
   if (!parsed.success) return { error: "invalid", fieldErrors: flattenZodError(parsed.error) };
 
@@ -152,5 +157,55 @@ export async function updateBusinessSettingsAction(
   });
 
   revalidatePath("/admin/configuracion");
+  revalidatePath("/");
+  return { success: true };
+}
+
+/** Full upsert per locale, same "write both locales at once" shape as the promotion/category editors — the form always submits both language tabs together, whether or not the admin touched one of them. */
+export async function updateBusinessTranslationAction(
+  _prevState: SettingsFormState,
+  formData: FormData
+): Promise<SettingsFormState> {
+  await requireRole(...ADMIN_ROLES);
+  const business = await getCurrentBusiness();
+
+  const parsed = businessTranslationSchema.safeParse({
+    en: {
+      tagline: String(formData.get("en.tagline") ?? ""),
+      shortBlurb: String(formData.get("en.shortBlurb") ?? ""),
+      aboutTitle: String(formData.get("en.aboutTitle") ?? ""),
+      aboutBody: String(formData.get("en.aboutBody") ?? ""),
+    },
+    es: {
+      tagline: String(formData.get("es.tagline") ?? ""),
+      shortBlurb: String(formData.get("es.shortBlurb") ?? ""),
+      aboutTitle: String(formData.get("es.aboutTitle") ?? ""),
+      aboutBody: String(formData.get("es.aboutBody") ?? ""),
+    },
+  });
+  if (!parsed.success) return { error: "invalid", fieldErrors: flattenZodError(parsed.error) };
+
+  // A locale left entirely blank must not leave (or create) a row at all —
+  // pickTranslation (lib/i18n/translations.ts), which the public landing
+  // relies on for its "requested locale, else whatever exists" fallback,
+  // treats a *present* row for the requested locale as a match even when
+  // every field on it is null. An empty "en" row would then win over a
+  // fully written "es" one instead of falling back to it.
+  await prisma.$transaction(
+    (["en", "es"] as const).map((locale) => {
+      const data = parsed.data[locale];
+      const isBlank = !data.tagline && !data.shortBlurb && !data.aboutTitle && !data.aboutBody;
+      return isBlank
+        ? prisma.businessTranslation.deleteMany({ where: { businessId: business.id, locale } })
+        : prisma.businessTranslation.upsert({
+            where: { businessId_locale: { businessId: business.id, locale } },
+            update: data,
+            create: { businessId: business.id, locale, ...data },
+          });
+    })
+  );
+
+  revalidatePath("/admin/configuracion");
+  revalidatePath("/");
   return { success: true };
 }

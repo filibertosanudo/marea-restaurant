@@ -57,6 +57,15 @@ export const closureSchema = z
   })
   .refine((v) => v.allDay || (v.startTime && v.endTime), { message: "time_required", path: ["startTime"] });
 
+/** Blank means "not set" (nullable in the schema) rather than a required field — a business can save the rest of this form before it has a public address, e.g. one that only takes takeaway orders. */
+const optionalContactField = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((v) => (v ? v : null));
+
 export const businessSettingsSchema = z
   .object({
     defaultLocale: z.enum(["es", "en"]),
@@ -67,6 +76,17 @@ export const businessSettingsSchema = z
     acceptsOnlinePayment: z.boolean(),
     minBookingLeadMinutes: requiredMinutes(0, 1440),
     minCancelLeadMinutes: requiredMinutes(0, 4320),
+    addressLine1: optionalContactField(200),
+    addressLine2: optionalContactField(200),
+    city: optionalContactField(100),
+    phone: optionalContactField(30),
+    email: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .transform((v) => (v ? v : null))
+      .pipe(z.string().email().nullable()),
   })
   // The asymmetry the deleted hardcoded constants (30 / 120) satisfied by
   // construction: a reservation shouldn't need more notice to book than it
@@ -76,3 +96,27 @@ export const businessSettingsSchema = z
     message: "booking_lead_exceeds_cancel_lead",
     path: ["minBookingLeadMinutes"],
   });
+
+/** Every field optional per locale — a business can fill in Spanish today and English later, and the landing falls back to whichever locale exists (see lib/i18n/translations.ts's pickTranslation). */
+const optionalContentField = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((v) => (v ? v : null));
+
+export const businessTranslationSchema = z.object({
+  en: z.object({
+    tagline: optionalContentField(160),
+    shortBlurb: optionalContentField(280),
+    aboutTitle: optionalContentField(160),
+    aboutBody: optionalContentField(2000),
+  }),
+  es: z.object({
+    tagline: optionalContentField(160),
+    shortBlurb: optionalContentField(280),
+    aboutTitle: optionalContentField(160),
+    aboutBody: optionalContentField(2000),
+  }),
+});
