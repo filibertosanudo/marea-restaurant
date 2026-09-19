@@ -130,12 +130,15 @@ describe("RealtimeHub degrading", () => {
     expect(seen).toContainEqual({ kind: "reconcile", businessId: null });
   });
 
-  it("does not start a poller when listening comes up in time", async () => {
+  it("does not start a poller when listening comes up in time, but reconciles once", async () => {
     const { hub, listens, polls } = make();
-    hub.subscribe({ businessId: "biz" }, () => {});
+    const seen: RealtimeEvent[] = [];
+    hub.subscribe({ businessId: "biz" }, (e) => seen.push(e));
     listens[0].setHealthy(true);
     await sleep(60);
     expect(polls).toHaveLength(0);
+    // Whatever happened between the screen rendering and LISTEN being in place is unknown.
+    expect(seen).toEqual([{ kind: "reconcile", businessId: null }]);
   });
 
   it("stops polling and reconciles when listening recovers", async () => {

@@ -79,7 +79,8 @@ describe("degrading to polling", () => {
     });
     const seen: RealtimeEvent[] = [];
     unsubscribers.push(hub.subscribe({ businessId: business.id }, (e) => seen.push(e)));
-    await sleep(250);
+    await sleep(250); // the poller's first look reports a reconcile of its own
+    seen.length = 0;
 
     await prisma.orderStatusEvent.create({ data: { orderId: order.id, toStatus: "READY" } });
 

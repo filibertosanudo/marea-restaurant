@@ -8,7 +8,7 @@ let source: PollSource | null = null;
 afterEach(() => source?.stop());
 
 describe("PollSource", () => {
-  it("records a baseline first and reports a reconcile only when the fingerprint changes", async () => {
+  it("reconciles on the first look, then only when the fingerprint changes", async () => {
     const events: RealtimeEvent[] = [];
     let current = "v1";
     source = new PollSource({
@@ -19,11 +19,14 @@ describe("PollSource", () => {
     });
     source.start();
     await sleep(60);
-    expect(events).toEqual([]);
+    expect(events).toEqual([{ kind: "reconcile", businessId: "biz" }]); // the baseline itself
 
     current = "v2";
     await sleep(60);
-    expect(events).toEqual([{ kind: "reconcile", businessId: "biz" }]);
+    expect(events).toEqual([
+      { kind: "reconcile", businessId: "biz" },
+      { kind: "reconcile", businessId: "biz" },
+    ]);
   });
 
   it("polls each watched business once per tick, however many screens watch it", async () => {
@@ -57,7 +60,11 @@ describe("PollSource", () => {
     });
     source.start();
     await sleep(90);
-    expect(events).toEqual([{ kind: "reconcile", businessId: "biz" }]);
+    // the first look, then the change after the skipped tick
+    expect(events).toEqual([
+      { kind: "reconcile", businessId: "biz" },
+      { kind: "reconcile", businessId: "biz" },
+    ]);
   });
 
   it("still notices what changed while nobody was watching, once someone is back", async () => {
@@ -71,7 +78,8 @@ describe("PollSource", () => {
       intervalMs: 15,
     });
     source.start();
-    await sleep(40); // baseline recorded
+    await sleep(40); // baseline recorded (and reported)
+    events.length = 0;
 
     watched = []; // the last screen is between two connections
     await sleep(40);

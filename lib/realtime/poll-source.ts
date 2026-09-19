@@ -14,8 +14,9 @@ export type PollSourceOptions = {
  * never what. One loop for the whole process, not one per connected screen, so
  * five screens cost the same as one.
  *
- * The first tick only records a baseline. Whatever changed before it is the
- * hub's to cover with a reconcile when it switches to this source.
+ * The first look at a business records its baseline and says "reconcile":
+ * whatever changed between a screen rendering and this first fingerprint is
+ * unknowable, and on a cold server that gap can be seconds long.
  *
  * A business's last fingerprint is kept even while nobody watches it. Dropping
  * it would make the next tick after a screen reconnects (the scheduled handoff
@@ -53,7 +54,7 @@ export class PollSource {
         const signature = await this.options.signature(businessId);
         const previous = this.signatures.get(businessId);
         this.signatures.set(businessId, signature);
-        if (previous !== undefined && previous !== signature) {
+        if (previous !== signature) {
           this.options.onChange({ kind: "reconcile", businessId });
         }
       } catch {

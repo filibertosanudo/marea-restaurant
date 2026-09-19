@@ -90,10 +90,11 @@ export class RealtimeHub {
     if (!this.running) return;
     if (healthy) {
       this.clearFallback();
-      if (this.poll) {
-        this.stopPoll();
-        this.dispatch({ kind: "reconcile", businessId: null });
-      }
+      this.stopPoll();
+      // Every arrival at "listening", the first included, may follow a gap the
+      // screens cannot know about: a change between a page render and the
+      // moment LISTEN was actually in place, or the stretch spent polling.
+      this.dispatch({ kind: "reconcile", businessId: null });
     } else {
       this.armFallback();
     }
