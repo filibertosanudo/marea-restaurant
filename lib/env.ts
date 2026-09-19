@@ -17,11 +17,27 @@ const schema = z
   .object({
     DATABASE_URL: z.string().min(1, "postgresql://user:pass@host:5432/db"),
     // Outside serverless, the app is a long-lived process with its own
-    // pool: (Postgres max_connections - reserved) / (replicas + workers).
-    // Postgres defaults to max_connections=100; with a couple of replicas
-    // and headroom for a future worker, 25 per process is comfortable.
-    // Whoever needs to raise it should know what it's measured against.
+    // pool: (Postgres max_connections - reserved) / (replicas + workers) - 1.
+    // The "- 1" is the dedicated LISTEN connection each web replica holds
+    // outside this pool (lib/realtime/listen-source.ts), so it comes off the
+    // budget before the pool is sized. Postgres defaults to
+    // max_connections=100; with a couple of replicas and headroom for a
+    // future worker, 25 per process is comfortable. Whoever needs to raise it
+    // should know what it's measured against.
     DATABASE_POOL_MAX: withDefault(z.coerce.number().int().min(1).default(25)),
+    // A connection that reaches Postgres directly, not through a
+    // transaction-mode pooler. Two things read it and that is on purpose:
+    // prisma.config.ts (migrations) runs outside Next, so it cannot import
+    // this server-only module and reads process.env itself; the realtime
+    // listener runs inside the app and goes through here. LISTEN does not
+    // survive a transaction-mode pooler: the connection succeeds and no
+    // notification ever arrives, which the listener's heartbeat detects.
+    // Missing: DATABASE_URL is used, correct whenever there is no pooler.
+    DIRECT_URL: optional(z.string().min(1)),
+    // "auto" listens for change notifications and falls back to polling by
+    // itself when it cannot; "poll" skips LISTEN entirely, for a host where
+    // it is known not to work (a pooler with no direct URL to give).
+    REALTIME_MODE: withDefault(z.enum(["auto", "poll"]).default("auto")),
     // Unset in every real deployment — the app always queries "public".
     // Exists so the integration test harness can point the same client at
     // a throwaway per-worker schema instead: @prisma/adapter-pg qualifies
