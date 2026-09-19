@@ -8,13 +8,9 @@ import { getNextStatus } from "@/lib/orders/state-machine";
 import { AgingIndicator, elapsedMinutes, agingTier } from "@/components/admin/AgingIndicator";
 import { AllergyIcon, SingleTableIcon, TakeawayBagIcon } from "@/components/admin/icons";
 import { shortFolio } from "@/lib/orders/folio-format";
+import { kitchenAdvanceLabelKey } from "@/lib/orders/kitchen-advance";
 
 type KitchenDict = AdminDictionary["kitchen"];
-
-const ADVANCE_LABEL_KEY = {
-  PENDING: "advanceStart",
-  PREPARING: "advanceReady",
-} as const;
 
 const NEW_ORDER_WINDOW_MS = 60_000;
 
@@ -50,6 +46,7 @@ export function KitchenOrderCard({ order, dict }: { order: BoardOrderDTO; dict: 
   const isNew = isRecent(order.placedAt);
   const tier = agingTier(minutes);
   const nextStatus = getNextStatus(order.status);
+  const advanceLabelKey = kitchenAdvanceLabelKey(order.status);
   const isDineIn = order.type === "DINE_IN";
 
   function advance() {
@@ -121,7 +118,7 @@ export function KitchenOrderCard({ order, dict }: { order: BoardOrderDTO; dict: 
         </div>
       )}
 
-      {nextStatus ? (
+      {advanceLabelKey ? (
         <button
           type="button"
           onClick={advance}
@@ -130,7 +127,7 @@ export function KitchenOrderCard({ order, dict }: { order: BoardOrderDTO; dict: 
             nextStatus === "READY" ? "bg-success hover:bg-success" : "bg-primary hover:bg-primary-hover"
           }`}
         >
-          {dict[ADVANCE_LABEL_KEY[order.status as keyof typeof ADVANCE_LABEL_KEY]]}
+          {dict[advanceLabelKey]}
         </button>
       ) : (
         <div className="flex min-h-[42px] items-center justify-center rounded-md bg-success/12 text-[14px] font-bold text-success">
