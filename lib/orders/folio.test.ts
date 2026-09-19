@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatFolio, isDailyFolio, isLegacyFolio, shortFolio } from "./folio-format";
+import { folioMatches, formatFolio, isDailyFolio, isLegacyFolio, shortFolio } from "./folio-format";
 
 describe("formatFolio", () => {
   it("puts the business's local date and a zero-padded running number in the folio", () => {
@@ -41,5 +41,35 @@ describe("shortFolio", () => {
   it("leaves a legacy folio, or anything else, untouched", () => {
     expect(shortFolio("A-0042")).toBe("A-0042");
     expect(shortFolio("TEST-abc")).toBe("TEST-abc");
+  });
+});
+
+describe("folioMatches", () => {
+  const full = "A-260918-042";
+
+  it("finds an order by the short form the kitchen shouts, or the full form on the screen", () => {
+    for (const query of ["A-042", "a-042", "A042", "042", "42", " 42 ", "A-260918-042", "260918-042", "a-260918-042"]) {
+      expect(folioMatches(query, full), query).toBe(true);
+    }
+  });
+
+  it("does not find a different number, or the right number on another day", () => {
+    expect(folioMatches("A-043", full)).toBe(false);
+    expect(folioMatches("A-260919-042", full)).toBe(false);
+    expect(folioMatches("A-1042", full)).toBe(false);
+  });
+
+  it("still finds a legacy order by its old folio, however it is padded", () => {
+    for (const query of ["A-0042", "A-42", "0042", "42"]) {
+      expect(folioMatches(query, "A-0042"), query).toBe(true);
+    }
+    expect(folioMatches("A-260918-042", "A-0042")).toBe(false);
+  });
+
+  it("accepts a typographic dash and ignores what is not a folio", () => {
+    expect(folioMatches("A–042", full)).toBe(true);
+    expect(folioMatches("", full)).toBe(false);
+    expect(folioMatches("mesa 4", full)).toBe(false);
+    expect(folioMatches("42", "TEST-abc")).toBe(false);
   });
 });
