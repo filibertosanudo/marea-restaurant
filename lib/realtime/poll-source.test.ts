@@ -59,4 +59,28 @@ describe("PollSource", () => {
     await sleep(90);
     expect(events).toEqual([{ kind: "reconcile", businessId: "biz" }]);
   });
+
+  it("still notices what changed while nobody was watching, once someone is back", async () => {
+    const events: RealtimeEvent[] = [];
+    let watched = ["biz"];
+    let current = "v1";
+    source = new PollSource({
+      businesses: () => watched,
+      signature: async () => current,
+      onChange: (event) => events.push(event),
+      intervalMs: 15,
+    });
+    source.start();
+    await sleep(40); // baseline recorded
+
+    watched = []; // the last screen is between two connections
+    await sleep(40);
+    current = "v2";
+    await sleep(40);
+    expect(events).toEqual([]);
+
+    watched = ["biz"]; // a screen reconnects
+    await sleep(60);
+    expect(events).toEqual([{ kind: "reconcile", businessId: "biz" }]);
+  });
 });

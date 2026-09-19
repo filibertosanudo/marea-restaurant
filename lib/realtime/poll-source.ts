@@ -16,6 +16,11 @@ export type PollSourceOptions = {
  *
  * The first tick only records a baseline. Whatever changed before it is the
  * hub's to cover with a reconcile when it switches to this source.
+ *
+ * A business's last fingerprint is kept even while nobody watches it. Dropping
+ * it would make the next tick after a screen reconnects (the scheduled handoff
+ * leaves a gap of no subscribers) record a fresh baseline instead of noticing
+ * what changed meanwhile.
  */
 export class PollSource {
   private readonly options: PollSourceOptions;
@@ -54,9 +59,6 @@ export class PollSource {
       } catch {
         // a transient database hiccup skips this business for one tick
       }
-    }
-    for (const known of this.signatures.keys()) {
-      if (!watched.has(known)) this.signatures.delete(known);
     }
     if (this.running) this.timer = setTimeout(() => void this.tick(), this.options.intervalMs);
   }
