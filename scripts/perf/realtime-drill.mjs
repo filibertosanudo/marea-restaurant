@@ -2,8 +2,12 @@
 // Postgres: how long a change takes to reach a screen, and what happens when
 // the LISTEN connection is killed while changes keep coming.
 //
-//   node scripts/perf/realtime-drill.mjs latency
+//   node scripts/perf/realtime-drill.mjs latency [samples=10]
 //   node scripts/perf/realtime-drill.mjs kill
+//
+// The screen does not reconnect when the server hands the stream off after
+// SSE_MAX_LIFETIME_MS (75 s by default), so against a polling server, where each
+// sample can take 10 s, ask for fewer samples.
 //
 // `kill` is the manual version of recovery.integration.test.ts: it terminates
 // the server's LISTEN backend, changes an order while nobody is listening, and
@@ -66,7 +70,8 @@ console.log(`${at()}  screen connected; LISTEN backends: ${(await listenBackends
 
 if (mode === "latency") {
   const samples = [];
-  for (let i = 0; i < 10; i++) {
+  const count = Number(process.argv[3] ?? 10);
+  for (let i = 0; i < count; i++) {
     const token = await placeOrder({ ids, itemIds, ip: fakeIp(900_000 + i + Math.floor(Math.random() * 1e5)), index: i });
     const orderId = await orderIdFor(token);
     const before = screen.updates.length;
@@ -79,7 +84,7 @@ if (mode === "latency") {
   }
   samples.sort((a, b) => a - b);
   console.log(
-    `${at()}  advance -> update on the screen, 10 samples: median ${Math.round(samples[5])} ms, max ${Math.round(samples[9])} ms`
+    `${at()}  advance -> update on the screen, ${count} samples: median ${Math.round(samples[Math.floor(count / 2)])} ms, max ${Math.round(samples[count - 1])} ms`
   );
 } else if (mode === "kill") {
   const token = await placeOrder({ ids, itemIds, ip: fakeIp(950_000 + Math.floor(Math.random() * 1e5)), index: 1 });
