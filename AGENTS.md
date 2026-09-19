@@ -28,6 +28,23 @@ instead of duplicating it here.
   config. It validates lazily (first real access, not at import — see its
   own header comment for why) and the process refuses to start if
   something required is missing or malformed.
+- **The board, kitchen screen and order tracking are driven by Postgres
+  triggers you cannot see from the code.** `marea_notify_change()` (migration
+  `add_realtime_notify_triggers`) runs `pg_notify` after every write to
+  `OrderStatusEvent`, `Payment`, `CashSession` and `CashMovement`, so anything
+  that writes one of them is a live update, with no call to make. Adding a
+  fifth source is one `CREATE TRIGGER` in a new migration. The listener
+  (`lib/realtime/`) must sweep after every reconnect: a notification sent while
+  nobody listens is gone, and a row can commit after a newer one with an
+  older timestamp, which is what `RECOVERY_WINDOW_MS` covers. That window is
+  derived from Prisma's 5 s transaction timeout: do not pass a longer one to a
+  `$transaction` without revisiting it (`lib/realtime/timing.test.ts` fails).
+- **`DIRECT_URL` has two readers on purpose.** `prisma.config.ts` runs outside
+  Next and cannot import the server-only `lib/env.ts`, so it reads
+  `process.env`; the realtime listener goes through `lib/env.ts`. Do not
+  "fix" the duplication. `LISTEN` does not survive a transaction-mode pooler
+  (it connects and never delivers), so behind one, `DIRECT_URL` must be a
+  direct connection or `REALTIME_MODE=poll` must be set.
 - **Nothing depends on a single cloud provider.** Storage (`lib/storage/`)
   and, going forward, any other external integration go behind an
   interface with at least two implementations — see `lib/storage/driver.ts`

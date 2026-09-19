@@ -146,6 +146,19 @@ rolling deploys across a fleet, complex traffic routing. Real added cost
 cert management) for zero benefit at this scale. Revisit only alongside
 multi-location/multi-tenant support, not before.
 
+## Live updates and poolers
+
+The board, the kitchen screen and order tracking learn about changes through
+Postgres `LISTEN/NOTIFY`: each web process holds one dedicated connection that
+does nothing else (visible in `pg_stat_activity` as `marea_realtime_listen`),
+so budget one connection per replica outside `DATABASE_POOL_MAX`. If a
+transaction-mode pooler (pgbouncer and similar) sits in front of the app, set
+`DIRECT_URL` to a direct connection; `LISTEN` through such a pooler connects
+and never delivers. The listener detects that with a periodic self-addressed
+ping and falls back to polling every 10 s, so the screens keep working, slower.
+`REALTIME_MODE=poll` skips `LISTEN` entirely for a host where it is known not to
+work.
+
 ## Postgres version
 
 The Compose stack pins `postgres:17-alpine`. `btree_gist` (the extension

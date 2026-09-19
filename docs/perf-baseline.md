@@ -48,13 +48,37 @@ figure, not the estimate.
 
 ### Realtime: statements to Postgres with the board open and idle
 
-| Scenario | Before | After |
-|---|---|---|
-| 1 board screen, per minute | 121 (4 polls x 30 ticks + 1 for the business) | |
-| 1 board screen, per hour | 7,260 | |
-| 5 screens (kitchen, till, 3 waiters), per minute | 605 | |
-| 5 screens, per hour | 36,300 | |
-| SSE bytes per minute per screen | 232 | |
+Phase 3 replaces the per-screen poll with one dedicated `LISTEN` connection per
+web process, fed by `pg_notify` triggers on the four tables the old signature
+watched (`OrderStatusEvent`, `Payment`, `CashSession`, `CashMovement`).
+
+| Scenario | Before (polling) | After (LISTEN) | After (forced polling fallback) |
+|---|---|---|---|
+| 1 board screen, per minute | 121 | 3 (2 heartbeats, 1 cache fill) | not measured (same loop as 5 screens) |
+| 5 screens (kitchen, till, 3 waiters), per minute | 605 | **2** | 29 |
+| 5 screens, per hour | 36,300 | **120** | about 1,740 |
+| Cost grows with screens? | linearly | no | no (one loop for every screen) |
+| SSE bytes per minute per screen | 232 | 29 | 29 |
+
+The 2 statements a minute are the listener's own heartbeat (`SELECT
+pg_notify(...)` every 30 s), the price of noticing a connection that is up but
+deaf. **The module's goal was "fewer than 100 an hour with five screens"; the
+heartbeat alone is 120.** Setting `HEARTBEAT_INTERVAL_MS` to 60 s gives 60 an
+hour at the cost of a slower detection of a dead channel (up to about 65 s
+instead of 35 s). It was left at 30 s because a kitchen wall screen is the one
+place that must not stay stale, and nothing else in the loop costs a statement.
+
+| Latency of one change (an order advanced through the real admin action) | |
+|---|---|
+| LISTEN, 10 samples | median 126-139 ms, max 146 ms |
+| Forced polling fallback (`REALTIME_MODE=poll`), 5 samples | median 9.1 s, max 9.5 s (interval 10 s) |
+
+**Killing the LISTEN connection** (`node scripts/perf/realtime-drill.mjs kill`,
+and `recovery.integration.test.ts`): the server's `marea_realtime_listen`
+backend is terminated with `pg_terminate_backend`, an order is advanced while
+nobody is listening (so its notification goes nowhere), and the screen is told
+to refresh 1.2 s later, after the reconnect and the sweep. A new LISTEN backend
+appears under a new pid.
 
 ### What one board event costs a screen (`router.refresh()`)
 
