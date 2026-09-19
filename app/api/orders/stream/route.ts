@@ -4,95 +4,39 @@ import { STAFF_ROLES } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
+import { getRealtimeHub } from "@/lib/realtime/runtime";
+import type { Subscription } from "@/lib/realtime/hub";
+import type { RealtimeEvent } from "@/lib/realtime/events";
+import { SSE_COALESCE_MS } from "@/lib/realtime/timing";
 
-const POLL_INTERVAL_MS = 2000;
 // A periodic handoff (env.SSE_MAX_LIFETIME_MS, 0 to disable) keeps a
 // connection left open for a whole shift from wedging a proxy or load
 // balancer that expects streams to end sometime. EventSource reconnects on
 // its own, and useEventStream's backoff treats this exactly like any other
 // dropped connection — so it costs nothing to close cleanly.
 
-type Scope = { kind: "board"; businessId: string } | { kind: "order"; orderId: string };
+/** Idle keep-alive: keeps a proxy or load balancer from timing out a quiet stream. */
+const KEEP_ALIVE_MS = 20_000;
+
+/** A burst bigger than this is sent as "reconcile" instead of listing every change. */
+const MAX_EVENTS_PER_UPDATE = 50;
 
 /**
- * A cheap fingerprint of "has anything this scope cares about changed" —
- * never the actual order data (the client re-fetches that through the
- * normal, already-authorized page render via router.refresh()). For the
- * board: the latest OrderStatusEvent (catches new orders and every status
- * transition) plus the latest Payment update (catches collectCashPaymentAction,
- * which touches Payment but not Order — an OrderStatusEvent-only signature
- * would miss a cash collection landing on the board). For a single tracked
- * order: its own status + updatedAt, plus its latest Payment update for the
- * same reason.
- */
-async function getSignature(scope: Scope): Promise<string | null> {
-  if (scope.kind === "order") {
-    // Webhook-driven payment updates (see handlePaymentIntentSucceeded)
-    // only ever touch the Payment row, never the Order row itself — a
-    // signature built from the order alone would never change when a card
-    // payment settles, so the tracking page would poll forever without
-    // ever seeing it. Nested select, one query — the same pattern
-    // getOrderByPublicToken already uses to fetch an order's payments.
-    const order = await prisma.order.findUnique({
-      where: { id: scope.orderId },
-      select: {
-        status: true,
-        updatedAt: true,
-        payments: { orderBy: { updatedAt: "desc" }, take: 1, select: { updatedAt: true } },
-      },
-    });
-    if (!order) return null;
-    return `${order.status}:${order.updatedAt.getTime()}:${order.payments[0]?.updatedAt.getTime() ?? "-"}`;
-  }
-
-  const [latestEvent, latestPayment, latestCashSession, latestCashMovement] = await Promise.all([
-    prisma.orderStatusEvent.findFirst({
-      where: { order: { businessId: scope.businessId } },
-      orderBy: { createdAt: "desc" },
-      select: { id: true },
-    }),
-    prisma.payment.findFirst({
-      where: { businessId: scope.businessId },
-      orderBy: { updatedAt: "desc" },
-      select: { id: true, updatedAt: true },
-    }),
-    // The cash-register widget on the board (open/close a shift, record a
-    // movement) has no OrderStatusEvent or Payment write of its own to key
-    // off — without these, a second device watching the same board would
-    // never see another cashier's shift open or close.
-    prisma.cashSession.findFirst({
-      where: { businessId: scope.businessId },
-      orderBy: [{ closedAt: "desc" }, { openedAt: "desc" }],
-      select: { id: true, closedAt: true },
-    }),
-    prisma.cashMovement.findFirst({
-      where: { cashSession: { businessId: scope.businessId } },
-      orderBy: { createdAt: "desc" },
-      select: { id: true },
-    }),
-  ]);
-  return [
-    latestEvent?.id ?? "-",
-    latestPayment?.id ?? "-",
-    latestPayment?.updatedAt.getTime() ?? "-",
-    latestCashSession?.id ?? "-",
-    latestCashSession?.closedAt?.getTime() ?? "-",
-    latestCashMovement?.id ?? "-",
-  ].join(":");
-}
-
-/**
- * Server-side polling dressed up as a push: no LISTEN/NOTIFY (doesn't
- * survive Supabase's transaction-mode pooler in production) and no
- * Supabase Realtime (unavailable against the local Postgres dev runs
- * against). Polls every 2s and only emits when the signature actually
- * changed, so the client isn't refetching the page on every tick, just
- * when there's something new to show.
+ * The push channel for the board, the kitchen screen and order tracking. It
+ * used to poll the database itself every 2 s per connected screen; now it
+ * subscribes to the process-wide hub (lib/realtime/hub.ts), which listens to
+ * Postgres notifications, or polls once for everyone when it cannot.
+ *
+ * What goes down the wire is never order data: at most which order changed
+ * and its new status, for staff. A tracked order's page gets a bare "update"
+ * for its own order only. The client re-reads through the normal,
+ * already-authorized page render.
  */
 export async function GET(request: NextRequest) {
   const publicToken = request.nextUrl.searchParams.get("token");
 
-  let scope: Scope;
+  let scope: Subscription;
+  let isStaff: boolean;
   if (publicToken) {
     const business = await getCurrentBusiness();
     const order = await prisma.order.findFirst({
@@ -100,24 +44,47 @@ export async function GET(request: NextRequest) {
       select: { id: true },
     });
     if (!order) return new Response("Not found", { status: 404 });
-    scope = { kind: "order", orderId: order.id };
+    scope = { businessId: business.id, orderId: order.id };
+    isStaff = false;
   } else {
     const session = await getSession();
     if (!session?.user || session.user.revoked || !STAFF_ROLES.includes(session.user.role)) {
       return new Response("Forbidden", { status: 403 });
     }
     const business = await getCurrentBusiness();
-    scope = { kind: "board", businessId: business.id };
+    scope = { businessId: business.id };
+    isStaff = true;
   }
 
   const encoder = new TextEncoder();
   let closed = false;
+  const timers: Array<ReturnType<typeof setTimeout>> = [];
+  let unsubscribe: (() => void) | null = null;
+
+  // Everything that must stop when the stream ends, however it ends.
+  const release = () => {
+    closed = true;
+    unsubscribe?.();
+    for (const timer of timers) {
+      // setInterval and setTimeout ids are interchangeable for clearing.
+      clearTimeout(timer);
+      clearInterval(timer);
+    }
+  };
 
   const stream = new ReadableStream({
-    async start(controller) {
+    start(controller) {
+      const send = (chunk: string) => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(chunk));
+        } catch {
+          close();
+        }
+      };
       const close = () => {
         if (closed) return;
-        closed = true;
+        release();
         try {
           controller.close();
         } catch {
@@ -126,52 +93,50 @@ export async function GET(request: NextRequest) {
       };
       request.signal.addEventListener("abort", close);
 
-      let lastSignature: string | null = null;
-      try {
-        lastSignature = await getSignature(scope);
-      } catch {
-        lastSignature = null;
-      }
+      // Several triggers fire for one order (its status event, its payment):
+      // send them as one update so a screen refreshes once, not three times.
+      let pending: RealtimeEvent[] = [];
+      let flushTimer: ReturnType<typeof setTimeout> | null = null;
+      const flush = () => {
+        flushTimer = null;
+        const batch = pending;
+        pending = [];
+        if (batch.length === 0) return;
+        send(`event: update\ndata: ${JSON.stringify(describeBatch(batch, isStaff))}\n\n`);
+      };
 
-      const deadline = env.SSE_MAX_LIFETIME_MS > 0 ? Date.now() + env.SSE_MAX_LIFETIME_MS : Infinity;
-
-      while (!closed) {
-        if (Date.now() >= deadline) {
-          // A plain close() here would look identical to a real drop to the
-          // client: EventSource fires the same "error" event for any
-          // server-initiated close, so useEventStream would flip to
-          // "offline" every ~75s on a healthy connection. Telling the
-          // client first lets it close and reconnect itself instead — a
-          // client-initiated close() never fires "error" — so the scheduled
-          // handoff never shows as an outage on a kitchen display that's
-          // read at a glance, not debugged.
-          controller.enqueue(encoder.encode(`event: reconnect\ndata: ${Date.now()}\n\n`));
-          close();
-          break;
+      unsubscribe = getRealtimeHub().subscribe(scope, (event) => {
+        pending.push(event);
+        if (!flushTimer) {
+          flushTimer = setTimeout(flush, SSE_COALESCE_MS);
+          timers.push(flushTimer);
         }
+      });
 
-        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-        if (closed) break;
+      // Flushes the headers so the client's EventSource opens right away.
+      send(": connected\n\n");
 
-        try {
-          const signature = await getSignature(scope);
-          if (signature !== lastSignature) {
-            lastSignature = signature;
-            controller.enqueue(encoder.encode(`event: update\ndata: ${Date.now()}\n\n`));
-          } else {
-            // Keep-alive comment line — invisible to EventSource's message
-            // handling, just keeps proxies/load balancers from timing out
-            // an idle connection.
-            controller.enqueue(encoder.encode(`: ping\n\n`));
-          }
-        } catch {
-          // A transient DB hiccup shouldn't drop the connection — just
-          // skip this tick and try again next poll.
-        }
+      timers.push(setInterval(() => send(": ping\n\n"), KEEP_ALIVE_MS));
+
+      if (env.SSE_MAX_LIFETIME_MS > 0) {
+        timers.push(
+          setTimeout(() => {
+            // A plain close() here would look identical to a real drop to the
+            // client: EventSource fires the same "error" event for any
+            // server-initiated close, so useEventStream would flip to
+            // "offline" every ~75s on a healthy connection. Telling the
+            // client first lets it close and reconnect itself instead — a
+            // client-initiated close() never fires "error" — so the scheduled
+            // handoff never shows as an outage on a kitchen display that's
+            // read at a glance, not debugged.
+            send(`event: reconnect\ndata: ${Date.now()}\n\n`);
+            close();
+          }, env.SSE_MAX_LIFETIME_MS)
+        );
       }
     },
     cancel() {
-      closed = true;
+      release();
     },
   });
 
@@ -183,4 +148,13 @@ export async function GET(request: NextRequest) {
       "X-Accel-Buffering": "no",
     },
   });
+}
+
+/** The body of one `update` event. Staff learn which order changed; a guest tracking an order learns only that something did. */
+function describeBatch(batch: RealtimeEvent[], isStaff: boolean) {
+  if (!isStaff) return {};
+  const changes = batch.flatMap((e) => (e.kind === "reconcile" ? [] : [{ kind: e.kind, orderId: e.orderId, status: e.status }]));
+  // A reconcile in the batch, or too many changes to list: say "refresh" instead.
+  if (changes.length < batch.length || batch.length > MAX_EVENTS_PER_UPDATE) return { reconcile: true };
+  return { changes };
 }
