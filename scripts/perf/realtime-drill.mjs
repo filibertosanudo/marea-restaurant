@@ -99,9 +99,12 @@ if (mode === "latency") {
   await advance(orderId); // NOTIFY goes to nobody: the connection is down
   console.log(`${at()}  advanced order while down (LISTEN backend absent: ${gone}); updates seen so far: ${screen.updates.length}`);
 
-  await waitFor(() => screen.updates.some((u) => JSON.stringify(u.body).includes(orderId)), 15_000, "the missed change");
-  const hit = screen.updates.find((u) => JSON.stringify(u.body).includes(orderId));
-  console.log(`${at()}  screen learned about the order after recovery: ${JSON.stringify(hit.body)}`);
+  // After recovery the screen is told either which orders changed or, when the
+  // batch also carries a reconcile (every return to listening does), to refresh.
+  await waitFor(() => screen.updates.length > 0, 15_000, "the update after recovery");
+  const body = screen.updates[0].body;
+  const summary = body.reconcile ? "reconcile (refresh everything)" : `${body.changes.length} change(s), this order included: ${JSON.stringify(body).includes(orderId)}`;
+  console.log(`${at()}  screen told to refresh after recovery: ${summary}`);
   console.log(`${at()}  LISTEN backend restored: ${(await listenBackends()).join(",") || "NO"}`);
 }
 
