@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from "react";
 
 export type StreamStatus = "connecting" | "open" | "offline";
 
+/** Whether an `open` should refresh: only when it follows a connection that dropped, not the first open and not the planned handoff. */
+export function shouldRefreshOnOpen(state: { hasBeenOpen: boolean; plannedHandoff: boolean }): boolean {
+  return state.hasBeenOpen && !state.plannedHandoff;
+}
+
 const BASE_RETRY_MS = 1000;
 const MAX_RETRY_MS = 30000;
 
@@ -16,11 +21,14 @@ const MAX_RETRY_MS = 30000;
  * it carries no payload the caller should trust — the actual data always
  * comes back through the normal, already-authorized page render.
  *
- * Every reconnect after the first also calls onUpdate(). A stream that was
- * closed (a server restart, a network drop, the scheduled handoff) can have
- * missed changes, and nothing on the server replays them to one client; a
- * refresh on reconnect is what makes "offline for a minute" not mean "stale
- * until the next change".
+ * Every reconnect after the first that was not the server's own scheduled
+ * handoff also calls onUpdate(). A stream that dropped (a server restart, a
+ * network cut) can have missed changes, and nothing on the server replays them
+ * to one client; a refresh on reconnect is what makes "offline for a minute"
+ * not mean "stale until the next change". The handoff is excluded because it
+ * happens every 75 s on a healthy connection and reconnects in milliseconds:
+ * refreshing on it would cost every open screen a full page render each time,
+ * which is exactly the load this stream exists to remove.
  */
 export function useEventStream(url: string, onUpdate: () => void): StreamStatus {
   const [status, setStatus] = useState<StreamStatus>("connecting");
@@ -36,6 +44,7 @@ export function useEventStream(url: string, onUpdate: () => void): StreamStatus 
     let retryDelay = BASE_RETRY_MS;
     let stopped = false;
     let hasBeenOpen = false;
+    let plannedHandoff = false;
 
     function connect() {
       if (stopped) return;
@@ -45,8 +54,9 @@ export function useEventStream(url: string, onUpdate: () => void): StreamStatus 
       source.addEventListener("open", () => {
         retryDelay = BASE_RETRY_MS;
         setStatus("open");
-        if (hasBeenOpen) onUpdateRef.current();
+        if (shouldRefreshOnOpen({ hasBeenOpen, plannedHandoff })) onUpdateRef.current();
         hasBeenOpen = true;
+        plannedHandoff = false;
       });
 
       source.addEventListener("update", () => {
@@ -61,6 +71,7 @@ export function useEventStream(url: string, onUpdate: () => void): StreamStatus 
       // for a healthy reconnect. Resets the backoff too, since this isn't
       // the failure the backoff exists to slow down.
       source.addEventListener("reconnect", () => {
+        plannedHandoff = true;
         source?.close();
         retryDelay = BASE_RETRY_MS;
         connect();
