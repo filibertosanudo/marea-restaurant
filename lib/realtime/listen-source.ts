@@ -60,6 +60,8 @@ export class ListenSource {
   private eventHandlers: Array<(event: RealtimeEvent) => void> = [];
   private healthHandlers: Array<(healthy: boolean) => void> = [];
   private stopped = true;
+  /** Bumped on every start(), so a loop left over from before a stop() can tell it is no longer the current one. */
+  private generation = 0;
   private healthy = false;
   private client: ListenClient | null = null;
   /** The last moment the channel was proven to deliver; the sweep re-reads from here. Null until the first healthy moment. */
@@ -95,7 +97,7 @@ export class ListenSource {
   start(): void {
     if (!this.stopped) return;
     this.stopped = false;
-    void this.run();
+    void this.run(++this.generation);
   }
 
   async stop(): Promise<void> {
@@ -110,9 +112,9 @@ export class ListenSource {
     await client?.end().catch(() => {});
   }
 
-  private async run(): Promise<void> {
+  private async run(generation: number): Promise<void> {
     let delay = this.reconnectBaseMs;
-    while (!this.stopped) {
+    while (!this.stopped && generation === this.generation) {
       try {
         await this.connectOnce();
         delay = this.reconnectBaseMs;
@@ -126,6 +128,7 @@ export class ListenSource {
         // connect, LISTEN, sweep or the first heartbeat failed: drop it all and retry
         this.discardClient();
       }
+      if (generation !== this.generation) return;
       this.setHealthy(false);
       if (this.stopped) return;
       await this.sleep(delay);

@@ -242,4 +242,19 @@ describe("ListenSource", () => {
     created[0].deliver({ channel: PING_CHANNEL, payload: "someone-else" });
     await until(() => created.length === 2);
   });
+
+  it("runs one connect loop even when stopped and started again straight away", async () => {
+    const { source: s, created } = make();
+    s.start();
+    await until(() => s.isHealthy);
+
+    await s.stop();
+    s.start();
+    await until(() => s.isHealthy);
+    await sleep(150); // long enough for a second loop, if there were one, to open its own client
+
+    expect(created).toHaveLength(2);
+    expect(created[0].ended).toBe(true);
+    expect(created[1].ended).toBe(false);
+  });
 });
