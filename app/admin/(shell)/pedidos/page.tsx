@@ -7,7 +7,7 @@ import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import {
   countBoardOrdersRaw,
-  listBoardPageRaw,
+  listBoardFirstPagesRaw,
   listCancelledOrdersRaw,
   listActiveTablesRaw,
 } from "@/lib/orders/queries";
@@ -53,11 +53,9 @@ export default async function OrdersBoardPage({
   // First paint carries the first page of each live column and every column's
   // total. The delivered column is not read here: the board asks for it after
   // it has painted, so a refresh never pays for it.
-  const liveColumns = BOARD_COLUMNS.filter(({ status }) => status !== "DELIVERED");
-  const [boardPages, totals, cancelledOrders, tables, openSession] = await Promise.all([
-    tab === "board"
-      ? Promise.all(liveColumns.map(({ status }) => listBoardPageRaw(business.id, status, filters)))
-      : Promise.resolve([]),
+  const liveColumns = BOARD_COLUMNS.filter(({ status }) => status !== "DELIVERED").map(({ status }) => status);
+  const [boardOrders, totals, cancelledOrders, tables, openSession] = await Promise.all([
+    tab === "board" ? listBoardFirstPagesRaw(business.id, liveColumns, filters) : Promise.resolve([]),
     tab === "board" ? countBoardOrdersRaw(business.id, filters) : Promise.resolve(EMPTY_TOTALS),
     tab === "cancelled" ? listCancelledOrdersRaw(business.id, filters) : Promise.resolve([]),
     listActiveTablesRaw(business.id),
@@ -70,7 +68,7 @@ export default async function OrdersBoardPage({
 
   return (
     <OrdersBoard
-      orders={boardPages.flatMap((page) => page.orders).map(toBoardOrderDTO)}
+      orders={boardOrders.map(toBoardOrderDTO)}
       totals={totals}
       cancelledOrders={cancelledOrders.map(toBoardOrderDTO)}
       tables={tables}

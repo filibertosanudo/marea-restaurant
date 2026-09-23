@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import type { OrderType, Prisma } from "@/lib/generated/prisma/client";
+import { Prisma } from "@/lib/generated/prisma/client";
+import type { OrderType } from "@/lib/generated/prisma/client";
 import type { BoardColumnStatus } from "@/lib/orders/state-machine";
 import type { BoardCursor } from "@/lib/orders/board-cursor";
 
@@ -108,6 +109,41 @@ export async function listBoardPageRaw(
     include: BOARD_INCLUDE,
   });
   return { orders: rows.slice(0, take), hasMore: rows.length > take };
+}
+
+/**
+ * The first page of several columns at once, for first paint. One statement
+ * ranks each column's orders and keeps the first `perColumn` ids, then one read
+ * fetches those cards. Prisma loads every relation with a statement of its own
+ * (seven for a board card), so three column queries cost about twenty-one
+ * statements a render and this costs about eight, on a page that re-reads
+ * every minute.
+ */
+export async function listBoardFirstPagesRaw(
+  businessId: string,
+  statuses: BoardColumnStatus[],
+  filters: BoardFilters = {},
+  perColumn: number = BOARD_PAGE_SIZE
+) {
+  const type = filters.orderType ? Prisma.sql`AND type = ${filters.orderType}::"OrderType"` : Prisma.empty;
+  const table = filters.tableId ? Prisma.sql`AND "tableId" = ${filters.tableId}` : Prisma.empty;
+  const ranked = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT id FROM (
+      SELECT id, row_number() OVER (PARTITION BY status ORDER BY "placedAt", id) AS n
+      FROM "Order"
+      WHERE "businessId" = ${businessId}
+        AND status = ANY(${statuses}::"OrderStatus"[])
+        ${type}
+        ${table}
+    ) ranked
+    WHERE n <= ${perColumn}
+  `;
+  if (ranked.length === 0) return [];
+  return prisma.order.findMany({
+    where: { id: { in: ranked.map((row) => row.id) } },
+    orderBy: [{ placedAt: "asc" }, { id: "asc" }],
+    include: BOARD_INCLUDE,
+  });
 }
 
 /** How many cards each column holds in total, in one statement: the badge shows this, whatever page is loaded. */

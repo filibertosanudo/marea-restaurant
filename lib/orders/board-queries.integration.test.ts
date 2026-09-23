@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { listBoardPageRaw, countBoardOrdersRaw, listBoardOrdersByIdsRaw, BOARD_PAGE_SIZE } from "./queries";
+import {
+  listBoardPageRaw,
+  listBoardFirstPagesRaw,
+  countBoardOrdersRaw,
+  listBoardOrdersByIdsRaw,
+  BOARD_PAGE_SIZE,
+} from "./queries";
 import { makeBusiness, makeOrder } from "@/test/factories";
 
 describe("listBoardPageRaw", () => {
@@ -142,5 +148,60 @@ describe("listBoardOrdersByIdsRaw", () => {
     const found = await listBoardOrdersByIdsRaw(business.id, [mine.id, hidden.id, foreign.id], { orderType: "TAKEAWAY" });
 
     expect(found.map((o) => o.id)).toEqual([mine.id]);
+  });
+});
+
+describe("listBoardFirstPagesRaw", () => {
+  it("returns the first page of every column asked for, oldest first, in one read", async () => {
+    const business = await makeBusiness();
+    const base = Date.now() - 60 * 60_000;
+    const pending = [];
+    for (let i = 0; i < 5; i++) pending.push(await makeOrder(business.id, { status: "PENDING", placedAt: new Date(base + i * 1000) }));
+    const preparing = [];
+    for (let i = 0; i < 4; i++) preparing.push(await makeOrder(business.id, { status: "PREPARING", placedAt: new Date(base + i * 2000) }));
+    await makeOrder(business.id, { status: "READY" });
+    await makeOrder(business.id, { status: "DELIVERED" });
+    await makeOrder(business.id, { status: "CANCELLED" });
+
+    const orders = await listBoardFirstPagesRaw(business.id, ["PENDING", "PREPARING"], {}, 3);
+
+    // three per column, the oldest three of each; nothing from READY, DELIVERED or CANCELLED
+    expect(orders.filter((o) => o.status === "PENDING").map((o) => o.id)).toEqual(pending.slice(0, 3).map((o) => o.id));
+    expect(orders.filter((o) => o.status === "PREPARING").map((o) => o.id)).toEqual(preparing.slice(0, 3).map((o) => o.id));
+    expect(orders).toHaveLength(6);
+  });
+
+  it("agrees with paging each column separately", async () => {
+    const business = await makeBusiness();
+    for (let i = 0; i < 7; i++) await makeOrder(business.id, { status: "PENDING", placedAt: new Date(Date.now() - (10 - i) * 60_000) });
+    for (let i = 0; i < 6; i++) await makeOrder(business.id, { status: "READY", placedAt: new Date(Date.now() - (10 - i) * 60_000) });
+
+    const together = await listBoardFirstPagesRaw(business.id, ["PENDING", "READY"], {}, 4);
+    const apart = [
+      ...(await listBoardPageRaw(business.id, "PENDING", {}, { take: 4 })).orders,
+      ...(await listBoardPageRaw(business.id, "READY", {}, { take: 4 })).orders,
+    ];
+
+    expect(together.map((o) => o.id).sort()).toEqual(apart.map((o) => o.id).sort());
+  });
+
+  it("applies the board's filters and stays inside its own business", async () => {
+    const business = await makeBusiness();
+    const other = await makeBusiness();
+    const table = await prisma.restaurantTable.create({ data: { businessId: business.id, code: "T-02", seats: 2 } });
+    const wanted = await makeOrder(business.id, { status: "PENDING", type: "DINE_IN", tableId: table.id });
+    await makeOrder(business.id, { status: "PENDING", type: "TAKEAWAY" });
+    await makeOrder(other.id, { status: "PENDING", type: "DINE_IN" });
+
+    const byType = await listBoardFirstPagesRaw(business.id, ["PENDING"], { orderType: "DINE_IN" });
+    const byTable = await listBoardFirstPagesRaw(business.id, ["PENDING"], { tableId: table.id });
+
+    expect(byType.map((o) => o.id)).toEqual([wanted.id]);
+    expect(byTable.map((o) => o.id)).toEqual([wanted.id]);
+  });
+
+  it("returns nothing, without a second read, when there is nothing to show", async () => {
+    const business = await makeBusiness();
+    expect(await listBoardFirstPagesRaw(business.id, ["PENDING", "PREPARING", "READY"])).toEqual([]);
   });
 });

@@ -3,7 +3,7 @@ import { requirePageRole } from "@/lib/auth/permissions";
 import { getCurrentBusiness } from "@/lib/business";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
-import { countBoardOrdersRaw, listBoardPageRaw } from "@/lib/orders/queries";
+import { countBoardOrdersRaw, listBoardFirstPagesRaw } from "@/lib/orders/queries";
 import { KITCHEN_COLUMNS } from "@/lib/orders/state-machine";
 import { toBoardOrderDTO } from "@/lib/orders/dto";
 import { getActivePrinterStatus } from "@/lib/devices/queries";
@@ -22,15 +22,15 @@ export default async function KitchenScreenPage() {
   // The first page of each column (50 cards) and every column's total: a
   // kitchen with more pending than that has a problem scrolling does not solve,
   // so the rest waits behind "ver más".
-  const [pages, totals, printer] = await Promise.all([
-    Promise.all(KITCHEN_COLUMNS.map((status) => listBoardPageRaw(business.id, status))),
+  const [boardOrders, totals, printer] = await Promise.all([
+    listBoardFirstPagesRaw(business.id, KITCHEN_COLUMNS),
     countBoardOrdersRaw(business.id),
     getActivePrinterStatus(business.id),
   ]);
 
   return (
     <KitchenBoard
-      orders={pages.flatMap((page) => page.orders).map(toBoardOrderDTO)}
+      orders={boardOrders.map(toBoardOrderDTO)}
       totals={totals}
       dict={dict.kitchen}
       printerLastSeenAt={printer?.lastSeenAt?.toISOString() ?? null}
