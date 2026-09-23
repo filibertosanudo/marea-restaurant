@@ -59,12 +59,14 @@ export async function GET(request: NextRequest) {
   const encoder = new TextEncoder();
   let closed = false;
   const timers: Array<ReturnType<typeof setTimeout>> = [];
+  let flushTimer: ReturnType<typeof setTimeout> | null = null;
   let unsubscribe: (() => void) | null = null;
 
   // Everything that must stop when the stream ends, however it ends.
   const release = () => {
     closed = true;
     unsubscribe?.();
+    if (flushTimer) clearTimeout(flushTimer);
     for (const timer of timers) {
       // setInterval and setTimeout ids are interchangeable for clearing.
       clearTimeout(timer);
@@ -96,7 +98,6 @@ export async function GET(request: NextRequest) {
       // Several triggers fire for one order (its status event, its payment):
       // send them as one update so a screen refreshes once, not three times.
       let pending: RealtimeEvent[] = [];
-      let flushTimer: ReturnType<typeof setTimeout> | null = null;
       const flush = () => {
         flushTimer = null;
         const batch = pending;
@@ -109,7 +110,6 @@ export async function GET(request: NextRequest) {
         pending.push(event);
         if (!flushTimer) {
           flushTimer = setTimeout(flush, SSE_COALESCE_MS);
-          timers.push(flushTimer);
         }
       });
 
