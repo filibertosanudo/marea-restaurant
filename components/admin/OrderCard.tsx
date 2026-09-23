@@ -166,8 +166,13 @@ export function OrderCard({
   const isDelivered = order.status === "DELIVERED";
 
   function advance() {
+    // Called in the click itself, outside the transition: React holds every
+    // update made inside an async transition until it finishes, and the move
+    // is meant to show before the server has answered. The transition only
+    // keeps the button disabled until it does.
+    const settled = onAdvance(order);
     startTransition(async () => {
-      await onAdvance(order);
+      await settled;
     });
   }
 
