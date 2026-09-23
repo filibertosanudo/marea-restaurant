@@ -73,6 +73,12 @@ place that must not stay stale, and nothing else in the loop costs a statement.
 | LISTEN, 10 samples | median 126-139 ms, max 146 ms |
 | Forced polling fallback (`REALTIME_MODE=poll`), 5 samples | median 9.1 s, max 9.5 s (interval 10 s) |
 
+These figures were measured with raw SSE clients. A real screen adds a page
+refresh (about 12 statements) only after a connection that dropped, not on the
+server's scheduled 75 s handoff: the first version of the client refreshed on
+both, which review caught as about 2,900 statements an hour for five screens,
+and `shouldRefreshOnOpen` now excludes the handoff (`useEventStream.test.ts`).
+
 **Killing the LISTEN connection** (`node scripts/perf/realtime-drill.mjs kill`,
 and `recovery.integration.test.ts`): the server's `marea_realtime_listen`
 backend is terminated with `pg_terminate_backend`, an order is advanced while
