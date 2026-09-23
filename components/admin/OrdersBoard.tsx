@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useSearchParams, usePathname } from "next/navigation";
 import type { BoardOrderDTO } from "@/lib/orders/dto";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import type { Lang } from "@/lib/i18n/lang";
@@ -13,7 +13,10 @@ import { OrderPaymentDrawer } from "./OrderPaymentDrawer";
 import { BOARD_COLUMNS } from "@/lib/orders/state-machine";
 import { SoundOnIcon, SoundOffIcon } from "./icons";
 import { shortFolio } from "@/lib/orders/folio-format";
-import { useEventStream } from "@/lib/realtime/useEventStream";
+import { useLiveBoard } from "./useLiveBoard";
+import { LoadMoreButton } from "./LoadMoreButton";
+import type { BoardView, ColumnTotals } from "@/lib/orders/board-state";
+import type { BoardColumnStatus } from "@/lib/orders/state-machine";
 import { playChime, primeAudio } from "@/lib/realtime/chime";
 import { CashRegisterWidget } from "./cash-register/CashRegisterWidget";
 import type { OpenCashSessionDTO, CashSessionActivityDTO, CashMovementDTO } from "@/lib/dto/cash-register";
@@ -36,7 +39,8 @@ function buildHref(pathname: string, params: URLSearchParams, patch: Record<stri
 }
 
 export function OrdersBoard({
-  boardOrders,
+  orders,
+  totals,
   cancelledOrders,
   tables,
   dict,
@@ -51,7 +55,10 @@ export function OrdersBoard({
   cashMovements,
   currency,
 }: {
-  boardOrders: BoardOrderDTO[];
+  /** The first page of each live column; the delivered column is asked for after first paint. */
+  orders: BoardOrderDTO[];
+  /** Every column's total, whatever page is loaded. */
+  totals: ColumnTotals;
   cancelledOrders: BoardOrderDTO[];
   tables: { id: string; code: string; zone: string | null }[];
   dict: AdminDictionary["orders"];
@@ -106,25 +113,23 @@ export function OrdersBoard({
     };
   }, []);
 
-  const router = useRouter();
-  const streamUrl = "/api/orders/stream";
-  const streamStatus = useEventStream(streamUrl, () => router.refresh());
-
-  // Chime only for a genuinely NEW order arriving, not every status click —
-  // detected by diffing the set of order ids this render got against the
-  // previous one, after a stream-triggered refresh brings fresh props in.
-  const knownOrderIds = useRef<Set<string> | null>(null);
-  useEffect(() => {
-    const currentIds = new Set(boardOrders.map((o) => o.id));
-    if (knownOrderIds.current) {
-      const hasNewOrder = [...currentIds].some((id) => !knownOrderIds.current!.has(id));
-      if (hasNewOrder && soundEnabled) playChime();
-    }
-    knownOrderIds.current = currentIds;
-  }, [boardOrders, soundEnabled]);
-
   const activeType = searchParams.get("type");
   const activeTable = searchParams.get("table");
+
+  // Chime only for a genuinely NEW order arriving, not every status click:
+  // the hook reports a card this screen did not hold, whether it came in a
+  // live event or in a fresh render.
+  const { view, hasMore, loadMore, loadingMore, advance, streamStatus } = useLiveBoard({
+    orders,
+    totals,
+    filters: { type: activeType, table: activeTable },
+    deltas: tab === "board",
+    includeDelivered: tab === "board",
+    refreshOnCash: true,
+    onNewOrders: () => {
+      if (soundEnabled) playChime();
+    },
+  });
 
   const filterBar = (
     <div className="flex flex-wrap items-center gap-[8px]">
@@ -257,14 +262,25 @@ export function OrdersBoard({
           {/* Desktop / kiosk: columns. */}
           <div className="hidden flex-1 grid-cols-4 gap-[1px] overflow-hidden bg-border/25 md:grid">
             {BOARD_COLUMNS.map(({ status }) => {
-              const columnOrders = boardOrders.filter((o) => o.status === status);
+              const columnOrders = view.columns[status];
               return (
                 <KanbanColumn
                   key={status}
                   title={dict[COLUMN_LABEL_KEY[status]]}
-                  count={columnOrders.length}
+                  count={view.totals[status]}
                   emptyLabel={dict.emptyColumn}
                   density="kitchen"
+                  footer={
+                    hasMore(status) && (
+                      <LoadMoreButton
+                        label={dict.loadMore}
+                        remaining={view.totals[status] - columnOrders.length}
+                        loading={loadingMore[status] === true}
+                        onClick={() => void loadMore(status)}
+                        size="waiter"
+                      />
+                    )
+                  }
                 >
                   {columnOrders.map((order) => (
                     <OrderCard
@@ -275,6 +291,7 @@ export function OrdersBoard({
                       canCancel={canCancel}
                       onCancel={setCancelTarget}
                       onViewPayment={setPaymentTarget}
+                      onAdvance={advance}
                       density="kitchen"
                     />
                   ))}
@@ -285,12 +302,16 @@ export function OrdersBoard({
 
           {/* Waiter view: compact list, filterable by status pills. */}
           <MobileOrderList
-            orders={boardOrders}
+            view={view}
+            hasMore={hasMore}
+            loadMore={loadMore}
+            loadingMore={loadingMore}
             dict={dict}
             lang={lang}
             canCancel={canCancel}
             onCancel={setCancelTarget}
             onViewPayment={setPaymentTarget}
+            onAdvance={advance}
           />
         </>
       )}
@@ -309,28 +330,36 @@ export function OrdersBoard({
 }
 
 function MobileOrderList({
-  orders,
+  view,
+  hasMore,
+  loadMore,
+  loadingMore,
   dict,
   lang,
   canCancel,
   onCancel,
   onViewPayment,
+  onAdvance,
 }: {
-  orders: BoardOrderDTO[];
+  view: BoardView;
+  hasMore: (status: BoardColumnStatus) => boolean;
+  loadMore: (status: BoardColumnStatus) => Promise<void>;
+  loadingMore: Partial<Record<BoardColumnStatus, boolean>>;
   dict: AdminDictionary["orders"];
   lang: Lang;
   canCancel: boolean;
   onCancel: (order: BoardOrderDTO) => void;
   onViewPayment: (order: BoardOrderDTO) => void;
+  onAdvance: (order: BoardOrderDTO) => Promise<void>;
 }) {
   const [statusFilter, setStatusFilter] = useState<(typeof BOARD_COLUMNS)[number]["status"]>("PENDING");
-  const filtered = orders.filter((o) => o.status === statusFilter);
+  const filtered = view.columns[statusFilter];
 
   return (
     <div className="flex flex-1 flex-col md:hidden">
       <div className="flex flex-none gap-[6px] overflow-x-auto border-b border-border/20 bg-surface px-md py-sm">
         {BOARD_COLUMNS.map(({ status }) => {
-          const count = orders.filter((o) => o.status === status).length;
+          const count = view.totals[status];
           return (
             <button
               key={status}
@@ -361,9 +390,19 @@ function MobileOrderList({
                 canCancel={canCancel}
                 onCancel={onCancel}
                 onViewPayment={onViewPayment}
+                onAdvance={onAdvance}
                 density="waiter"
               />
             ))}
+            {hasMore(statusFilter) && (
+              <LoadMoreButton
+                label={dict.loadMore}
+                remaining={view.totals[statusFilter] - filtered.length}
+                loading={loadingMore[statusFilter] === true}
+                onClick={() => void loadMore(statusFilter)}
+                size="waiter"
+              />
+            )}
           </div>
         )}
       </div>

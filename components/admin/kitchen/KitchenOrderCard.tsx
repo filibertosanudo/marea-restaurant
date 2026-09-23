@@ -3,7 +3,6 @@
 import { useEffect, useState, useTransition } from "react";
 import type { BoardOrderDTO } from "@/lib/orders/dto";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
-import { advanceOrderStatusAction } from "@/lib/orders/board-actions";
 import { getNextStatus } from "@/lib/orders/state-machine";
 import { AgingIndicator, elapsedMinutes, agingTier } from "@/components/admin/AgingIndicator";
 import { AllergyIcon, SingleTableIcon, TakeawayBagIcon } from "@/components/admin/icons";
@@ -34,7 +33,16 @@ function isRecent(placedAt: string): boolean {
  * scale sits below OrdersBoard's own "kitchen" density (that one only ever
  * shows a handful of cards in a single wide list, never a dense grid).
  */
-export function KitchenOrderCard({ order, dict }: { order: BoardOrderDTO; dict: KitchenDict }) {
+export function KitchenOrderCard({
+  order,
+  dict,
+  onAdvance,
+}: {
+  order: BoardOrderDTO;
+  dict: KitchenDict;
+  /** Owned by the board, which moves the card at once and puts it back if this fails. */
+  onAdvance: (order: BoardOrderDTO) => Promise<void>;
+}) {
   const [pending, startTransition] = useTransition();
   const [minutes, setMinutes] = useState(() => elapsedMinutes(order.placedAt));
 
@@ -51,7 +59,7 @@ export function KitchenOrderCard({ order, dict }: { order: BoardOrderDTO; dict: 
 
   function advance() {
     startTransition(async () => {
-      await advanceOrderStatusAction(order.id);
+      await onAdvance(order);
     });
   }
 

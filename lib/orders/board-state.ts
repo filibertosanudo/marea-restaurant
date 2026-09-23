@@ -103,6 +103,21 @@ export function applyDelta(
   return { state: { ...state, orders, totals: { ...totals } }, added };
 }
 
+/**
+ * A fresh server snapshot does not carry the delivered column (it is loaded on
+ * demand), so the delivered cards this screen already holds are carried over
+ * instead of being dropped and asked for again on every reconcile.
+ */
+export function carryDelivered(next: BoardState, previous: BoardState): BoardState {
+  if (!previous.deliveredLoaded) return next;
+  const delivered = Object.values(previous.orders).filter((order) => order.status === "DELIVERED");
+  return {
+    ...next,
+    orders: { ...next.orders, ...Object.fromEntries(delivered.map((order) => [order.id, order])) },
+    deliveredLoaded: true,
+  };
+}
+
 /** Adds a loaded page ("ver más", or the DELIVERED column asked for) without touching what is already held. */
 export function mergePage(
   state: BoardState,

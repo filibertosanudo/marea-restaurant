@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   applyDelta,
+  carryDelivered,
   columnCards,
   fromSnapshot,
   hasMore,
@@ -168,5 +169,23 @@ describe("optimistic moves", () => {
   it("reverts by simply dropping the move", () => {
     const state = fromSnapshot([card("a", "PENDING", 1)], totals({ PENDING: 1 }));
     expect(viewOf(state, {}).columns.PENDING.map((c) => c.id)).toEqual(["a"]);
+  });
+});
+
+describe("a fresh snapshot", () => {
+  it("keeps the delivered cards already loaded, since the server does not send them", () => {
+    const opened = mergePage(fromSnapshot([], totals({ DELIVERED: 1 })), "DELIVERED", [card("d", "DELIVERED", 1)], totals({ DELIVERED: 1 }));
+    const fresh = fromSnapshot([card("a", "PENDING", 2)], totals({ PENDING: 1, DELIVERED: 2 }));
+
+    const merged = carryDelivered(fresh, opened);
+
+    expect(Object.keys(merged.orders).sort()).toEqual(["a", "d"]);
+    expect(merged.deliveredLoaded).toBe(true);
+    expect(merged.totals.DELIVERED).toBe(2); // the server's count, not the old one
+  });
+
+  it("changes nothing when the delivered column was never opened", () => {
+    const fresh = fromSnapshot([card("a", "PENDING", 2)], totals({ PENDING: 1 }));
+    expect(carryDelivered(fresh, fromSnapshot([], totals()))).toBe(fresh);
   });
 });

@@ -17,12 +17,15 @@ export function KanbanColumn({
   children,
   emptyLabel,
   density,
+  footer,
 }: {
   title: string;
   count: number;
   children: ReactNode;
   emptyLabel: string;
   density: BoardDensity;
+  /** Below the cards: "ver más" when the column holds more than it shows. */
+  footer?: ReactNode;
 }) {
   const s = SCALE[density];
   return (
@@ -41,7 +44,10 @@ export function KanbanColumn({
             {emptyLabel}
           </p>
         ) : (
-          children
+          <>
+            {children}
+            {footer}
+          </>
         )}
       </div>
     </div>

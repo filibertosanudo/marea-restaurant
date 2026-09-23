@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { formatMoney } from "@/lib/dto/money";
 import type { BoardOrderDTO } from "@/lib/orders/dto";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
-import { advanceOrderStatusAction, collectCashPaymentAction } from "@/lib/orders/board-actions";
+import { collectCashPaymentAction } from "@/lib/orders/board-actions";
 import { reprintKitchenTicketAction } from "@/lib/printing/actions";
 import { shortFolio } from "@/lib/orders/folio-format";
 import { getNextStatus } from "@/lib/orders/state-machine";
@@ -137,6 +137,7 @@ export function OrderCard({
   canCancel,
   onCancel,
   onViewPayment,
+  onAdvance,
   density,
 }: {
   order: BoardOrderDTO;
@@ -145,6 +146,8 @@ export function OrderCard({
   canCancel: boolean;
   onCancel: (order: BoardOrderDTO) => void;
   onViewPayment: (order: BoardOrderDTO) => void;
+  /** Owned by the board, which moves the card at once and puts it back if this fails. */
+  onAdvance: (order: BoardOrderDTO) => Promise<void>;
   density: BoardDensity;
 }) {
   const [pending, startTransition] = useTransition();
@@ -164,7 +167,7 @@ export function OrderCard({
 
   function advance() {
     startTransition(async () => {
-      await advanceOrderStatusAction(order.id);
+      await onAdvance(order);
     });
   }
 

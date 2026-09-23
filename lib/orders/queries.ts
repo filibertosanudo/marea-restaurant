@@ -153,27 +153,6 @@ export async function listBoardOrdersByIdsRaw(businessId: string, ids: string[],
   });
 }
 
-/**
- * The whole board in one read, as before pages existed. Kept only until the
- * pages and the kitchen screen read by column (next commit removes it).
- */
-export async function listBoardOrdersRaw(businessId: string, filters: BoardFilters = {}) {
-  const everything = { take: Number.MAX_SAFE_INTEGER - 1 };
-  const pages = await Promise.all(
-    (["PENDING", "PREPARING", "READY", "DELIVERED"] as const).map((status) => listBoardPageRaw(businessId, status, filters, everything))
-  );
-  return pages.flatMap((page) => page.orders).sort((a, b) => a.placedAt.getTime() - b.placedAt.getTime());
-}
-
-/** Same, for the kitchen screen: the three live columns only. Removed together with the one above. */
-export async function listKitchenBoardOrdersRaw(businessId: string) {
-  const everything = { take: Number.MAX_SAFE_INTEGER - 1 };
-  const pages = await Promise.all(
-    (["PENDING", "PREPARING", "READY"] as const).map((status) => listBoardPageRaw(businessId, status, {}, everything))
-  );
-  return pages.flatMap((page) => page.orders).sort((a, b) => a.placedAt.getTime() - b.placedAt.getTime());
-}
-
 /** The Cancelados tab — same recent window, its own query since it's a different tab, not a board column. */
 export async function listCancelledOrdersRaw(businessId: string, filters: BoardFilters = {}) {
   return prisma.order.findMany({
