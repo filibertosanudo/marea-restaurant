@@ -4,6 +4,8 @@
 //   node scripts/perf/measure.mjs idle [screens] [seconds]
 //   node scripts/perf/measure.mjs payload
 //   node scripts/perf/measure.mjs latency [requests]
+//   node scripts/perf/measure.mjs event
+//   node scripts/perf/measure.mjs page-idle [/admin/pedidos|/admin/cocina] [seconds]
 //
 // Needs pg_stat_statements on the database being measured; all counts are
 // "statements the app ran", not "connections", so they hold under any pooler.
@@ -98,6 +100,41 @@ async function payload() {
   console.log(JSON.stringify({ liveOrders: rows[0].n, html, queriesForHtml, rsc, queriesForRsc }));
 }
 
+/** What one live event costs a screen: the one-card read the board makes now, against re-rendering the page. */
+async function event() {
+  const jar = await login();
+  const cookie = { cookie: jar.header() };
+  const { rows } = await db.query(`select id from "Order" where status = 'PENDING' order by "placedAt" limit 1`);
+  await reset();
+  const card = await fetchSize(`${BASE_URL}/api/orders/board?ids=${rows[0].id}`, cookie);
+  const cardStatements = await statementCount();
+  await reset();
+  const page = await fetchSize(`${BASE_URL}/admin/pedidos`, { ...cookie, rsc: "1" });
+  const pageStatements = await statementCount();
+  const live = await db.query(`select count(*)::int n from "Order" where status in ('PENDING','PREPARING','READY')`);
+  console.log(JSON.stringify({ liveOrders: live.rows[0].n, card: { ...card, statements: cardStatements }, page: { ...page, statements: pageStatements } }));
+}
+
+/** A real browser on a real screen, idle: statements per minute once its first paint is over. */
+async function pageIdle(path, seconds) {
+  const { chromium } = await import("@playwright/test");
+  const jar = await login();
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+  await ctx.addCookies(jar.header().split("; ").map((c) => ({ name: c.slice(0, c.indexOf("=")), value: c.slice(c.indexOf("=") + 1), url: BASE_URL })));
+  const page = await ctx.newPage();
+  await page.goto(`${BASE_URL}${path}`);
+  await new Promise((r) => setTimeout(r, 10_000)); // first paint, the delivered column, the stream opening
+  await reset();
+  const startedAt = Date.now();
+  await new Promise((r) => setTimeout(r, seconds * 1000));
+  const elapsed = (Date.now() - startedAt) / 1000;
+  const calls = await statementCount();
+  const top = await topStatements(6);
+  await browser.close();
+  console.log(JSON.stringify({ path, seconds: Math.round(elapsed), statements: calls, perMinute: +((calls / elapsed) * 60).toFixed(1), top }));
+}
+
 async function latency(requests) {
   const out = {};
   for (const path of ["/", "/menu"]) {
@@ -127,7 +164,9 @@ try {
   if (command === "idle") await idle(Number(rest[0] ?? 1), Number(rest[1] ?? 60));
   else if (command === "payload") await payload();
   else if (command === "latency") await latency(Number(rest[0] ?? 50));
-  else throw new Error("usage: measure.mjs idle|payload|latency");
+  else if (command === "event") await event();
+  else if (command === "page-idle") await pageIdle(rest[0] ?? "/admin/pedidos", Number(rest[1] ?? 130));
+  else throw new Error("usage: measure.mjs idle|payload|latency|event|page-idle");
 } finally {
   await db.end();
 }
