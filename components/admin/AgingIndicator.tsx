@@ -54,6 +54,12 @@ export function AgingIndicator({
 
   return (
     <span
+      // The minutes come from the clock at render, and the server renders a
+      // moment before the browser hydrates: on a board with a hundred cards
+      // one of them always crosses a minute in between. The client's number is
+      // the right one and the effect below keeps it moving, so the mismatch
+      // is expected, not a fault.
+      suppressHydrationWarning
       className={`inline-flex items-center rounded-sm font-bold tabular-nums ${sizeClassName} ${tierClasses}`}
     >
       <span className={`rounded-full ${dotClassName} ${dotClasses}`} />
