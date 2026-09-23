@@ -4,6 +4,43 @@ import { useEffect, useRef, useState } from "react";
 
 export type StreamStatus = "connecting" | "open" | "offline";
 
+/**
+ * What an `update` event says, for a staff screen: which orders changed
+ * (and how), or that it cannot say and the screen should re-read everything.
+ * A guest tracking an order gets neither, and always re-reads its own page.
+ */
+export type StreamPayload = {
+  reconcile?: boolean;
+  changes?: { kind: "order" | "payment" | "cash"; orderId: string | null; status: string | null }[];
+};
+
+/** The event body as sent, or null when there is nothing usable in it. Never trusted beyond its shape. */
+export function parseStreamPayload(data: unknown): StreamPayload | null {
+  if (typeof data !== "string") return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(data);
+  } catch {
+    return null;
+  }
+  if (typeof raw !== "object" || raw === null) return null;
+  const { reconcile, changes } = raw as Record<string, unknown>;
+  if (reconcile === true) return { reconcile: true };
+  if (!Array.isArray(changes)) return null;
+  const parsed: NonNullable<StreamPayload["changes"]> = [];
+  for (const change of changes) {
+    if (typeof change !== "object" || change === null) return null;
+    const { kind, orderId, status } = change as Record<string, unknown>;
+    if (kind !== "order" && kind !== "payment" && kind !== "cash") return null;
+    parsed.push({
+      kind,
+      orderId: typeof orderId === "string" ? orderId : null,
+      status: typeof status === "string" ? status : null,
+    });
+  }
+  return { changes: parsed };
+}
+
 /** Whether an `open` should refresh: only when it follows a connection that dropped, not the first open and not the planned handoff. */
 export function shouldRefreshOnOpen(state: { hasBeenOpen: boolean; plannedHandoff: boolean }): boolean {
   return state.hasBeenOpen && !state.plannedHandoff;
@@ -17,9 +54,9 @@ const MAX_RETRY_MS = 30000;
  * the browser's native auto-reconnect exists but retries at a fixed
  * interval and can't be backed off, so this manages the connection
  * manually (closing it before scheduling a retry stops the native
- * reconnect from also firing). Every `update` event just calls onUpdate();
- * it carries no payload the caller should trust — the actual data always
- * comes back through the normal, already-authorized page render.
+ * reconnect from also firing). Every `update` event calls onUpdate() with
+ * what it says changed; that names an order, never carries one — the actual
+ * data always comes back through the normal, already-authorized read.
  *
  * Every reconnect after the first that was not the server's own scheduled
  * handoff also calls onUpdate(). A stream that dropped (a server restart, a
@@ -30,7 +67,7 @@ const MAX_RETRY_MS = 30000;
  * refreshing on it would cost every open screen a full page render each time,
  * which is exactly the load this stream exists to remove.
  */
-export function useEventStream(url: string, onUpdate: () => void): StreamStatus {
+export function useEventStream(url: string, onUpdate: (payload: StreamPayload | null) => void): StreamStatus {
   const [status, setStatus] = useState<StreamStatus>("connecting");
   const onUpdateRef = useRef(onUpdate);
 
@@ -54,13 +91,13 @@ export function useEventStream(url: string, onUpdate: () => void): StreamStatus 
       source.addEventListener("open", () => {
         retryDelay = BASE_RETRY_MS;
         setStatus("open");
-        if (shouldRefreshOnOpen({ hasBeenOpen, plannedHandoff })) onUpdateRef.current();
+        if (shouldRefreshOnOpen({ hasBeenOpen, plannedHandoff })) onUpdateRef.current({ reconcile: true });
         hasBeenOpen = true;
         plannedHandoff = false;
       });
 
-      source.addEventListener("update", () => {
-        onUpdateRef.current();
+      source.addEventListener("update", (event) => {
+        onUpdateRef.current(parseStreamPayload((event as MessageEvent).data));
       });
 
       // The server's scheduled lifetime handoff (see MAX_LIFETIME_MS in the
