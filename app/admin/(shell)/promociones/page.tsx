@@ -1,6 +1,6 @@
 import { UserRole } from "@/lib/generated/prisma/client";
 import { requirePageRole } from "@/lib/auth/permissions";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { listPromotionsRaw } from "@/lib/promotions/queries";
@@ -14,7 +14,7 @@ import type { Lang } from "@/lib/i18n/lang";
 export default async function PromotionsPage() {
   await requirePageRole("/admin/login", UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN);
 
-  const [business, lang] = await Promise.all([getCurrentBusiness(), getAdminLang()]);
+  const [business, lang] = await Promise.all([getBusinessForRequest(), getAdminLang()]);
   const dict = getDictionary(lang);
 
   const [promotions, menuItems] = await Promise.all([

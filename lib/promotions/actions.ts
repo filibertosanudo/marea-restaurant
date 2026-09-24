@@ -5,7 +5,7 @@ import { invalidatePublicCache } from "@/lib/cache/public";
 import { prisma } from "@/lib/prisma";
 import { Prisma, UserRole } from "@/lib/generated/prisma/client";
 import { requireRole } from "@/lib/auth/permissions";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { buildPromotionSchema } from "@/lib/promotions/schemas";
 import type { Lang } from "@/lib/i18n/lang";
 import { slugify } from "@/lib/menu/slugify";
@@ -119,7 +119,7 @@ export async function createPromotionAction(
   formData: FormData
 ): Promise<PromotionFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = buildPromotionSchema(business.defaultLocale as Lang).safeParse(
     readPromotionForm(formData)
@@ -190,7 +190,7 @@ export async function updatePromotionAction(
   formData: FormData
 ): Promise<PromotionFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "missing id" };
 
@@ -285,7 +285,7 @@ export async function toggleActivePromotionAction(
   isActive: boolean
 ): Promise<{ success: true } | { error: "not_found" }> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   try {
     await prisma.promotion.update({
       where: { id, businessId: business.id, deletedAt: null },
@@ -302,7 +302,7 @@ export async function toggleActivePromotionAction(
 
 export async function deletePromotionAction(id: string): Promise<{ success: true } | { error: "not_found" }> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   try {
     await prisma.promotion.update({
       where: { id, businessId: business.id, deletedAt: null },
