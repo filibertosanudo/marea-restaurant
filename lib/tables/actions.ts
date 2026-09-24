@@ -5,7 +5,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { BLOCKING_STATUSES } from "@/lib/reservations/availability";
 import { tableSchema, batchTableSchema } from "./schemas";
@@ -33,7 +33,7 @@ export async function createTableAction(
   formData: FormData
 ): Promise<TableFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = tableSchema.safeParse({
     code: formData.get("code"),
@@ -74,7 +74,7 @@ export async function createTablesBatchAction(
   formData: FormData
 ): Promise<TableFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = batchTableSchema.safeParse({
     zone: formData.get("zone"),
@@ -117,7 +117,7 @@ export async function updateTableAction(
   formData: FormData
 ): Promise<TableFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "missing_id" };
 
@@ -149,7 +149,7 @@ export async function updateTableAction(
 
 export async function toggleTableActiveAction(id: string, isActive: boolean): Promise<void> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   await prisma.restaurantTable.update({
     where: { id, businessId: business.id },
     data: { isActive },
@@ -168,7 +168,7 @@ export async function toggleTableActiveAction(id: string, isActive: boolean): Pr
  */
 export async function toggleOutOfServiceAction(id: string, outOfService: boolean): Promise<{ blocked: boolean }> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   if (outOfService) {
     const blockingCount = await prisma.reservation.count({
@@ -187,7 +187,7 @@ export async function toggleOutOfServiceAction(id: string, outOfService: boolean
 
 export async function reorderTablesAction(orderedIds: string[]): Promise<void> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   await prisma.$transaction(
     orderedIds.map((id, index) =>
       prisma.restaurantTable.update({
@@ -210,7 +210,7 @@ export async function reorderTablesAction(orderedIds: string[]): Promise<void> {
  */
 export async function rotateTableQrAction(id: string): Promise<{ error?: string }> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const table = await prisma.restaurantTable.findFirst({
     where: { id, businessId: business.id, deletedAt: null },
@@ -245,7 +245,7 @@ export async function rotateTableQrAction(id: string): Promise<{ error?: string 
  */
 export async function deleteTableAction(id: string): Promise<{ blocked: boolean }> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   return prisma.$transaction(async (tx) => {
     const table = await tx.restaurantTable.findFirst({
