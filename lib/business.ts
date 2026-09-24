@@ -2,12 +2,11 @@ import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { Prisma, type Business } from "@/lib/generated/prisma/client";
+import { env } from "@/lib/env";
 import { cachedPublicRead, invalidatePublicCache } from "@/lib/cache/public";
 
-const BUSINESS_SLUG = process.env.BUSINESS_SLUG ?? "marea";
-
-/** Tag scope for the business row: its id isn't known until the row is read, so the slug stands in. */
-export const BUSINESS_ROW_CACHE_SCOPE = BUSINESS_SLUG;
+/** Tag scope for the business row: its id isn't known until the row is read, so the slug stands in. Read lazily: lib/env validates on first access, not at import. */
+export const businessRowCacheScope = (): string => env.BUSINESS_SLUG;
 
 // The data cache stores JSON, which turns Date and Decimal columns into
 // strings. Converting them explicitly, both ways, keeps `Business` honest
@@ -40,7 +39,7 @@ export function fromCacheable(c: ReturnType<typeof toCacheable>): Business {
 
 /** Expires the row (by slug) and everything keyed by business id; Server Actions only. */
 export function invalidateBusinessCache(businessId: string): void {
-  invalidatePublicCache("business", BUSINESS_ROW_CACHE_SCOPE);
+  invalidatePublicCache("business", businessRowCacheScope());
   invalidatePublicCache("business", businessId);
 }
 
@@ -58,12 +57,12 @@ export function invalidateBusinessCache(businessId: string): void {
  * checkout transaction reads it, and it reads it from the row it just locked.
  */
 export const getCurrentBusiness = cache(async (): Promise<Business> => {
-  const cached = await cachedPublicRead("business", "business-row", BUSINESS_ROW_CACHE_SCOPE, async () => {
+  const cached = await cachedPublicRead("business", "business-row", businessRowCacheScope(), async () => {
     const business = await prisma.business.findUnique({
-      where: { slug: BUSINESS_SLUG },
+      where: { slug: env.BUSINESS_SLUG },
     });
     if (!business) {
-      throw new Error(`Business "${BUSINESS_SLUG}" not found — did you run the seed?`);
+      throw new Error(`Business "${env.BUSINESS_SLUG}" not found — did you run the seed?`);
     }
     return toCacheable(business);
   });

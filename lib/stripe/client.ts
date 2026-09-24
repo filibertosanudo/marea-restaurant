@@ -1,5 +1,6 @@
 import "server-only";
 import Stripe from "stripe";
+import { env } from "@/lib/env";
 
 /**
  * The one Stripe client instance for the whole app — secret key never
@@ -15,7 +16,7 @@ import Stripe from "stripe";
  * hard build failure instead of a normal missing-config error at boot.
  */
 function createStripeClient(): Stripe {
-  return new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
+  return new Stripe(env.STRIPE_SECRET_KEY ?? "", {
     apiVersion: "2026-07-29.dahlia",
     typescript: true,
   });

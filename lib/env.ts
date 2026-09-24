@@ -44,6 +44,9 @@ const schema = z
     // every generated query with whatever schema it's given (defaulting to
     // "public"), and doesn't infer it from the connection's search_path.
     DATABASE_SCHEMA: optional(z.string().min(1)),
+    // Which Business row this deployment serves. Single-tenant only: goes
+    // away when the business is resolved per request (module 17, Fase 2).
+    BUSINESS_SLUG: withDefault(z.string().min(1).default("marea")),
     AUTH_SECRET: z.string().min(1),
     AUTH_URL: optional(z.string().url()),
     APP_ORIGIN: optional(z.string().url()),
@@ -69,6 +72,11 @@ const schema = z
     SMTP_USER: optional(z.string().min(1)),
     SMTP_PASSWORD: optional(z.string().min(1)),
     RESEND_API_KEY: optional(z.string().min(1)),
+    // Optional, not required: a deployment without card payments must still
+    // boot, and Docker's build stage runs before either exists. Module 17
+    // may turn these into per-business values (Stripe Connect).
+    STRIPE_SECRET_KEY: optional(z.string().min(1)),
+    STRIPE_WEBHOOK_SECRET: optional(z.string().min(1)),
     // Guards app/api/cron/notifications — the serverless-friendly way to
     // drive the same queue a long-running worker polls, per Fase 3.
     CRON_SECRET: optional(z.string().min(16)),
