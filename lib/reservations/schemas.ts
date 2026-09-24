@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { businessLocalDateParts } from "./availability";
+import { MAX_BOOKING_HORIZON_DAYS } from "./limits";
 
-/** How far out a guest can even ask about — a business decision, not a derived constant. 90 days is the common horizon real booking systems use. */
-export const MAX_BOOKING_HORIZON_DAYS = 90;
+// Client code imports the constant from ./limits (no zod); this keeps every
+// existing server-side import working.
+export { MAX_BOOKING_HORIZON_DAYS };
 
 /**
  * Purely structural: a real "YYYY-MM-DD" calendar date, nothing about how
