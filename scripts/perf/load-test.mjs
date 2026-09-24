@@ -55,9 +55,7 @@ function openScreen(index) {
         if (screen.stop) return;
         buffer += decoder.decode(chunk, { stream: true });
         let end;
-        while ((end = buffer.indexOf("
-
-")) !== -1) {
+        while ((end = buffer.indexOf("\n\n")) !== -1) {
           const block = buffer.slice(0, end);
           buffer = buffer.slice(end + 2);
           if (/^event: reconnect$/m.test(block)) {
