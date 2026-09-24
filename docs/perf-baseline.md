@@ -150,19 +150,50 @@ longer runs are worth far more than the 7 ms shown here.
 `getCurrentBusiness` no longer queries. Panel responses are still
 `Cache-Control: private, no-cache, no-store`.
 
-### Lighthouse, landing (mobile profile, simulated slow 4G, 4x CPU, v12.8.2)
+### Lighthouse, landing (phase 5; mobile profile, Slow 4G, 4x CPU, v12.8.2)
 
-Three runs, `/`:
+Before, three runs, `/`: LCP 2.9 / 2.8 / 2.8 s, CLS 0, TBT 100-190 ms (simulated).
 
-| Run | Score | LCP | CLS | TBT |
-|---|---|---|---|---|
-| 1 | 92 | 2.9 s | 0 | 190 ms |
-| 2 | 95 | 2.8 s | 0 | 100 ms |
-| 3 | 95 | 2.8 s | 0 | 100 ms |
+What moved it, one change at a time, five runs each, LCP median (simulated
+throttling, the default):
 
-**LCP is already over the 2.5 s budget the module sets for phase 5**, so that
-phase has to fix it, not just guard it. The LCP element is the hero `<h1>`, a
-text node, so it is gated by font loading rather than by an image.
+| Step | LCP | Page weight |
+|---|---|---|
+| Before | 2.87 s | 312 KiB |
+| Drop the unused Montserrat 500 weight | 2.86 s | 295 KiB |
+| ... and stop preloading the body font | 2.73 s | 295 KiB |
+| ... and keep `zod` out of the landing bundle | 2.58 s | 231 KiB |
+| ... and stop preloading every font | 2.54 s | 214 KiB |
+| ... and inline the CSS | 2.57 s (no change) | 232 KiB |
+
+The one that mattered: `ReservationForm` imported a single constant
+(`MAX_BOOKING_HORIZON_DAYS`) from `lib/reservations/schemas.ts`, which imports
+`zod`, so the whole validation library shipped to every visitor of the landing
+for a number. The constant now lives in `lib/reservations/limits.ts` (no
+imports; a test fails if it grows one). First-load JS for `/`: **777 KB to 481
+KB** uncompressed.
+
+**Two ways of measuring disagree, and they should be read together.** Lighthouse's
+default simulator estimates this page from the JS it downloads (the React and
+Next runtime are about 170 KB of gzip that no change here can remove), so it
+stays at about 2.55 s whatever is done to fonts or CSS. With throttling applied
+by Chrome, the same page paints at **2.1 s before the CSS was inlined and 1.3-1.5
+s after**, because the first paint waited on two render-blocking stylesheets,
+each a round trip on Slow 4G. The CI budget uses the applied throttling (median
+of 3): LCP 1.50 s against 2.5 s, CLS 0.003 against 0.1. Simulated LCP is printed
+alongside for information; it is over 2.5 s and no change available here moves
+it.
+
+**Images: nothing to optimise on the public side.** The public pages render no
+dish photos at all (`Dish.tsx` draws a text placeholder), and the two `<img>`
+tags in `packages/ui` (`MenuCard`, `TestimonialCard`) are never given an image
+by this app and belong to a library that should not depend on Next. The real
+`<img>` are in the panel: a 36 px thumbnail in the menu table that downloads
+the full 1600 px WebP, and a 96 px preview of a file just uploaded. Neither is
+public and neither was measured with real photos (the seeded `/menu/*.jpg`
+files do not exist); they are left for a follow-up. Note for that follow-up:
+the local storage driver stores absolute URLs on the app's own origin, which
+the existing `remotePatterns` do not cover.
 
 ### Order folio (phase 2)
 
