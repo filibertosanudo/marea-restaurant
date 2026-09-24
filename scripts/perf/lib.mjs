@@ -15,9 +15,9 @@ export function pool(max = 2) {
   return new pg.Pool({ connectionString: DATABASE_URL, max });
 }
 
-/** Server Action ids change per build; read them from the manifest of the build being measured. */
+/** Server Action ids change per build; read them from the manifest of the build being measured (PERF_NEXT_DIR points at another checkout's .next). */
 export function actionIds() {
-  const manifest = JSON.parse(readFileSync(resolve(".next/server/server-reference-manifest.json"), "utf8"));
+  const manifest = JSON.parse(readFileSync(resolve(process.env.PERF_NEXT_DIR ?? ".next", "server/server-reference-manifest.json"), "utf8"));
   const byName = {};
   for (const [id, entry] of Object.entries(manifest.node)) byName[entry.exportedName] = id;
   return byName;
