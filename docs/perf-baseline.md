@@ -247,10 +247,69 @@ Method: `node scripts/perf/checkout-load.mjs 100 20` for the HTTP figures;
 `BENCH_OUT=/tmp/b.txt CONC=4 NN=40 DATABASE_POOL_MAX=25 npx vitest run
 scripts/perf/checkout-db-bench` for the rest, three runs each side.
 
-### Checkout under the phase 6 scenario
+### Load test (phase 6): a service, not a benchmark
 
-Measured in phase 6.
+`node scripts/perf/load-test.mjs 200 10 5`: 200 real checkouts spread at random
+over 10 minutes, five board screens connected the whole time, and guests reading
+`/` and `/menu` in the background, all over HTTP against a production build and a
+seeded Postgres. Before is `main` (`--legacy`: its stream sends no order ids, so
+the per-order board check cannot be made there).
 
-| Figure | Before | After |
+| | Before (`main`) | After (module 16) |
 |---|---|---|
-| Checkout p95 under the phase 6 scenario | | |
+| Orders created / failed | 200 / 0 | 200 / 0 |
+| Checkout p50 / p95 / p99 / max | 76 / 118 / 166 / 199 ms | **39 / 91 / 104 / 181 ms** |
+| Duplicate folios | 0 | 0 |
+| Background menu and landing requests, errors | 963, 0 | 963, 0 |
+| Postgres connections, min / max | 9 / **26** (the pool is 25) | **7 / 10** |
+| Updates each board received | 151-154 (2 s polls that saw a change) | 205 |
+| Orders missing from a board | not checkable | **0** on all five |
+| Boards still receiving events at the end | yes | yes |
+
+All four criteria of the module hold: no error, no duplicate folio, no order lost
+from a board; p95 under 800 ms (91 ms); connections stable (7-10); boards live
+at the end. The before column shows what polling cost: five screens kept the
+pool at 9 to 26 connections, touching its limit of 25.
+
+**The first run of this test failed, and that was the point.** Five screens each
+missed the same three orders. Cause: the server's scheduled 75 s stream handoff
+closed the old stream before the client opened the next, and an order announced in
+that gap reached nobody. The same gap existed in the browser hook. Fixed by
+opening the replacement first and letting the old stream keep delivering for 5 s
+(`lib/realtime/stream-client.ts`, tested with a fake EventSource); the rerun
+above is the fixed build.
+
+Caveat: 200 orders in 10 minutes is 0.33 a second, and the local database has no
+network distance, so the p95 figures show the path is clean, not where it would
+break. The next table is where it would.
+
+### Folio: counter row against a SEQUENCE
+
+Requested comparison, done as a micro-benchmark of the lock alone
+(`scripts/perf/folio-lock-bench.mjs`): the same 25-statement transaction, eight in
+flight, the number taken (A) from one shared row early, as before module 16, (B)
+from the per-day counter row last, as now, (C) from a `SEQUENCE`. It measures the
+lock, not the app.
+
+| Transactions a second | A shared row, early | B daily counter, last | C sequence |
+|---|---|---|---|
+| Localhost | 265 | 722 | 1,325 |
+| 20 ms round trip | 1.8 (p95 11.0 s) | 3.7 (p95 3.9 s) | **9.5** (p95 0.84 s) |
+
+**The sequence wins on the numbers**, 2.6x the counter at 20 ms and 5x the old row:
+it takes no row lock, so it is limited by the connections, not by a queue. **It
+was not adopted**, for two reasons and one caveat:
+
+- At the demand measured above (0.33 orders a second, bursts of a few) the counter's
+  ceiling at 20 ms (3.7 a second) is already many times what a restaurant
+  produces; the sequence's extra headroom buys nothing the load test can see.
+- A sequence cannot reset each day, so it cannot give the folio the daily meaning
+  the product chose (the 42nd order of the day, `A-042` on the kitchen screen). The
+  format would become a global running number (`A-260918-1234`). That is a product
+  decision, not a performance one, and it is the reason the daily folio exists.
+- The gaps a sequence leaves on rollback are, as you said, probably harmless for a
+  ticket number; the counter takes its number inside the transaction and leaves
+  none.
+
+If the deployment ever needs more than about 3 orders a second per business, the
+sequence is the change to make, and this table is the evidence for it.
