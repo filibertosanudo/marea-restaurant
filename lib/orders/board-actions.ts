@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole, ForbiddenError } from "@/lib/auth/permissions";
 import { STAFF_ROLES, ADMIN_ROLES } from "@/lib/auth/roles";
 import { getCurrentBusiness } from "@/lib/business";
+import { invalidatePublicCache } from "@/lib/cache/public";
 import { getNextStatus, isCancellable } from "@/lib/orders/state-machine";
 import { cancelOpenPayments, markPaymentSucceeded } from "@/lib/payments/actions";
 import { computePaymentSummary } from "@/lib/payments/summary";
@@ -241,6 +242,7 @@ export async function cancelOrderAction(
   // same two paths every other availability-changing mutation revalidates.
   revalidatePath("/admin/menu");
   revalidatePath("/");
+  invalidatePublicCache("menu", business.id);
 }
 
 /** "Cobrar en efectivo" — STAFF and up, per the matrix. Only ever touches this order's own CASH_REGISTER/PENDING payment. */

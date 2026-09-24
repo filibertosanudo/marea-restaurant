@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicCache } from "@/lib/cache/public";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
 import { getCurrentBusiness } from "@/lib/business";
@@ -113,6 +114,7 @@ export async function createMenuItemAction(
 
   revalidatePath("/admin/menu");
   revalidatePath("/");
+  invalidatePublicCache("menu", business.id);
   return { success: true };
 }
 
@@ -235,6 +237,7 @@ export async function updateMenuItemAction(
 
   revalidatePath("/admin/menu");
   revalidatePath("/");
+  invalidatePublicCache("menu", business.id);
   return { success: true };
 }
 
@@ -247,6 +250,7 @@ export async function toggleAvailabilityAction(id: string, isAvailable: boolean)
   });
   revalidatePath("/admin/menu");
   revalidatePath("/");
+  invalidatePublicCache("menu", business.id);
 }
 
 export type AdjustStockState =
@@ -316,6 +320,7 @@ export async function adjustMenuItemStockAction(
   if ("error" in result) return result;
   revalidatePath("/admin/menu");
   revalidatePath("/");
+  invalidatePublicCache("menu", business.id);
   return result;
 }
 
@@ -328,6 +333,7 @@ export async function softDeleteMenuItemAction(id: string) {
   });
   revalidatePath("/admin/menu");
   revalidatePath("/");
+  invalidatePublicCache("menu", business.id);
 }
 
 function flatten(error: { issues: { path: PropertyKey[]; message: string }[] }) {

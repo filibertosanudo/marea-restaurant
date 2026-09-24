@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicCache } from "@/lib/cache/public";
 import { prisma } from "@/lib/prisma";
 import { Prisma, UserRole } from "@/lib/generated/prisma/client";
 import { requireRole } from "@/lib/auth/permissions";
@@ -180,6 +181,7 @@ export async function createPromotionAction(
   }
 
   revalidatePath("/admin/promociones");
+  invalidatePublicCache("promotions", business.id);
   return { success: true };
 }
 
@@ -269,6 +271,7 @@ export async function updatePromotionAction(
   }
 
   revalidatePath("/admin/promociones");
+  invalidatePublicCache("promotions", business.id);
   return { success: true };
 }
 
@@ -293,6 +296,7 @@ export async function toggleActivePromotionAction(
     throw err;
   }
   revalidatePath("/admin/promociones");
+  invalidatePublicCache("promotions", business.id);
   return { success: true };
 }
 
@@ -309,5 +313,6 @@ export async function deletePromotionAction(id: string): Promise<{ success: true
     throw err;
   }
   revalidatePath("/admin/promociones");
+  invalidatePublicCache("promotions", business.id);
   return { success: true };
 }

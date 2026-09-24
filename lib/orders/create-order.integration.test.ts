@@ -186,6 +186,23 @@ describe("createOrderFromCart", () => {
     expect(untrackedMovements).toBe(0);
   });
 
+  it("flags the public menu as stale only when a tracked dish just sold out", async () => {
+    const business = await makeBusiness();
+    const category = await makeMenuCategory(business.id);
+    const plentiful = await makeMenuItem(business.id, category.id, { trackInventory: true, stockQuantity: 5 });
+    const lastOne = await makeMenuItem(business.id, category.id, { trackInventory: true, stockQuantity: 1 });
+
+    const cartA = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cartA.id, menuItemId: plentiful.id, quantity: 1 } });
+    const partial = await checkout(cartA, business);
+    expect(partial.publicCacheStale).toEqual({ menu: false, promotions: false });
+
+    const cartB = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cartB.id, menuItemId: lastOne.id, quantity: 1 } });
+    const soldOut = await checkout(cartB, business);
+    expect(soldOut.publicCacheStale).toEqual({ menu: true, promotions: false });
+  });
+
   it("rejects a discontinued dish", async () => {
     const business = await makeBusiness();
     const category = await makeMenuCategory(business.id);

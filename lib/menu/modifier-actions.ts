@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicCache } from "@/lib/cache/public";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
 import { getCurrentBusiness } from "@/lib/business";
@@ -87,6 +88,7 @@ export async function createModifierGroupAction(
   });
 
   revalidatePath("/admin/menu/modificadores");
+  invalidatePublicCache("menu", business.id);
   return { success: true };
 }
 
@@ -143,6 +145,7 @@ export async function updateModifierGroupAction(
   ]);
 
   revalidatePath("/admin/menu/modificadores");
+  invalidatePublicCache("menu", business.id);
   return { success: true };
 }
 
@@ -158,6 +161,7 @@ export async function deleteModifierGroupAction(id: string): Promise<{ blocked: 
     data: { deletedAt: new Date() },
   });
   revalidatePath("/admin/menu/modificadores");
+  invalidatePublicCache("menu", business.id);
   return { blocked: false };
 }
 
@@ -203,6 +207,7 @@ export async function createModifierOptionAction(
   });
 
   revalidatePath("/admin/menu/modificadores");
+  invalidatePublicCache("menu", business.id);
   return { success: true };
 }
 
@@ -253,6 +258,7 @@ export async function updateModifierOptionAction(
   ]);
 
   revalidatePath("/admin/menu/modificadores");
+  invalidatePublicCache("menu", business.id);
   return { success: true };
 }
 
@@ -264,6 +270,7 @@ export async function deleteModifierOptionAction(id: string) {
     data: { deletedAt: new Date(), isAvailable: false },
   });
   revalidatePath("/admin/menu/modificadores");
+  invalidatePublicCache("menu", business.id);
 }
 
 function flatten(error: { issues: { path: PropertyKey[]; message: string }[] }) {

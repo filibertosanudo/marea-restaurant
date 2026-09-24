@@ -4,7 +4,7 @@ import { pickTranslation } from "@/lib/i18n/translations";
 import { getPromotionStatus } from "@/lib/promotions/status";
 import { formatWeeklyHours } from "@/lib/business/opening-hours-format";
 import type { OpeningHourWindow } from "@/lib/reservations/availability";
-import type { Promotion, PromotionTranslation, Testimonial, TestimonialTranslation } from "@/lib/generated/prisma/client";
+import type { LandingPromotion } from "@/lib/promotions/queries";
 
 const LOCALES: Lang[] = ["en", "es"];
 
@@ -38,8 +38,11 @@ export type LandingBusinessInfo = {
   email: string | null;
 };
 
-type RawPromotion = Promotion & { translations: PromotionTranslation[] };
-type RawTestimonial = Testimonial & { translations: TestimonialTranslation[] };
+type RawTestimonial = {
+  authorName: string;
+  rating: number | null;
+  translations: { locale: string; quote: string }[];
+};
 type RawBusinessTranslation = {
   locale: string;
   tagline: string | null;
@@ -48,7 +51,7 @@ type RawBusinessTranslation = {
   aboutBody: string | null;
 };
 
-function toLandingOffers(promotions: RawPromotion[], lang: Lang, now: Date): LandingOffer[] {
+function toLandingOffers(promotions: LandingPromotion[], lang: Lang, now: Date): LandingOffer[] {
   return promotions
     .filter((p) => getPromotionStatus(p, now) === "active")
     .slice(0, MAX_OFFERS)
@@ -75,7 +78,7 @@ function toLandingTestimonials(testimonials: RawTestimonial[], lang: Lang): Land
  * to resolve the other locale later.
  */
 export function toLandingContentByLang(input: {
-  promotions: RawPromotion[];
+  promotions: LandingPromotion[];
   testimonials: RawTestimonial[];
   businessTranslations: RawBusinessTranslation[];
   openingHours: OpeningHourWindow[];

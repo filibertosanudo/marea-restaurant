@@ -2,6 +2,8 @@ import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/lib/generated/prisma/client";
+import { cachedPublicRead } from "@/lib/cache/public";
+import { toPublicMenuByLang } from "@/lib/menu/public-menu";
 
 // Centralized catalog queries — every read goes through here so
 // `deletedAt: null` is never a `where` clause someone forgets to repeat
@@ -183,6 +185,18 @@ export async function getPublicMenuRaw(businessId: string) {
 }
 
 /**
+ * The landing's and /menu's read: the same menu as getPublicMenuRaw, already
+ * turned into its per-language DTO (strings only, so it survives the data
+ * cache). Everything a guest's session could change, the cart and the table,
+ * is read separately and never enters this.
+ */
+export function getPublicMenuByLang(businessId: string) {
+  return cachedPublicRead("menu", "public-menu", businessId, async () =>
+    toPublicMenuByLang(await getPublicMenuRaw(businessId))
+  );
+}
+
+/**
  * One dish photo for Open Graph / Twitter Card sharing — Business has no
  * cover-photo field of its own (no upload flow exists for one), so a link
  * shared in WhatsApp uses a real, already-uploaded dish photo instead of
@@ -191,12 +205,14 @@ export async function getPublicMenuRaw(businessId: string) {
  * the same dish shows every time, not a different one per request.
  */
 export const getRepresentativeMenuImageUrl = cache(async (businessId: string): Promise<string | null> => {
-  const item = await prisma.menuItem.findFirst({
-    where: { businessId, deletedAt: null, isAvailable: true, imageUrl: { not: null } },
-    orderBy: [{ category: { sortOrder: "asc" } }, { sortOrder: "asc" }],
-    select: { imageUrl: true },
+  return cachedPublicRead("menu", "representative-image", businessId, async () => {
+    const item = await prisma.menuItem.findFirst({
+      where: { businessId, deletedAt: null, isAvailable: true, imageUrl: { not: null } },
+      orderBy: [{ category: { sortOrder: "asc" } }, { sortOrder: "asc" }],
+      select: { imageUrl: true },
+    });
+    return item?.imageUrl ?? null;
   });
-  return item?.imageUrl ?? null;
 });
 
 /**

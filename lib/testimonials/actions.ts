@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidatePublicCache } from "@/lib/cache/public";
 import { prisma } from "@/lib/prisma";
 import { Prisma, UserRole } from "@/lib/generated/prisma/client";
 import { requireRole } from "@/lib/auth/permissions";
@@ -29,6 +30,7 @@ export async function approveTestimonialAction(id: string): Promise<ModerationRe
     throw err;
   }
   revalidatePath(TESTIMONIALS_PATH);
+  invalidatePublicCache("testimonials", business.id);
   return { success: true };
 }
 
@@ -46,6 +48,7 @@ export async function rejectTestimonialAction(id: string): Promise<ModerationRes
     throw err;
   }
   revalidatePath(TESTIMONIALS_PATH);
+  invalidatePublicCache("testimonials", business.id);
   return { success: true };
 }
 
@@ -65,6 +68,7 @@ export async function toggleFeaturedTestimonialAction(
     throw err;
   }
   revalidatePath(TESTIMONIALS_PATH);
+  invalidatePublicCache("testimonials", business.id);
   return { success: true };
 }
 
@@ -95,5 +99,6 @@ export async function reorderTestimonialsAction(orderedIds: string[]): Promise<M
     throw err;
   }
   revalidatePath(TESTIMONIALS_PATH);
+  invalidatePublicCache("testimonials", business.id);
   return { success: true };
 }
