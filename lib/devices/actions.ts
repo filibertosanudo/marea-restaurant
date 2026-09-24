@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
 import { ADMIN_ROLES, STAFF_ROLES } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { deviceSchema } from "@/lib/devices/schemas";
 import { generateDeviceToken } from "@/lib/devices/token";
 import { getActivePrinterStatus } from "@/lib/devices/queries";
@@ -22,7 +22,7 @@ export async function createDeviceAction(
   formData: FormData
 ): Promise<DeviceFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = deviceSchema.safeParse({ name: String(formData.get("name") ?? "") });
   if (!parsed.success) {
@@ -45,7 +45,7 @@ export type RotateTokenResult = { ok: true; token: string } | { ok: false; error
 /** Invalidates the old token immediately — overwriting tokenHash in place, same "reissue, don't append" pattern as RestaurantTable's QR rotation. The old token stops authenticating the instant this commits. */
 export async function rotateDeviceTokenAction(deviceId: string): Promise<RotateTokenResult> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const { token, tokenHash } = generateDeviceToken();
   const result = await prisma.device.updateMany({
@@ -61,7 +61,7 @@ export async function rotateDeviceTokenAction(deviceId: string): Promise<RotateT
 /** Deactivate/reactivate — never a hard delete, so PrintJob history (lockedBy pointing at this device's id) keeps meaning "which device printed this" even after the printer is replaced. */
 export async function setDeviceActiveAction(deviceId: string, isActive: boolean): Promise<void> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   await prisma.device.updateMany({
     where: { id: deviceId, businessId: business.id },
@@ -79,7 +79,7 @@ export async function setDeviceActiveAction(deviceId: string, isActive: boolean)
  */
 export async function getPrinterStatusAction(): Promise<{ lastSeenAt: string | null }> {
   await requireRole(...STAFF_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   const printer = await getActivePrinterStatus(business.id);
   return { lastSeenAt: printer?.lastSeenAt?.toISOString() ?? null };
 }

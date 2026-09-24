@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
-import { getCurrentBusiness, invalidateBusinessCache } from "@/lib/business";
+import { getBusinessForRequest, invalidateBusinessCache } from "@/lib/business";
 import { invalidatePublicCache } from "@/lib/cache/public";
 import { localWallClockToUtc } from "@/lib/reservations/availability";
 import { parseDateParam } from "@/lib/reservations/schemas";
@@ -30,7 +30,7 @@ export type UpdateOpeningHoursResult =
  */
 export async function updateOpeningHoursAction(days: DayScheduleInput[]): Promise<UpdateOpeningHoursResult> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = weeklyScheduleSchema.safeParse({ days });
   if (!parsed.success) return { error: "invalid", dayErrors: {} };
@@ -90,7 +90,7 @@ export async function createClosureAction(
   formData: FormData
 ): Promise<SettingsFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = closureSchema.safeParse({
     date: formData.get("date"),
@@ -124,7 +124,7 @@ export async function createClosureAction(
 
 export async function deleteClosureAction(id: string): Promise<void> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   await prisma.businessClosure.deleteMany({ where: { id, businessId: business.id } });
   revalidatePath("/admin/configuracion");
 }
@@ -134,7 +134,7 @@ export async function updateBusinessSettingsAction(
   formData: FormData
 ): Promise<SettingsFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = businessSettingsSchema.safeParse({
     defaultLocale: formData.get("defaultLocale"),
@@ -170,7 +170,7 @@ export async function updateBusinessTranslationAction(
   formData: FormData
 ): Promise<SettingsFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = businessTranslationSchema.safeParse({
     en: {

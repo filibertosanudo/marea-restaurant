@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
 import { isAdminRole } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { hashPassword } from "@/lib/auth/password";
 import { teamMemberSchema } from "@/lib/team/schemas";
 import { UserRole } from "@/lib/generated/prisma/client";
@@ -42,7 +42,7 @@ export async function createTeamMemberAction(
   formData: FormData
 ): Promise<TeamFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = teamMemberSchema.safeParse({
     name: String(formData.get("name") ?? ""),
@@ -83,7 +83,7 @@ export async function createTeamMemberAction(
 
 export async function setTeamMemberActiveAction(membershipId: string, isActive: boolean): Promise<TeamMutationResult> {
   const session = await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const membership = await prisma.businessMembership.findFirst({
     where: { id: membershipId, businessId: business.id },
@@ -131,7 +131,7 @@ export async function setTeamMemberRoleAction(
   role: "STAFF" | "BUSINESS_ADMIN"
 ): Promise<TeamMutationResult> {
   const session = await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const membership = await prisma.businessMembership.findFirst({
     where: { id: membershipId, businessId: business.id },

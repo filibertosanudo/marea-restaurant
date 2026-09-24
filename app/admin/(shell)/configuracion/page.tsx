@@ -1,6 +1,6 @@
 import { UserRole } from "@/lib/generated/prisma/client";
 import { requirePageRole } from "@/lib/auth/permissions";
-import { getCurrentBusiness, getBusinessTranslations } from "@/lib/business";
+import { getBusinessForRequest, getBusinessTranslations } from "@/lib/business";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getOpeningHours } from "@/lib/reservations/queries";
@@ -15,7 +15,7 @@ import { toDeviceDTO } from "@/lib/devices/dto";
 export default async function SettingsPage() {
   await requirePageRole("/admin/menu", UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN);
 
-  const [business, lang] = await Promise.all([getCurrentBusiness(), getAdminLang()]);
+  const [business, lang] = await Promise.all([getBusinessForRequest(), getAdminLang()]);
   const dict = getDictionary(lang).settings;
 
   const [openingHours, closures, translations, notificationJobs, notificationsDueCount, devices] = await Promise.all([

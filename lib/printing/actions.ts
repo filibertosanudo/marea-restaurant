@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
 import { STAFF_ROLES } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { enqueueKitchenTicket } from "@/lib/printing/queue";
 import { buildKitchenTicketDocument } from "@/lib/printing/kitchen-ticket";
 import type { Lang } from "@/lib/i18n/lang";
@@ -20,7 +20,7 @@ export type ReprintResult = { ok: true } | { ok: false; error: "not_found" };
  */
 export async function reprintKitchenTicketAction(orderId: string): Promise<ReprintResult> {
   await requireRole(...STAFF_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const order = await prisma.order.findFirst({
     where: { id: orderId, businessId: business.id },
