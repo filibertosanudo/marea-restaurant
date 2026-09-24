@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusiness } from "@/lib/business";
 import { appOrigin } from "@/lib/env";
 import type { Lang } from "@/lib/i18n/lang";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
@@ -36,7 +36,7 @@ export async function subscribeAction(email: string, lang: Lang): Promise<Subscr
   }
   await recordScopeAttempt(SUBSCRIBE_SCOPE, ip);
 
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
 
   await prisma.$transaction(async (tx) => {
     const existing = await tx.newsletterSubscriber.findUnique({

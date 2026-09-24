@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Montserrat_Alternates, Poppins } from "next/font/google";
 import { headers } from "next/headers";
 import { CSP_NONCE_HEADER } from "@/lib/security/csp";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusiness } from "@/lib/business";
 import { resolveSiteMetadataText } from "@/lib/seo/site-metadata";
 import "./globals.css";
 
@@ -45,7 +45,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const nonce = (await headers()).get(CSP_NONCE_HEADER) ?? undefined;
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
 
   return (
     // suppressHydrationWarning: the inline script below sets data-theme

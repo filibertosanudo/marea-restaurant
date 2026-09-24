@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { MareaLandingPage } from "@/components/marea-landing/MareaLandingPage";
-import { getCurrentBusiness, getPublicBusinessTranslations } from "@/lib/business";
+import { getPublicBusiness, getPublicBusinessTranslations } from "@/lib/business";
 import { getPublicMenuByLang, getRepresentativeMenuImageUrl } from "@/lib/menu/queries";
 import { listFeaturedPromotionsForLanding } from "@/lib/promotions/queries";
 import { listFeaturedTestimonialsForLanding } from "@/lib/testimonials/queries";
@@ -11,7 +11,7 @@ import { buildRestaurantJsonLd } from "@/lib/seo/restaurant-jsonld";
 import { appOrigin } from "@/lib/env";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   const [{ title, description }, image] = await Promise.all([
     resolveSiteMetadataText(),
     getRepresentativeMenuImageUrl(business.id),
@@ -38,7 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home() {
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
 
   const [menuByLang, promotions, testimonials, businessTranslations, openingHours, image, { description }] =
     await Promise.all([

@@ -6,7 +6,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import { requestPasswordResetSchema, resetPasswordSchema } from "@/lib/auth/schemas";
 import { generateResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from "@/lib/auth/reset-token";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusiness } from "@/lib/business";
 import { appOrigin } from "@/lib/env";
 
 const RESET_REQUEST_MAX_ATTEMPTS = 5;
@@ -66,7 +66,7 @@ export async function requestPasswordResetAction(
   }
 
   const { token, tokenHash } = generateResetToken();
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   const resetUrl = `${appOrigin()}/admin/reset-password/${token}`;
 
   // Outbox pattern, same as reservation/order confirmations: the job is
