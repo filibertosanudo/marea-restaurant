@@ -160,7 +160,7 @@ export async function updateBusinessSettingsAction(
 
   revalidatePath("/admin/configuracion");
   revalidatePath("/");
-  invalidateBusinessCache(business.id);
+  invalidateBusinessCache(business);
   return { success: true };
 }
 
@@ -210,6 +210,6 @@ export async function updateBusinessTranslationAction(
 
   revalidatePath("/admin/configuracion");
   revalidatePath("/");
-  invalidateBusinessCache(business.id);
+  invalidateBusinessCache(business);
   return { success: true };
 }

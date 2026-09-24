@@ -47,6 +47,10 @@ const schema = z
     // Which Business row this deployment serves. Single-tenant only: goes
     // away when the business is resolved per request (module 17, Fase 2).
     BUSINESS_SLUG: withDefault(z.string().min(1).default("marea")),
+    // The domain business subdomains hang off (`<slug>.<this>`). Missing:
+    // the host of APP_ORIGIN, which is right whenever the app is served from
+    // the bare root domain.
+    BUSINESS_ROOT_DOMAIN: optional(z.string().min(1)),
     AUTH_SECRET: z.string().min(1),
     AUTH_URL: optional(z.string().url()),
     APP_ORIGIN: optional(z.string().url()),

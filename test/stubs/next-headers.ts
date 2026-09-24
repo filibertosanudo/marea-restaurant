@@ -41,6 +41,17 @@ export function runWithCookies<T>(cookiesIn: Record<string, string>, fn: () => T
   return als.run(new Map(Object.entries(cookiesIn)), fn);
 }
 
+let testHost: string | null = null;
+
+/** Sets the Host every headers() call reports until clearTestHost(): the test-side equivalent of the request arriving on that subdomain. */
+export function setTestHost(host: string): void {
+  testHost = host;
+}
+
+export function clearTestHost(): void {
+  testHost = null;
+}
+
 export function headers(): Headers {
-  return new Headers();
+  return testHost ? new Headers({ host: testHost }) : new Headers();
 }
