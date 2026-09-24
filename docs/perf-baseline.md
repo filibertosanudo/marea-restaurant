@@ -86,16 +86,44 @@ nobody is listening (so its notification goes nowhere), and the screen is told
 to refresh 1.2 s later, after the reconnect and the sweep. A new LISTEN backend
 appears under a new pid.
 
-### What one board event costs a screen (`router.refresh()`)
+### What one board event costs a screen (phase 4)
 
-Measured with 54 live orders. Each event makes **every** connected screen do
-this, whichever order changed.
+Before, every event made every connected screen call `router.refresh()`: the
+whole board re-rendered on the server and its payload came back. Now an event
+names the orders that changed and the screen fetches only those cards.
 
-| | Before | After |
+| Per event, per screen | Before | After |
 |---|---|---|
-| Statements per event, per screen | 12 | |
-| Response body per event (RSC payload) | 64,773 B raw, 15,571 B gzip | |
-| Full page load of `/admin/pedidos` | 326,025 B raw, 25,695 B gzip, 12 statements | |
+| What the screen downloads | 64,773 B (15,571 B gzip) with 54 live orders; about 1.2 KB per live order, so about 180 KB at 150 (extrapolated, not measured) | **680 B (415 B gzip)**, whatever the board holds |
+| Statements | 12 | **8** (seven for the card's relations, one for the column totals) |
+
+Prisma 7 loads each relation with a statement of its own, and
+`relationLoadStrategy: "join"` is not in this client, so a board card costs
+seven statements wherever it is read; the count of *reads* is what could come down.
+
+| First paint and reconcile | Before | After |
+|---|---|---|
+| `/admin/pedidos` render, 150 live orders | one read of every live order (no cap) | first 50 of each live column: **82.5 KB (17.9 KB gzip), 15 statements** |
+| Same page with one read per column (an intermediate step) | | 25 statements |
+| Delivered column | in the page render | fetched after first paint, and kept across refreshes |
+
+**Idle screen, a real browser, two minutes** (`node scripts/perf/measure.mjs
+page-idle /admin/pedidos 130`, first paint excluded): **board 25.4 statements a
+minute, kitchen screen 21.2**, against 121 before (about 5x fewer). What is
+left is not the stream: it is the 60 s reconcile (one page render, 15
+statements) and the JWT re-check that each request after 60 s does
+(`BusinessMembership` and `User`, about 5 per render). **The module hoped the
+per-screen figure would fall by two orders of magnitude; with a full re-read
+every minute, as specified, it cannot go below about 20.** Two ways to get closer,
+neither done: a reconcile every 5 minutes instead of 1 (about 5 a minute), or a
+reconcile that compares a checksum of the board's first pages, one statement
+for the whole process instead of a page render per screen.
+
+Also in this phase: columns cap at 50 cards with "ver más" (the total stays in
+the badge), the optimistic move shows in about 100 ms with the server action
+held for 1.5 s and reverts when the action fails, and a reconnect after a
+dropped stream refreshes the screen. `node scripts/perf/board-drill.mjs` runs
+23 of these checks in a headless browser.
 
 ### Public pages
 
