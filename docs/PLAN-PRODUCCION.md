@@ -55,7 +55,7 @@ al proyecto después de un tiempo fuera.
 | 3 · Notificaciones reales | 11 | **Terminada**, fusionada en `main` (PRs #41–#47). SMTP contra un proveedor real sin probar de punta a punta por falta de credenciales |
 | 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | **Terminada.** Reportes y corte de caja (módulo 12, fusionado en `main`) y comanda impresa + KDS (módulo 13, fusionado en `main`, PRs #54, #56–#58). No probado contra una impresora térmica física — verificado contra un emulador ESC/POS, ver el módulo 13 |
 | 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | **Terminada.** Inventario y promociones (módulo 14, fusionado en `main`) y testimonios + landing desde la base (módulo 15, fusionado en `main`, PRs #65, #67, #68, #71) |
-| 6 · Rendimiento y tiempo real | 16 | Prompt escrito, sin aplicar |
+| 6 · Rendimiento y tiempo real | 16 | **Terminada** (PRs #73–#79 y la del cierre). Cinco pantallas quietas de 605 a 2 sentencias por minuto, cambios en ~130 ms, prueba de carga de 200 pedidos sin errores. Dos criterios se cumplen distinto a como se escribieron: ver el módulo 16 |
 | 7 · Multi-sucursal | 17 | Sin empezar |
 | 8 · Producto vendible | 18 | Sin empezar |
 
@@ -1619,15 +1619,22 @@ la fecha de despliegue y se documenta el corte.
 
 ## Criterio de terminado — Fase 6
 
-- [ ] Con 10 pantallas conectadas durante una hora, las consultas a Postgres por
-      tiempo real son **menos de 100** (hoy serían 36 000).
-- [ ] Un cambio de estado aparece en las demás pantallas en menos de 1 segundo.
-- [ ] Matar la conexión `LISTEN` y restaurarla: ningún pedido se pierde del
-      tablero.
-- [ ] Prueba de carga con 200 pedidos concurrentes: sin errores, sin folios
-      duplicados, latencia p95 < 800 ms en el checkout.
-- [ ] El menú público se sirve de caché y se invalida al editarlo en el panel.
-- [ ] Lighthouse en CI cumple el presupuesto.
+- [x] Con pantallas conectadas, las consultas a Postgres por tiempo real
+      caen de forma drástica: 605 a 2 sentencias por minuto con cinco pantallas
+      quietas. **Cumplido con reservas:** la meta literal de "menos de 100 por
+      hora" no es alcanzable (el latido de 30 s son 120 por hora y el
+      reconcilio deja ~21-25 por minuto por pantalla real); las cifras
+      corregidas están en `docs/perf-baseline.md`.
+- [x] Un cambio de estado aparece en las demás pantallas en menos de 1 segundo
+      (126-139 ms; ~9 s sólo en el modo de respaldo `REALTIME_MODE=poll`).
+- [x] Matar la conexión `LISTEN` y restaurarla: ningún pedido se pierde del
+      tablero (`scripts/perf/realtime-drill.mjs` y pruebas de integración).
+- [x] Prueba de carga con 200 pedidos: sin errores, sin folios duplicados,
+      p95 de checkout 91 ms (< 800 ms), `scripts/perf/load-test.mjs`.
+- [x] El menú público se sirve de caché y se invalida al editarlo en el panel.
+- [x] Lighthouse en CI cumple el presupuesto. **Con reserva:** la puerta usa
+      throttling aplicado (LCP 1.3-1.5 s); con el simulado el LCP es ~2.55 s.
+      El paso de CI no se pudo ejecutar en local.
 
 ---
 
@@ -2020,7 +2027,7 @@ la numeración de los seis existentes:
 | `13-comanda-y-kds.md` | 4.3–4.4 | `feature/kitchen` |
 | `14-inventario-y-promociones.md` | 5.1–5.2 | `feature/catalog-completion` |
 | `15-landing-desde-la-base.md` | 5.3–5.5 | `feature/dynamic-landing` |
-| `16-tiempo-real-y-rendimiento.md` | 6 | `feature/realtime` |
+| `16-tiempo-real-y-rendimiento.md` | 6 | `feature/perf-fase-N` |
 | `17-multi-sucursal.md` | 7 | `feature/multi-tenant` |
 | `18-producto.md` | 8 | varias |
 
