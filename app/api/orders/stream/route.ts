@@ -22,6 +22,13 @@ const KEEP_ALIVE_MS = 20_000;
 const MAX_EVENTS_PER_UPDATE = 50;
 
 /**
+ * After announcing a handoff the old stream keeps delivering for this long, so
+ * the client can open its replacement first and lose nothing in between (see
+ * lib/realtime/stream-client.ts). It ends sooner when the client closes it.
+ */
+const HANDOFF_GRACE_MS = 5_000;
+
+/**
  * The push channel for the board, the kitchen screen and order tracking. It
  * used to poll the database itself every 2 s per connected screen; now it
  * subscribes to the process-wide hub (lib/realtime/hub.ts), which listens to
@@ -123,14 +130,15 @@ export async function GET(request: NextRequest) {
           setTimeout(() => {
             // A plain close() here would look identical to a real drop to the
             // client: EventSource fires the same "error" event for any
-            // server-initiated close, so useEventStream would flip to
-            // "offline" every ~75s on a healthy connection. Telling the
-            // client first lets it close and reconnect itself instead — a
-            // client-initiated close() never fires "error" — so the scheduled
-            // handoff never shows as an outage on a kitchen display that's
-            // read at a glance, not debugged.
+            // server-initiated close, so the hook would flip to "offline"
+            // every ~75s on a healthy connection. Telling the client first
+            // lets it open the next stream, then close this one itself — a
+            // client-initiated close() never fires "error" — so the handoff
+            // never shows as an outage on a kitchen display read at a glance,
+            // and never leaves a moment in which nothing is listening. This
+            // stream stays subscribed until then, or until the grace runs out.
             send(`event: reconnect\ndata: ${Date.now()}\n\n`);
-            close();
+            timers.push(setTimeout(close, HANDOFF_GRACE_MS));
           }, env.SSE_MAX_LIFETIME_MS)
         );
       }

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Dropdown } from "./Dropdown";
 import { STR, type Lang } from "./content";
 import { getReservationSlotsAction, createReservationAction } from "@/lib/reservations/actions";
-import { MAX_BOOKING_HORIZON_DAYS } from "@/lib/reservations/schemas";
+import { MAX_BOOKING_HORIZON_DAYS } from "@/lib/reservations/limits";
 
 type SlotsState = "idle" | "loading" | "loaded";
 type SubmitState = "idle" | "submitting" | "success";

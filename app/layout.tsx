@@ -8,14 +8,16 @@ import "./globals.css";
 
 const montserratAlternates = Montserrat_Alternates({
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["600", "700"],
   variable: "--font-montserrat-alternates",
+  preload: false,
 });
 
 const poppins = Poppins({
   subsets: ["latin"],
   weight: ["300", "400", "500"],
   variable: "--font-poppins",
+  preload: false,
 });
 
 /**

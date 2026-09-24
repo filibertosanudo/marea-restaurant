@@ -33,6 +33,14 @@ const nextConfig = {
   // still traced into the standalone output, just not passed through the
   // bundler pass that applies that condition.
   serverExternalPackages: ["@react-email/render", "@react-email/components"],
+  experimental: {
+    // Both stylesheets are render-blocking, so a first visitor waits a round
+    // trip for them before the first paint. Inlined, the HTML carries them.
+    // The cost is that each page's HTML repeats the CSS instead of the browser
+    // caching it, which favours the public pages (mostly first visits) over
+    // the panel (all repeat visits).
+    inlineCss: true,
+  },
   images: {
     // Only the storage host, never a wildcard — an open remote pattern
     // turns Next's image optimizer into an SSRF proxy for any URL an

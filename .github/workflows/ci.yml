@@ -161,6 +161,14 @@ jobs:
           E2E_DATABASE_URL: postgresql://marea:${{ env.POSTGRES_PASSWORD }}@localhost:5434/marea
         run: npm run test:e2e
 
+      # The same stack the E2E suite just ran against. Fails the build when the
+      # public landing's LCP passes 2.5 s or its CLS passes 0.1 on Slow 4G
+      # (median of 3 runs; see scripts/perf/lighthouse-budget.mjs for why the
+      # throttling is applied rather than simulated). Lighthouse is fetched by
+      # npx at a pinned version, so nothing is added to package.json.
+      - name: Performance budget (Lighthouse)
+        run: node scripts/perf/lighthouse-budget.mjs http://localhost:3000/ 3
+
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
