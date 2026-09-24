@@ -1,5 +1,5 @@
 import "server-only";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { getPublicMenuByLang } from "@/lib/menu/queries";
 import { getCartWithLivePrices } from "@/lib/cart/queries";
 import { getTableIdFromCookie } from "@/lib/cart/cookie";
@@ -17,7 +17,7 @@ import type { RestaurantTable } from "@/lib/generated/prisma/client";
  * nothing here needs to wait on it, so it stays out of the awaited batch.
  */
 export async function getMenuPageData(explicitTable?: RestaurantTable | null) {
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   const lang = await getOrderLang(business.defaultLocale === "en" ? "en" : "es");
   const dict = getOrderDictionary(lang);
 

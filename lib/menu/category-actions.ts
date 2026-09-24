@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { invalidatePublicCache } from "@/lib/cache/public";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { buildCategorySchema } from "@/lib/menu/schemas";
 import { UserRole } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
@@ -35,7 +35,7 @@ export async function createCategoryAction(
   formData: FormData
 ): Promise<CategoryFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = buildCategorySchema(business.defaultLocale as Lang).safeParse({
     translations: readTranslationsFromForm(formData),
@@ -90,7 +90,7 @@ export async function updateCategoryAction(
   formData: FormData
 ): Promise<CategoryFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "missing id" };
 
@@ -140,7 +140,7 @@ export async function updateCategoryAction(
 
 export async function toggleCategoryActiveAction(id: string, isActive: boolean) {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   await prisma.menuCategory.update({
     where: { id, businessId: business.id },
     data: { isActive },
@@ -152,7 +152,7 @@ export async function toggleCategoryActiveAction(id: string, isActive: boolean) 
 
 export async function reorderCategoriesAction(orderedIds: string[]) {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   await prisma.$transaction(
     orderedIds.map((id, index) =>
       prisma.menuCategory.update({
@@ -170,7 +170,7 @@ export async function deleteCategoryAction(
   id: string
 ): Promise<{ blocked: boolean }> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const itemCount = await prisma.menuItem.count({
     where: { categoryId: id, businessId: business.id, deletedAt: null },

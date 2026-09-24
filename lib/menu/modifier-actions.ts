@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { invalidatePublicCache } from "@/lib/cache/public";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { buildModifierGroupSchema, buildModifierOptionSchema } from "@/lib/menu/schemas";
 import { slugify } from "@/lib/menu/slugify";
 import { UserRole } from "@/lib/generated/prisma/client";
@@ -51,7 +51,7 @@ export async function createModifierGroupAction(
   formData: FormData
 ): Promise<ModifierFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = buildModifierGroupSchema(business.defaultLocale as Lang).safeParse({
     translations: readNameTranslations(formData),
@@ -97,7 +97,7 @@ export async function updateModifierGroupAction(
   formData: FormData
 ): Promise<ModifierFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "missing id" };
 
@@ -151,7 +151,7 @@ export async function updateModifierGroupAction(
 
 export async function deleteModifierGroupAction(id: string): Promise<{ blocked: boolean }> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const appliedCount = await prisma.menuItemModifierGroup.count({ where: { groupId: id } });
   if (appliedCount > 0) return { blocked: true };
@@ -170,7 +170,7 @@ export async function createModifierOptionAction(
   formData: FormData
 ): Promise<ModifierFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   const groupId = String(formData.get("groupId") ?? "");
 
   const group = await prisma.modifierGroup.findFirst({
@@ -216,7 +216,7 @@ export async function updateModifierOptionAction(
   formData: FormData
 ): Promise<ModifierFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   const id = String(formData.get("id") ?? "");
   const groupId = String(formData.get("groupId") ?? "");
   if (!id) return { error: "missing id" };
@@ -264,7 +264,7 @@ export async function updateModifierOptionAction(
 
 export async function deleteModifierOptionAction(id: string) {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   await prisma.modifierOption.updateMany({
     where: { id, group: { businessId: business.id } },
     data: { deletedAt: new Date(), isAvailable: false },

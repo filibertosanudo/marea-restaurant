@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { invalidatePublicCache } from "@/lib/cache/public";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { buildMenuItemSchema } from "@/lib/menu/schemas";
 import { UserRole } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
@@ -65,7 +65,7 @@ export async function createMenuItemAction(
   formData: FormData
 ): Promise<MenuItemFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = buildMenuItemSchema(business.defaultLocale as Lang).safeParse(
     readMenuItemForm(formData)
@@ -123,7 +123,7 @@ export async function updateMenuItemAction(
   formData: FormData
 ): Promise<MenuItemFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "missing id" };
 
@@ -243,7 +243,7 @@ export async function updateMenuItemAction(
 
 export async function toggleAvailabilityAction(id: string, isAvailable: boolean) {
   await requireRole(...STAFF_UP_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   await prisma.menuItem.update({
     where: { id, businessId: business.id },
     data: { isAvailable },
@@ -271,7 +271,7 @@ export async function adjustMenuItemStockAction(
   delta: number
 ): Promise<AdjustStockState> {
   const session = await requireRole(...STAFF_UP_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   if (!Number.isInteger(delta) || delta === 0) return { error: "invalid_delta" };
 
   const result = await prisma.$transaction(async (tx) => {
@@ -326,7 +326,7 @@ export async function adjustMenuItemStockAction(
 
 export async function softDeleteMenuItemAction(id: string) {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   await prisma.menuItem.update({
     where: { id, businessId: business.id },
     data: { deletedAt: new Date(), isAvailable: false },
