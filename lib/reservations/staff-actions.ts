@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole, ForbiddenError } from "@/lib/auth/permissions";
 import { STAFF_ROLES, ADMIN_ROLES } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { canTransitionReservation } from "./state-machine";
 import { isTableFreeForRange, BLOCKING_STATUSES } from "./availability";
 import { getReservationsOverlapping } from "./queries";
@@ -108,7 +108,7 @@ export async function confirmReservationAction(
 ): Promise<ReservationActionState> {
   const forbidden = await requireRoleOrForbidden(...STAFF_ROLES);
   if (forbidden) return forbidden;
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -156,7 +156,7 @@ export async function reassignReservationTableAction(
 ): Promise<ReservationActionState> {
   const forbidden = await requireRoleOrForbidden(...STAFF_ROLES);
   if (forbidden) return forbidden;
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -185,7 +185,7 @@ export async function reassignReservationTableAction(
 export async function seatReservationAction(reservationId: string): Promise<ReservationActionState> {
   const forbidden = await requireRoleOrForbidden(...STAFF_ROLES);
   if (forbidden) return forbidden;
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const result = await prisma.$transaction((tx) =>
     transitionReservation(tx, business.id, reservationId, "SEATED", { seatedAt: new Date() })
@@ -198,7 +198,7 @@ export async function seatReservationAction(reservationId: string): Promise<Rese
 export async function completeReservationAction(reservationId: string): Promise<ReservationActionState> {
   const forbidden = await requireRoleOrForbidden(...STAFF_ROLES);
   if (forbidden) return forbidden;
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const result = await prisma.$transaction((tx) => transitionReservation(tx, business.id, reservationId, "COMPLETED"));
   if (result?.error) return result;
@@ -216,7 +216,7 @@ export async function completeReservationAction(reservationId: string): Promise<
 export async function markNoShowAction(reservationId: string): Promise<ReservationActionState> {
   const forbidden = await requireRoleOrForbidden(...STAFF_ROLES);
   if (forbidden) return forbidden;
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const result = await prisma.$transaction((tx) =>
     transitionReservation(tx, business.id, reservationId, "NO_SHOW", {}, (reservation) =>
@@ -238,7 +238,7 @@ export async function cancelReservationAction(
   const forbidden = await requireRoleOrForbidden(...ADMIN_ROLES);
   if (forbidden) return forbidden;
 
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   const trimmedReason = reason.trim();
   if (!trimmedReason) return { error: "reason_required" };
 

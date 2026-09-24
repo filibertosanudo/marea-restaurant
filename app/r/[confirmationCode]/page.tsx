@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusiness } from "@/lib/business";
 import { getReservationByConfirmationCode } from "@/lib/reservations/queries";
 import { toReservationLookupDTO, RESERVATION_STATUS_LABEL_KEY } from "@/lib/reservations/dto";
 import { getOrderLang } from "@/lib/i18n/cookie";
@@ -28,7 +28,7 @@ export default async function ReservationLookupPage({
   if (await isScopeRateLimited(LOOKUP_SCOPE, ip)) notFound();
   await recordScopeAttempt(LOOKUP_SCOPE, ip);
 
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   const lang = await getOrderLang(business.defaultLocale === "en" ? "en" : "es");
   const dict = getReservationDictionary(lang);
 

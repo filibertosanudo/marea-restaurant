@@ -1,7 +1,7 @@
 import { UserRole } from "@/lib/generated/prisma/client";
 import { requirePageRole } from "@/lib/auth/permissions";
 import { isAdminRole } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { localWallClockToUtc, businessLocalDateParts } from "@/lib/reservations/availability";
@@ -36,7 +36,7 @@ export default async function ReservationsAgendaPage({
   );
   const canCancel = isAdminRole(session.user.role);
 
-  const [business, lang] = await Promise.all([getCurrentBusiness(), getAdminLang()]);
+  const [business, lang] = await Promise.all([getBusinessForRequest(), getAdminLang()]);
   const dict = getDictionary(lang).reservations;
 
   const params = await searchParams;

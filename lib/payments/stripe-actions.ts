@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusiness } from "@/lib/business";
 import { getOrderForPaymentIntentByPublicToken } from "@/lib/orders/queries";
 import { stripe } from "@/lib/stripe/client";
 import { toStripeAmount } from "./amount";
@@ -50,7 +50,7 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
   // against is incurred on every attempt, not just a successful one.
   await recordScopeAttempt(INTENT_SCOPE, ip);
 
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   if (!business.acceptsOnlinePayment) return { ok: false, error: "online_payment_disabled" };
 
   const order = await getOrderForPaymentIntentByPublicToken(business.id, publicToken);
