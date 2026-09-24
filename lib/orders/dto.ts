@@ -99,8 +99,11 @@ export type BoardOrderDTO = {
 };
 
 type RawBoardOrder = Order & {
-  table: RestaurantTable | null;
-  items: (OrderItem & { modifiers: OrderItemModifier[] })[];
+  // A projection, matching BOARD_INCLUDE: the card never reads more.
+  table: Pick<RestaurantTable, "code"> | null;
+  items: (Pick<OrderItem, "id" | "nameSnapshot" | "quantity" | "notes"> & {
+    modifiers: Pick<OrderItemModifier, "nameSnapshot">[];
+  })[];
   // A projection, not the full Payment/Refund rows — matches BOARD_INCLUDE's
   // own `select` in lib/orders/queries.ts, which only ever pulls the fields
   // this function actually reads below.

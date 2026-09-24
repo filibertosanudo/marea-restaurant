@@ -1054,8 +1054,13 @@ model OrderItemModifier {
 /// historial completo con timestamp y autor. Se separa porque:
 ///   - permite medir tiempos reales (¿cuánto tarda PENDING → READY?),
 ///   - da trazabilidad de quién canceló,
-///   - alimenta el feed en tiempo real (Supabase Realtime escucha INSERTs
-///     aquí, que son inmutables, en vez de UPDATEs sobre Order).
+///   - alimenta el feed en tiempo real: los INSERTs aquí son inmutables, por eso
+///     el trigger escucha esta tabla y no los UPDATEs sobre Order.
+///
+/// Real-time: an AFTER INSERT trigger calls pg_notify('marea_realtime', ...) on
+/// every row. Prisma cannot express it, so it lives in the hand-written
+/// migration `add_realtime_notify_triggers`, invisible from application code.
+/// See that file for the payload and lib/realtime/ for the listener.
 model OrderStatusEvent {
   id          String       @id @default(cuid())
   orderId     String
@@ -1079,6 +1084,11 @@ model OrderStatusEvent {
 /// Un pedido puede tener VARIOS pagos: un intento que falló y otro que
 /// funcionó, o una cuenta dividida entre dos tarjetas, o anticipo + resto.
 /// Por eso Payment es 1-a-muchos desde Order y no columnas en Order.
+///
+/// Real-time: an AFTER INSERT OR UPDATE trigger (migration
+/// `add_realtime_notify_triggers`) notifies the board. A cash collection or a
+/// webhook-settled card payment changes only this table, with no
+/// OrderStatusEvent, so anything that writes a Payment is also a board event.
 model Payment {
   id         String @id @default(cuid())
   businessId String
@@ -1159,6 +1169,10 @@ model Refund {
 /// a partial index). Without that constraint two concurrent open shifts
 /// could each claim the same CASH_REGISTER payments, and neither corte would
 /// reconcile against what's really in the one physical drawer.
+///
+/// Real-time: opening or closing a shift fires the `marea_realtime` trigger from
+/// migration `add_realtime_notify_triggers`, so a second device watching the
+/// same board sees it.
 model CashSession {
   id         String @id @default(cuid())
   businessId String
@@ -1193,6 +1207,9 @@ model CashSession {
 /// Cash in or out of the drawer that isn't a customer payment: a deposit to
 /// the safe, paying a produce supplier, a cash refund. Without this, the
 /// expected total at close can never match what a real shift actually did.
+///
+/// Real-time: an AFTER INSERT trigger (migration `add_realtime_notify_triggers`)
+/// resolves the business through `cashSessionId` and notifies the board.
 model CashMovement {
   id            String           @id @default(cuid())
   cashSessionId String

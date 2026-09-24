@@ -40,3 +40,6 @@ export const BOARD_COLUMNS: { status: BoardColumnStatus }[] = [
   { status: "READY" },
   { status: "DELIVERED" },
 ];
+
+/** What the kitchen screen shows: its job ends at Listo, so no Entregado and no Cancelados. */
+export const KITCHEN_COLUMNS: BoardColumnStatus[] = ["PENDING", "PREPARING", "READY"];

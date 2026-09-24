@@ -1,13 +1,27 @@
 import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
 import {
-  listBoardOrdersRaw,
+  listBoardPageRaw,
+  type BoardFilters,
   listCancelledOrdersRaw,
   listActiveTablesRaw,
-  listKitchenBoardOrdersRaw,
   getOrderByPublicToken,
 } from "./queries";
+import { BOARD_COLUMNS, KITCHEN_COLUMNS } from "./state-machine";
 import { makeBusiness, makeOrder } from "@/test/factories";
+
+// The board used to read every column in one query; it now reads a page per
+// column. These helpers rebuild "everything the board shows" from the pages, so
+// the original assertions below still say what they always said.
+async function listBoardOrdersRaw(businessId: string, filters: BoardFilters = {}) {
+  const pages = await Promise.all(BOARD_COLUMNS.map(({ status }) => listBoardPageRaw(businessId, status, filters)));
+  return pages.flatMap((page) => page.orders);
+}
+
+async function listKitchenBoardOrdersRaw(businessId: string) {
+  const pages = await Promise.all(KITCHEN_COLUMNS.map((status) => listBoardPageRaw(businessId, status)));
+  return pages.flatMap((page) => page.orders).sort((a, b) => a.placedAt.getTime() - b.placedAt.getTime());
+}
 
 describe("listBoardOrdersRaw", () => {
   it("includes live statuses and filters by table", async () => {

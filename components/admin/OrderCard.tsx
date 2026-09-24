@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { formatMoney } from "@/lib/dto/money";
 import type { BoardOrderDTO } from "@/lib/orders/dto";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
-import { advanceOrderStatusAction, collectCashPaymentAction } from "@/lib/orders/board-actions";
+import { collectCashPaymentAction } from "@/lib/orders/board-actions";
 import { reprintKitchenTicketAction } from "@/lib/printing/actions";
 import { shortFolio } from "@/lib/orders/folio-format";
 import { getNextStatus } from "@/lib/orders/state-machine";
@@ -24,11 +24,14 @@ import type { JobStatus } from "@/lib/generated/prisma/client";
  */
 export type BoardDensity = "kitchen" | "waiter";
 
-const ADVANCE_LABEL_KEY = {
+// A partial record indexed by the real status, not a const object reached
+// through a cast: a status with no label is `undefined` to handle, never an
+// empty button (the kitchen card had exactly that bug).
+const ADVANCE_LABEL_KEY: Partial<Record<BoardOrderDTO["status"], keyof AdminDictionary["orders"]>> = {
   PENDING: "advanceFromPending",
   PREPARING: "advanceFromPreparing",
   READY: "advanceFromReady",
-} as const;
+};
 
 // How long a just-placed order gets the "new" pulse border + badge. Owned
 // here (not passed from the board) so it ticks on its own, same reasoning
@@ -134,6 +137,7 @@ export function OrderCard({
   canCancel,
   onCancel,
   onViewPayment,
+  onAdvance,
   density,
 }: {
   order: BoardOrderDTO;
@@ -142,6 +146,8 @@ export function OrderCard({
   canCancel: boolean;
   onCancel: (order: BoardOrderDTO) => void;
   onViewPayment: (order: BoardOrderDTO) => void;
+  /** Owned by the board, which moves the card at once and puts it back if this fails. */
+  onAdvance: (order: BoardOrderDTO) => Promise<void>;
   density: BoardDensity;
 }) {
   const [pending, startTransition] = useTransition();
@@ -156,11 +162,17 @@ export function OrderCard({
   }, [order.placedAt]);
 
   const nextStatus = getNextStatus(order.status);
+  const advanceLabelKey = ADVANCE_LABEL_KEY[order.status];
   const isDelivered = order.status === "DELIVERED";
 
   function advance() {
+    // Called in the click itself, outside the transition: React holds every
+    // update made inside an async transition until it finishes, and the move
+    // is meant to show before the server has answered. The transition only
+    // keeps the button disabled until it does.
+    const settled = onAdvance(order);
     startTransition(async () => {
-      await advanceOrderStatusAction(order.id);
+      await settled;
     });
   }
 
@@ -300,7 +312,7 @@ export function OrderCard({
               {collectError && <p className="text-[13px] font-medium text-error">{collectError}</p>}
             </>
           )}
-          {nextStatus && (
+          {nextStatus && advanceLabelKey && (
             <button
               type="button"
               onClick={advance}
@@ -309,7 +321,7 @@ export function OrderCard({
                 s.advanceButton
               } ${nextStatus === "DELIVERED" ? "bg-success" : "bg-primary hover:bg-primary-hover"}`}
             >
-              {dict[ADVANCE_LABEL_KEY[order.status as keyof typeof ADVANCE_LABEL_KEY]]}
+              {dict[advanceLabelKey]}
               <svg
                 width={s.advanceIcon}
                 height={s.advanceIcon}

@@ -1,10 +1,26 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import type { OrderType, Prisma } from "@/lib/generated/prisma/client";
+import { Prisma } from "@/lib/generated/prisma/client";
+import type { OrderType } from "@/lib/generated/prisma/client";
+import type { BoardColumnStatus } from "@/lib/orders/state-machine";
+import type { BoardCursor } from "@/lib/orders/board-cursor";
 
 const BOARD_INCLUDE = {
-  table: true,
-  items: { include: { modifiers: true }, orderBy: { createdAt: "asc" as const } },
+  // Only what a card reads (toBoardOrderDTO): the table's code, and for each
+  // line its name, quantity, note and its modifiers' names. The full rows also
+  // carry prices, ids of the catalogue rows and timestamps the card never
+  // shows, on every event and every refresh.
+  table: { select: { code: true } },
+  items: {
+    select: {
+      id: true,
+      nameSnapshot: true,
+      quantity: true,
+      notes: true,
+      modifiers: { select: { nameSnapshot: true } },
+    },
+    orderBy: { createdAt: "asc" as const },
+  },
   // Every payment attempt, not just the latest — the card deciding whether
   // to show "Cobrar" reads computePaymentSummary over all of them (a card
   // attempt that failed, or that the guest abandoned for cash, must not
@@ -46,9 +62,97 @@ export type BoardFilters = {
   tableId?: string;
 };
 
-/** Pendiente · En preparación · Listo · Entregado (recent) — everything the kitchen board's columns need, one query. */
-export async function listBoardOrdersRaw(businessId: string, filters: BoardFilters = {}) {
+/** Cards per column on first paint, and per "ver más". A kitchen with more than this pending has a problem scrolling does not solve. */
+export const BOARD_PAGE_SIZE = 50;
+
+function columnWhere(businessId: string, status: BoardColumnStatus, filters: BoardFilters): Prisma.OrderWhereInput {
+  return {
+    businessId,
+    status,
+    // Live statuses show regardless of age; DELIVERED only inside the recent window.
+    ...(status === "DELIVERED" ? { placedAt: { gte: new Date(Date.now() - RECENT_WINDOW_MS) } } : {}),
+    ...(filters.orderType ? { type: filters.orderType } : {}),
+    ...(filters.tableId ? { tableId: filters.tableId } : {}),
+  };
+}
+
+/**
+ * One page of one board column, oldest first. Fetches one card more than asked
+ * so `hasMore` is known without a second count. `after` is the last card of the
+ * previous page (see board-cursor.ts).
+ */
+export async function listBoardPageRaw(
+  businessId: string,
+  status: BoardColumnStatus,
+  filters: BoardFilters = {},
+  page: { after?: BoardCursor | null; take?: number } = {}
+) {
+  const take = page.take ?? BOARD_PAGE_SIZE;
+  const after = page.after;
+  const base = columnWhere(businessId, status, filters);
+  const rows = await prisma.order.findMany({
+    where: after
+      ? {
+          AND: [
+            base,
+            {
+              OR: [
+                { placedAt: { gt: new Date(after.placedAt) } },
+                { placedAt: new Date(after.placedAt), id: { gt: after.id } },
+              ],
+            },
+          ],
+        }
+      : base,
+    orderBy: [{ placedAt: "asc" }, { id: "asc" }],
+    take: take + 1,
+    include: BOARD_INCLUDE,
+  });
+  return { orders: rows.slice(0, take), hasMore: rows.length > take };
+}
+
+/**
+ * The first page of several columns at once, for first paint. One statement
+ * ranks each column's orders and keeps the first `perColumn` ids, then one read
+ * fetches those cards. Prisma loads every relation with a statement of its own
+ * (seven for a board card), so three column queries cost about twenty-one
+ * statements a render and this costs about eight, on a page that re-reads
+ * every minute.
+ */
+export async function listBoardFirstPagesRaw(
+  businessId: string,
+  statuses: BoardColumnStatus[],
+  filters: BoardFilters = {},
+  perColumn: number = BOARD_PAGE_SIZE
+) {
+  const type = filters.orderType ? Prisma.sql`AND type = ${filters.orderType}::"OrderType"` : Prisma.empty;
+  const table = filters.tableId ? Prisma.sql`AND "tableId" = ${filters.tableId}` : Prisma.empty;
+  const ranked = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT id FROM (
+      SELECT id, row_number() OVER (PARTITION BY status ORDER BY "placedAt", id) AS n
+      FROM "Order"
+      WHERE "businessId" = ${businessId}
+        AND status = ANY(${statuses}::"OrderStatus"[])
+        ${type}
+        ${table}
+    ) ranked
+    WHERE n <= ${perColumn}
+  `;
+  if (ranked.length === 0) return [];
   return prisma.order.findMany({
+    where: { id: { in: ranked.map((row) => row.id) } },
+    orderBy: [{ placedAt: "asc" }, { id: "asc" }],
+    include: BOARD_INCLUDE,
+  });
+}
+
+/** How many cards each column holds in total, in one statement: the badge shows this, whatever page is loaded. */
+export async function countBoardOrdersRaw(
+  businessId: string,
+  filters: BoardFilters = {}
+): Promise<Record<BoardColumnStatus, number>> {
+  const groups = await prisma.order.groupBy({
+    by: ["status"],
     where: {
       businessId,
       OR: [
@@ -58,16 +162,29 @@ export async function listBoardOrdersRaw(businessId: string, filters: BoardFilte
       ...(filters.orderType ? { type: filters.orderType } : {}),
       ...(filters.tableId ? { tableId: filters.tableId } : {}),
     },
-    orderBy: { placedAt: "asc" },
-    include: BOARD_INCLUDE,
+    _count: { _all: true },
   });
+  const totals: Record<BoardColumnStatus, number> = { PENDING: 0, PREPARING: 0, READY: 0, DELIVERED: 0 };
+  for (const group of groups) {
+    if (group.status in totals) totals[group.status as BoardColumnStatus] = group._count._all;
+  }
+  return totals;
 }
 
-/** The kitchen screen's own read: Pendiente · En preparación · Listo, and nothing else — no Entregado, no Cancelados. It has no tabs and no history to show, so it has no reason to fetch either. */
-export async function listKitchenBoardOrdersRaw(businessId: string) {
+/**
+ * The cards for orders a live event named, in any status: a card that just
+ * moved to DELIVERED or CANCELLED comes back so the board can move or drop it.
+ * Scoped to the business and to the board's own filters, so an order the
+ * current view would not show is simply absent from the result.
+ */
+export async function listBoardOrdersByIdsRaw(businessId: string, ids: string[], filters: BoardFilters = {}) {
   return prisma.order.findMany({
-    where: { businessId, status: { in: ["PENDING", "PREPARING", "READY"] } },
-    orderBy: { placedAt: "asc" },
+    where: {
+      businessId,
+      id: { in: ids },
+      ...(filters.orderType ? { type: filters.orderType } : {}),
+      ...(filters.tableId ? { tableId: filters.tableId } : {}),
+    },
     include: BOARD_INCLUDE,
   });
 }

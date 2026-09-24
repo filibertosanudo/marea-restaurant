@@ -6,10 +6,13 @@ import { getCurrentBusiness } from "@/lib/business";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import {
-  listBoardOrdersRaw,
+  countBoardOrdersRaw,
+  listBoardFirstPagesRaw,
   listCancelledOrdersRaw,
   listActiveTablesRaw,
 } from "@/lib/orders/queries";
+import { EMPTY_TOTALS } from "@/lib/orders/board-state";
+import { BOARD_COLUMNS } from "@/lib/orders/state-machine";
 import { toBoardOrderDTO } from "@/lib/orders/dto";
 import { OrdersBoard } from "@/components/admin/OrdersBoard";
 import type { OrderType } from "@/lib/generated/prisma/client";
@@ -47,8 +50,13 @@ export default async function OrdersBoardPage({
   const [business, lang] = await Promise.all([getCurrentBusiness(), getAdminLang()]);
   const dict = getDictionary(lang);
 
-  const [boardOrders, cancelledOrders, tables, openSession] = await Promise.all([
-    tab === "board" ? listBoardOrdersRaw(business.id, filters) : Promise.resolve([]),
+  // First paint carries the first page of each live column and every column's
+  // total. The delivered column is not read here: the board asks for it after
+  // it has painted, so a refresh never pays for it.
+  const liveColumns = BOARD_COLUMNS.filter(({ status }) => status !== "DELIVERED").map(({ status }) => status);
+  const [boardOrders, totals, cancelledOrders, tables, openSession] = await Promise.all([
+    tab === "board" ? listBoardFirstPagesRaw(business.id, liveColumns, filters) : Promise.resolve([]),
+    tab === "board" ? countBoardOrdersRaw(business.id, filters) : Promise.resolve(EMPTY_TOTALS),
     tab === "cancelled" ? listCancelledOrdersRaw(business.id, filters) : Promise.resolve([]),
     listActiveTablesRaw(business.id),
     getOpenCashSessionRaw(business.id),
@@ -60,7 +68,8 @@ export default async function OrdersBoardPage({
 
   return (
     <OrdersBoard
-      boardOrders={boardOrders.map(toBoardOrderDTO)}
+      orders={boardOrders.map(toBoardOrderDTO)}
+      totals={totals}
       cancelledOrders={cancelledOrders.map(toBoardOrderDTO)}
       tables={tables}
       dict={dict.orders}

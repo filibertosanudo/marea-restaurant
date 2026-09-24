@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import type { BoardOrderDTO } from "@/lib/orders/dto";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
-import { useEventStream } from "@/lib/realtime/useEventStream";
+import { useLiveBoard } from "@/components/admin/useLiveBoard";
+import { LoadMoreButton } from "@/components/admin/LoadMoreButton";
+import type { ColumnTotals } from "@/lib/orders/board-state";
 import { playChime, primeAudio } from "@/lib/realtime/chime";
 import { getPrinterStatusAction } from "@/lib/devices/actions";
 import { KitchenColumn } from "./KitchenColumn";
@@ -145,30 +146,33 @@ function usePrinterStatus(initialLastSeenAt: string | null) {
 
 export function KitchenBoard({
   orders,
+  totals,
   dict,
   printerLastSeenAt,
 }: {
+  /** The first page of each column, oldest first. */
   orders: BoardOrderDTO[];
+  totals: ColumnTotals;
   dict: KitchenDict;
   printerLastSeenAt: string | null;
 }) {
-  const router = useRouter();
   const [soundEnabled, toggleSound] = usePersistedSound();
   const [isFullscreen, toggleFullscreen] = useFullscreen();
   const printer = usePrinterStatus(printerLastSeenAt);
   useWakeLock();
 
-  useEventStream("/api/orders/stream", () => router.refresh());
-
-  const knownOrderIds = useRef<Set<string> | null>(null);
-  useEffect(() => {
-    const currentIds = new Set(orders.map((o) => o.id));
-    if (knownOrderIds.current) {
-      const hasNewOrder = [...currentIds].some((id) => !knownOrderIds.current!.has(id));
-      if (hasNewOrder && soundEnabled) playChime();
-    }
-    knownOrderIds.current = currentIds;
-  }, [orders, soundEnabled]);
+  const { view, hasMore, loadMore, loadingMore, advance } = useLiveBoard({
+    orders,
+    totals,
+    filters: {},
+    deltas: true,
+    includeDelivered: false,
+    // The kitchen has no till to keep in step.
+    refreshOnCash: false,
+    onNewOrders: () => {
+      if (soundEnabled) playChime();
+    },
+  });
 
   useEffect(() => {
     function primeOnce() {
@@ -216,11 +220,27 @@ export function KitchenBoard({
 
       <div className="flex flex-1 gap-[1px] overflow-hidden bg-border/20">
         {COLUMNS.map(({ status, key }) => {
-          const columnOrders = orders.filter((o) => o.status === status);
+          const columnOrders = view.columns[status];
           return (
-            <KitchenColumn key={status} title={dict[key]} count={columnOrders.length} emptyLabel={dict.emptyColumn}>
+            <KitchenColumn
+              key={status}
+              title={dict[key]}
+              count={view.totals[status]}
+              emptyLabel={dict.emptyColumn}
+              footer={
+                hasMore(status) && (
+                  <LoadMoreButton
+                    label={dict.loadMore}
+                    remaining={view.totals[status] - columnOrders.length}
+                    loading={loadingMore[status] === true}
+                    onClick={() => void loadMore(status)}
+                    size="kitchen"
+                  />
+                )
+              }
+            >
               {columnOrders.map((order) => (
-                <KitchenOrderCard key={order.id} order={order} dict={dict} />
+                <KitchenOrderCard key={order.id} order={order} dict={dict} onAdvance={advance} />
               ))}
             </KitchenColumn>
           );

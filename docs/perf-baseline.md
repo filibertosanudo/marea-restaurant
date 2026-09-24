@@ -48,24 +48,82 @@ figure, not the estimate.
 
 ### Realtime: statements to Postgres with the board open and idle
 
-| Scenario | Before | After |
+Phase 3 replaces the per-screen poll with one dedicated `LISTEN` connection per
+web process, fed by `pg_notify` triggers on the four tables the old signature
+watched (`OrderStatusEvent`, `Payment`, `CashSession`, `CashMovement`).
+
+| Scenario | Before (polling) | After (LISTEN) | After (forced polling fallback) |
+|---|---|---|---|
+| 1 board screen, per minute | 121 | 3 (2 heartbeats, 1 cache fill) | not measured (same loop as 5 screens) |
+| 5 screens (kitchen, till, 3 waiters), per minute | 605 | **2** | 29 |
+| 5 screens, per hour | 36,300 | **120** | about 1,740 |
+| Cost grows with screens? | linearly | no | no (one loop for every screen) |
+| SSE bytes per minute per screen | 232 | 29 | 29 |
+
+The 2 statements a minute are the listener's own heartbeat (`SELECT
+pg_notify(...)` every 30 s), the price of noticing a connection that is up but
+deaf. **The module's goal was "fewer than 100 an hour with five screens"; the
+heartbeat alone is 120.** Setting `HEARTBEAT_INTERVAL_MS` to 60 s gives 60 an
+hour at the cost of a slower detection of a dead channel (up to about 65 s
+instead of 35 s). It was left at 30 s because a kitchen wall screen is the one
+place that must not stay stale, and nothing else in the loop costs a statement.
+
+| Latency of one change (an order advanced through the real admin action) | |
+|---|---|
+| LISTEN, 10 samples | median 126-139 ms, max 146 ms |
+| Forced polling fallback (`REALTIME_MODE=poll`), 5 samples | median 9.1 s, max 9.5 s (interval 10 s) |
+
+These figures were measured with raw SSE clients. A real screen adds a page
+refresh (about 12 statements) only after a connection that dropped, not on the
+server's scheduled 75 s handoff: the first version of the client refreshed on
+both, which review caught as about 2,900 statements an hour for five screens,
+and `shouldRefreshOnOpen` now excludes the handoff (`useEventStream.test.ts`).
+
+**Killing the LISTEN connection** (`node scripts/perf/realtime-drill.mjs kill`,
+and `recovery.integration.test.ts`): the server's `marea_realtime_listen`
+backend is terminated with `pg_terminate_backend`, an order is advanced while
+nobody is listening (so its notification goes nowhere), and the screen is told
+to refresh 1.2 s later, after the reconnect and the sweep. A new LISTEN backend
+appears under a new pid.
+
+### What one board event costs a screen (phase 4)
+
+Before, every event made every connected screen call `router.refresh()`: the
+whole board re-rendered on the server and its payload came back. Now an event
+names the orders that changed and the screen fetches only those cards.
+
+| Per event, per screen | Before | After |
 |---|---|---|
-| 1 board screen, per minute | 121 (4 polls x 30 ticks + 1 for the business) | |
-| 1 board screen, per hour | 7,260 | |
-| 5 screens (kitchen, till, 3 waiters), per minute | 605 | |
-| 5 screens, per hour | 36,300 | |
-| SSE bytes per minute per screen | 232 | |
+| What the screen downloads | 64,773 B (15,571 B gzip) with 54 live orders; about 1.2 KB per live order, so about 180 KB at 150 (extrapolated, not measured) | **680 B (415 B gzip)**, whatever the board holds |
+| Statements | 12 | **8** (seven for the card's relations, one for the column totals) |
 
-### What one board event costs a screen (`router.refresh()`)
+Prisma 7 loads each relation with a statement of its own, and
+`relationLoadStrategy: "join"` is not in this client, so a board card costs
+seven statements wherever it is read; the count of *reads* is what could come down.
 
-Measured with 54 live orders. Each event makes **every** connected screen do
-this, whichever order changed.
-
-| | Before | After |
+| First paint and reconcile | Before | After |
 |---|---|---|
-| Statements per event, per screen | 12 | |
-| Response body per event (RSC payload) | 64,773 B raw, 15,571 B gzip | |
-| Full page load of `/admin/pedidos` | 326,025 B raw, 25,695 B gzip, 12 statements | |
+| `/admin/pedidos` render, 150 live orders | one read of every live order (no cap) | first 50 of each live column: **82.5 KB (17.9 KB gzip), 15 statements** |
+| Same page with one read per column (an intermediate step) | | 25 statements |
+| Delivered column | in the page render | fetched after first paint, and kept across refreshes |
+
+**Idle screen, a real browser, two minutes** (`node scripts/perf/measure.mjs
+page-idle /admin/pedidos 130`, first paint excluded): **board 25.4 statements a
+minute, kitchen screen 21.2**, against 121 before (about 5x fewer). What is
+left is not the stream: it is the 60 s reconcile (one page render, 15
+statements) and the JWT re-check that each request after 60 s does
+(`BusinessMembership` and `User`, about 5 per render). **The module hoped the
+per-screen figure would fall by two orders of magnitude; with a full re-read
+every minute, as specified, it cannot go below about 20.** Two ways to get closer,
+neither done: a reconcile every 5 minutes instead of 1 (about 5 a minute), or a
+reconcile that compares a checksum of the board's first pages, one statement
+for the whole process instead of a page render per screen.
+
+Also in this phase: columns cap at 50 cards with "ver más" (the total stays in
+the badge), the optimistic move shows in about 100 ms with the server action
+held for 1.5 s and reverts when the action fails, and a reconnect after a
+dropped stream refreshes the screen. `node scripts/perf/board-drill.mjs` runs
+23 of these checks in a headless browser.
 
 ### Public pages
 

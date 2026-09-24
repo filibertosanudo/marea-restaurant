@@ -12,11 +12,14 @@ export function KitchenColumn({
   count,
   children,
   emptyLabel,
+  footer,
 }: {
   title: string;
   count: number;
   children: ReactNode;
   emptyLabel: string;
+  /** Below the cards: "ver más" when the column holds more than it shows. */
+  footer?: ReactNode;
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col bg-surface-subtle">
@@ -34,9 +37,12 @@ export function KitchenColumn({
           // 1920px TV leave ~600px per column after padding/gaps, and a
           // wider minimum would round back down to a single track there —
           // defeating the entire point of a grid over a vertical list.
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-[6px]">
-            {children}
-          </div>
+          <>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-[6px]">
+              {children}
+            </div>
+            {footer && <div className="pt-[8px]">{footer}</div>}
+          </>
         )}
       </div>
     </div>
