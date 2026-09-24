@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole, ForbiddenError } from "@/lib/auth/permissions";
 import { STAFF_ROLES, ADMIN_ROLES } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { invalidatePublicCache } from "@/lib/cache/public";
 import { getNextStatus, isCancellable } from "@/lib/orders/state-machine";
 import { cancelOpenPayments, markPaymentSucceeded } from "@/lib/payments/actions";
@@ -48,7 +48,7 @@ async function lockOrderForUpdate(
  */
 export async function advanceOrderStatusAction(orderId: string): Promise<BoardActionState> {
   const session = await requireRole(...STAFF_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const result = await prisma.$transaction(async (tx) => {
     if (!(await lockOrderForUpdate(tx, business.id, orderId))) return { error: "not_found" } as const;
@@ -123,7 +123,7 @@ export async function cancelOrderAction(
     throw err;
   }
 
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   const trimmedReason = reason.trim();
   if (!trimmedReason) return { error: "reason_required" };
 
@@ -248,7 +248,7 @@ export async function cancelOrderAction(
 /** "Cobrar en efectivo" — STAFF and up, per the matrix. Only ever touches this order's own CASH_REGISTER/PENDING payment. */
 export async function collectCashPaymentAction(orderId: string): Promise<BoardActionState> {
   const session = await requireRole(...STAFF_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   let result;
   try {

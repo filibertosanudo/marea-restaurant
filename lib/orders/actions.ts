@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusiness } from "@/lib/business";
 import { invalidatePublicCache } from "@/lib/cache/public";
 import { createOrderFromCart, CheckoutError } from "@/lib/orders/create-order";
 import { checkoutSchema } from "@/lib/orders/schemas";
@@ -53,7 +53,7 @@ export async function createOrderAction(
     return { error: "rate_limited" };
   }
 
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
 
   let order;
   try {

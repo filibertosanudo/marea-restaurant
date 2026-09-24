@@ -2,7 +2,7 @@ import { UserRole } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requirePageRole } from "@/lib/auth/permissions";
 import { isAdminRole } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import {
@@ -47,7 +47,7 @@ export default async function OrdersBoardPage({
   const tab = params.tab === "cancelled" ? "cancelled" : "board";
   const filters = { orderType: parseOrderType(params.type), tableId: params.table || undefined };
 
-  const [business, lang] = await Promise.all([getCurrentBusiness(), getAdminLang()]);
+  const [business, lang] = await Promise.all([getBusinessForRequest(), getAdminLang()]);
   const dict = getDictionary(lang);
 
   // First paint carries the first page of each live column and every column's

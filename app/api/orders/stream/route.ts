@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { STAFF_ROLES } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest, getPublicBusiness } from "@/lib/business";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
 import { getRealtimeHub } from "@/lib/realtime/runtime";
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
   let scope: Subscription;
   let isStaff: boolean;
   if (publicToken) {
-    const business = await getCurrentBusiness();
+    const business = await getPublicBusiness();
     const order = await prisma.order.findFirst({
       where: { businessId: business.id, publicToken },
       select: { id: true },
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     if (!session?.user || session.user.revoked || !STAFF_ROLES.includes(session.user.role)) {
       return new Response("Forbidden", { status: 403 });
     }
-    const business = await getCurrentBusiness();
+    const business = await getBusinessForRequest();
     scope = { businessId: business.id };
     isStaff = true;
   }

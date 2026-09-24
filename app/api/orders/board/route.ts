@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { STAFF_ROLES } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { toBoardOrderDTO } from "@/lib/orders/dto";
 import { decodeBoardCursor } from "@/lib/orders/board-cursor";
 import {
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     orderType: type === "DINE_IN" || type === "TAKEAWAY" ? (type as OrderType) : undefined,
     tableId: params.get("table") || undefined,
   };
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const rawIds = params.get("ids");
   if (rawIds !== null) {
