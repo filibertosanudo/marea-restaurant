@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { UserRole } from "@/lib/generated/prisma/client";
 import { requirePageRole } from "@/lib/auth/permissions";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { resolveReportRange, type ReportRangeKey, type CalendarDate } from "@/lib/reports/date-range";
@@ -36,7 +36,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   await requirePageRole("/admin/menu", UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN);
 
   const params = await searchParams;
-  const [business, lang] = await Promise.all([getCurrentBusiness(), getAdminLang()]);
+  const [business, lang] = await Promise.all([getBusinessForRequest(), getAdminLang()]);
   const dict = getDictionary(lang).reports;
   const locale = toIntlLocale(lang);
 
