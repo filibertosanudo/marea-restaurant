@@ -76,14 +76,12 @@ export function applyDelta(
   found: BoardOrderDTO[],
   missing: string[],
   totals: ColumnTotals
-): { state: BoardState; added: string[] } {
+): BoardState {
   const orders = { ...state.orders };
-  const added: string[] = [];
 
   for (const id of missing) delete orders[id];
 
   for (const card of found) {
-    const previous = orders[card.id];
     delete orders[card.id];
     if (!isColumn(card.status)) continue; // CANCELLED: gone from the board
     if (card.status === "DELIVERED" && !state.deliveredLoaded) continue;
@@ -94,13 +92,20 @@ export function applyDelta(
     const last = column[column.length - 1];
     const fullyLoaded = totals[card.status] <= column.length + 1; // this card is the one to add
     const insideWindow = last !== undefined && compareCards(card, last) < 0;
-    if (fullyLoaded || insideWindow) {
-      orders[card.id] = card;
-      if (!previous) added.push(card.id);
-    }
+    if (fullyLoaded || insideWindow) orders[card.id] = card;
   }
 
-  return { state: { ...state, orders, totals: { ...totals } }, added };
+  return { ...state, orders, totals: { ...totals } };
+}
+
+/**
+ * Whether an order arrived between two counts: every order starts PENDING, so a
+ * larger PENDING total is a new order, and only that. Comparing which cards
+ * are held would ring for a card that merely slid into the first page when
+ * another left it.
+ */
+export function hasNewOrder(before: ColumnTotals, after: ColumnTotals): boolean {
+  return after.PENDING > before.PENDING;
 }
 
 /**

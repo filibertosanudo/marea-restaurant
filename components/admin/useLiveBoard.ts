@@ -10,6 +10,7 @@ import {
   carryDelivered,
   fromSnapshot,
   hasMore as columnHasMore,
+  hasNewOrder,
   mergePage,
   nextCursor,
   viewOf,
@@ -71,8 +72,7 @@ export function useLiveBoard({ orders, totals, filters, deltas, includeDelivered
     setRenderedFrom({ orders, filterKey });
     const fresh = fromSnapshot(orders, totals);
     const sameView = renderedFrom.filterKey === filterKey;
-    const held = new Set(Object.keys(state.orders));
-    if (orders.some((order) => !held.has(order.id))) setChimeTick((tick) => tick + 1);
+    if (hasNewOrder(state.totals, totals)) setChimeTick((tick) => tick + 1);
     setState(sameView ? carryDelivered(fresh, state) : fresh);
     if (!sameView) setDeliveredAskedFor(null);
     setMoves({});
@@ -132,9 +132,9 @@ export function useLiveBoard({ orders, totals, filters, deltas, includeDelivered
       const response = await fetch(boardCardsUrl(ids, filtersRef.current), { headers: { accept: "application/json" } });
       if (!response.ok) throw new Error(`board cards: ${response.status}`);
       const body = (await response.json()) as { orders: BoardOrderDTO[]; missing: string[]; totals: ColumnTotals };
-      const result = applyDelta(stateRef.current, body.orders, body.missing, body.totals);
-      commit(result.state);
-      if (result.added.length > 0) setChimeTick((tick) => tick + 1);
+      const before = stateRef.current.totals;
+      commit(applyDelta(stateRef.current, body.orders, body.missing, body.totals));
+      if (hasNewOrder(before, body.totals)) setChimeTick((tick) => tick + 1);
       // The server has spoken for these orders: whatever was guessed for them is over.
       setMoves((current) => {
         const settled = new Set(ids);

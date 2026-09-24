@@ -116,9 +116,7 @@ export function OrdersBoard({
   const activeType = searchParams.get("type");
   const activeTable = searchParams.get("table");
 
-  // Chime only for a genuinely NEW order arriving, not every status click:
-  // the hook reports a card this screen did not hold, whether it came in a
-  // live event or in a fresh render.
+  // Chime only for a genuinely NEW order arriving, not every status click.
   const { view, hasMore, loadMore, loadingMore, advance, streamStatus } = useLiveBoard({
     orders,
     totals,

@@ -5,6 +5,7 @@ import {
   columnCards,
   fromSnapshot,
   hasMore,
+  hasNewOrder,
   mergePage,
   nextCursor,
   viewOf,
@@ -68,69 +69,66 @@ describe("snapshot", () => {
 });
 
 describe("a live delta", () => {
-  it("adds a new order to a column that is fully loaded, and reports it as new", () => {
+  it("adds a new order to a column that is fully loaded", () => {
     const state = fromSnapshot([card("a", "PENDING", 1)], totals({ PENDING: 1 }));
-    const { state: next, added } = applyDelta(state, [card("n", "PENDING", 9)], [], totals({ PENDING: 2 }));
+    const next = applyDelta(state, [card("n", "PENDING", 9)], [], totals({ PENDING: 2 }));
     expect(columnCards(next, "PENDING").map((c) => c.id)).toEqual(["a", "n"]);
-    expect(added).toEqual(["n"]);
     expect(next.totals.PENDING).toBe(2);
   });
 
-  it("moves a card to its new column and does not call it new", () => {
+  it("moves a card to its new column", () => {
     const state = fromSnapshot([card("a", "PENDING", 1)], totals({ PENDING: 1 }));
-    const { state: next, added } = applyDelta(state, [card("a", "PREPARING", 1)], [], totals({ PREPARING: 1 }));
+    const next = applyDelta(state, [card("a", "PREPARING", 1)], [], totals({ PREPARING: 1 }));
     expect(columnCards(next, "PENDING")).toEqual([]);
     expect(columnCards(next, "PREPARING").map((c) => c.id)).toEqual(["a"]);
-    expect(added).toEqual([]);
   });
 
   it("replaces a card in place when only its content changed, such as a payment", () => {
     const state = fromSnapshot([card("a", "PENDING", 1)], totals({ PENDING: 1 }));
     const paid = card("a", "PENDING", 1, { paymentReading: "PAID", canCollectCash: false });
-    const { state: next } = applyDelta(state, [paid], [], totals({ PENDING: 1 }));
+    const next = applyDelta(state, [paid], [], totals({ PENDING: 1 }));
     expect(next.orders.a.paymentReading).toBe("PAID");
   });
 
   it("drops a cancelled card and one the server no longer shows this view", () => {
     const state = fromSnapshot([card("a", "PENDING", 1), card("b", "PENDING", 2), card("c", "READY", 3)], totals({ PENDING: 2, READY: 1 }));
-    const { state: next } = applyDelta(state, [card("a", "CANCELLED", 1)], ["c"], totals({ PENDING: 1 }));
+    const next = applyDelta(state, [card("a", "CANCELLED", 1)], ["c"], totals({ PENDING: 1 }));
     expect(Object.keys(next.orders)).toEqual(["b"]);
     expect(next.totals).toEqual(totals({ PENDING: 1 }));
   });
 
   it("takes the totals from the server rather than adjusting them", () => {
     const state = fromSnapshot([card("a", "PENDING", 1)], totals({ PENDING: 80 }));
-    const { state: next } = applyDelta(state, [], [], totals({ PENDING: 83, READY: 2 }));
+    const next = applyDelta(state, [], [], totals({ PENDING: 83, READY: 2 }));
     expect(next.totals).toEqual(totals({ PENDING: 83, READY: 2 }));
   });
 
   it("leaves a new card that would sit beyond the loaded window for 'ver más'", () => {
     const loaded = Array.from({ length: 3 }, (_, i) => card(`p${i}`, "PENDING", i));
     const state = fromSnapshot(loaded, totals({ PENDING: 200 }));
-    const { state: next, added } = applyDelta(state, [card("late", "PENDING", 50)], [], totals({ PENDING: 201 }));
+    const next = applyDelta(state, [card("late", "PENDING", 50)], [], totals({ PENDING: 201 }));
     expect(next.orders.late).toBeUndefined();
-    expect(added).toEqual([]);
     expect(hasMore(next, "PENDING")).toBe(true);
   });
 
   it("still takes a card that falls inside the loaded window of a column with more", () => {
     const loaded = [card("p1", "PENDING", 10), card("p2", "PENDING", 20)];
     const state = fromSnapshot(loaded, totals({ PENDING: 200 }));
-    const { state: next } = applyDelta(state, [card("early", "READY", 15), card("mid", "PENDING", 15)], [], totals({ PENDING: 200, READY: 1 }));
+    const next = applyDelta(state, [card("early", "READY", 15), card("mid", "PENDING", 15)], [], totals({ PENDING: 200, READY: 1 }));
     expect(columnCards(next, "PENDING").map((c) => c.id)).toEqual(["p1", "mid", "p2"]);
     expect(columnCards(next, "READY").map((c) => c.id)).toEqual(["early"]);
   });
 
   it("does not add delivered cards before the delivered column has been asked for", () => {
     const state = fromSnapshot([card("a", "READY", 1)], totals({ READY: 1 }));
-    const { state: next } = applyDelta(state, [card("a", "DELIVERED", 1)], [], totals({ DELIVERED: 1 }));
+    const next = applyDelta(state, [card("a", "DELIVERED", 1)], [], totals({ DELIVERED: 1 }));
     expect(next.orders.a).toBeUndefined();
     expect(next.totals.DELIVERED).toBe(1);
   });
 
   it("adds delivered cards once the column is loaded", () => {
     const opened = mergePage(fromSnapshot([card("a", "READY", 1)], totals({ READY: 1, DELIVERED: 0 })), "DELIVERED", [], totals({ READY: 1 }));
-    const { state: next } = applyDelta(opened, [card("a", "DELIVERED", 1)], [], totals({ DELIVERED: 1 }));
+    const next = applyDelta(opened, [card("a", "DELIVERED", 1)], [], totals({ DELIVERED: 1 }));
     expect(columnCards(next, "DELIVERED").map((c) => c.id)).toEqual(["a"]);
   });
 });
@@ -187,5 +185,21 @@ describe("a fresh snapshot", () => {
   it("changes nothing when the delivered column was never opened", () => {
     const fresh = fromSnapshot([card("a", "PENDING", 2)], totals({ PENDING: 1 }));
     expect(carryDelivered(fresh, fromSnapshot([], totals()))).toBe(fresh);
+  });
+});
+
+describe("a new order", () => {
+  it("is a larger PENDING total, and nothing else", () => {
+    expect(hasNewOrder(totals({ PENDING: 3 }), totals({ PENDING: 4 }))).toBe(true);
+    expect(hasNewOrder(totals({ PENDING: 3 }), totals({ PENDING: 3 }))).toBe(false);
+    expect(hasNewOrder(totals({ PENDING: 3 }), totals({ PENDING: 2, PREPARING: 9 }))).toBe(false);
+  });
+
+  it("does not ring when a card slides into the first page because another left it", () => {
+    // 60 pending, 50 held; one is advanced and the 51st takes its place on the first page.
+    const held = Array.from({ length: 50 }, (_, i) => card(`p${String(i).padStart(2, "0")}`, "PENDING", i));
+    const before = fromSnapshot(held, totals({ PENDING: 60 }));
+    const afterTotals = totals({ PENDING: 59, PREPARING: 1 });
+    expect(hasNewOrder(before.totals, afterTotals)).toBe(false);
   });
 });
