@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getPublicBusiness } from "@/lib/business";
+import { canTakeOnlinePayments } from "@/lib/payments/availability";
 import { getOrderForPaymentIntentByPublicToken } from "@/lib/orders/queries";
 import { stripe } from "@/lib/stripe/client";
 import { toStripeAmount } from "./amount";
@@ -51,7 +52,7 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
   await recordScopeAttempt(INTENT_SCOPE, ip);
 
   const business = await getPublicBusiness();
-  if (!business.acceptsOnlinePayment) return { ok: false, error: "online_payment_disabled" };
+  if (!business.acceptsOnlinePayment || !(await canTakeOnlinePayments(business))) return { ok: false, error: "online_payment_disabled" };
 
   const order = await getOrderForPaymentIntentByPublicToken(business.id, publicToken);
   if (!order) return { ok: false, error: "not_found" };

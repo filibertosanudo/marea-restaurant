@@ -559,6 +559,8 @@ export const en = {
       paymentsTitle: "Payments",
       onlinePaymentLabel: "Accept online payment",
       onlinePaymentHint: "Card at the time of ordering, via Stripe.",
+      onlinePaymentNeedsAccount:
+        "Card payments are off because this business has no Stripe account of its own yet. Until it does, guests pay at the register.",
 
       contactTitle: "Contact & address",
       contactLead: "Shown in the footer of your public site — leave blank to hide a field there.",

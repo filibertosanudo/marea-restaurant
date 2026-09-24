@@ -564,6 +564,8 @@ export const es = {
       paymentsTitle: "Pagos",
       onlinePaymentLabel: "Aceptar pago en línea",
       onlinePaymentHint: "Tarjeta al momento de ordenar, vía Stripe.",
+      onlinePaymentNeedsAccount:
+        "El pago con tarjeta está desactivado porque este negocio aún no tiene una cuenta de Stripe propia. Mientras tanto, los clientes pagan en caja.",
 
       contactTitle: "Contacto y dirección",
       contactLead: "Se muestra en el pie de tu sitio público — déjalo en blanco para ocultar ese dato ahí.",

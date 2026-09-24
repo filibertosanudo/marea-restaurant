@@ -1,6 +1,7 @@
 import { UserRole } from "@/lib/generated/prisma/client";
 import { requirePageRole } from "@/lib/auth/permissions";
 import { getBusinessForRequest, getBusinessTranslations } from "@/lib/business";
+import { canTakeOnlinePayments } from "@/lib/payments/availability";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getOpeningHours } from "@/lib/reservations/queries";
@@ -16,6 +17,7 @@ export default async function SettingsPage() {
   await requirePageRole("/admin/menu", UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN);
 
   const [business, lang] = await Promise.all([getBusinessForRequest(), getAdminLang()]);
+  const onlinePaymentAllowed = await canTakeOnlinePayments(business);
   const dict = getDictionary(lang).settings;
 
   const [openingHours, closures, translations, notificationJobs, notificationsDueCount, devices] = await Promise.all([
@@ -60,7 +62,8 @@ export default async function SettingsPage() {
         timezone: business.timezone,
         defaultReservationMinutes: business.defaultReservationMinutes,
         maxPartySize: business.maxPartySize,
-        acceptsOnlinePayment: business.acceptsOnlinePayment,
+        acceptsOnlinePayment: business.acceptsOnlinePayment && onlinePaymentAllowed,
+        onlinePaymentAllowed,
         minBookingLeadMinutes: business.minBookingLeadMinutes,
         minCancelLeadMinutes: business.minCancelLeadMinutes,
         addressLine1: business.addressLine1,

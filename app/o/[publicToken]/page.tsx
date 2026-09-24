@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getPublicBusinessForToken } from "@/lib/business";
+import { canTakeOnlinePayments } from "@/lib/payments/availability";
 import { getOrderByPublicToken } from "@/lib/orders/queries";
 import { toTrackedOrderDTO } from "@/lib/orders/dto";
 import { getOrderLang } from "@/lib/i18n/cookie";
@@ -111,7 +112,7 @@ export default async function OrderTrackingPage({
             total={order.total}
             currency={order.currency}
             lang={lang}
-            acceptsOnlinePayment={business.acceptsOnlinePayment}
+            acceptsOnlinePayment={business.acceptsOnlinePayment && (await canTakeOnlinePayments(business))}
             publicToken={publicToken}
             dict={dict}
           />
