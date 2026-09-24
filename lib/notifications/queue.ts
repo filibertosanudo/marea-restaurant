@@ -2,7 +2,6 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { NotificationJob } from "@/lib/generated/prisma/client";
-import { getCurrentBusiness } from "@/lib/business";
 import { getMailer } from "@/lib/notifications";
 import { MailerError } from "@/lib/notifications/mailer";
 import { renderTemplate, UnknownTemplateError } from "@/lib/notifications/templates/registry";
@@ -137,17 +136,28 @@ export async function processQueue(limit: number): Promise<ProcessQueueResult> {
   const jobs = await claimBatch(limit, workerId);
   if (jobs.length === 0) return { claimed: 0, sent: 0, failed: 0 };
 
-  const business = await getCurrentBusiness();
-  const templateBusiness: TemplateBusiness = {
-    name: business.name,
-    address: [business.addressLine1, business.addressLine2, business.city].filter(Boolean).join(", ") || null,
-    phone: business.phone,
-  };
+  // The worker runs outside any request, so there is no "current" business:
+  // each job names its own, and the email it renders carries that business's
+  // name, address and phone. Loaded once per business in the batch.
+  const businessIds = [...new Set(jobs.map((job) => job.businessId))];
+  const businesses = await prisma.business.findMany({ where: { id: { in: businessIds } } });
+  const templateBusinesses = new Map<string, TemplateBusiness>(
+    businesses.map((b) => [
+      b.id,
+      {
+        name: b.name,
+        address: [b.addressLine1, b.addressLine2, b.city].filter(Boolean).join(", ") || null,
+        phone: b.phone,
+      },
+    ])
+  );
 
   let sent = 0;
   let failed = 0;
   for (const job of jobs) {
     try {
+      const templateBusiness = templateBusinesses.get(job.businessId);
+      if (!templateBusiness) throw new MailerError(`Job names business ${job.businessId}, which does not exist`, true);
       await sendOne(job, templateBusiness);
       await markSent(job.id);
       sent += 1;
