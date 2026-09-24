@@ -6,6 +6,7 @@ import type { BoardOrderDTO } from "@/lib/orders/dto";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import { advanceOrderStatusAction, collectCashPaymentAction } from "@/lib/orders/board-actions";
 import { reprintKitchenTicketAction } from "@/lib/printing/actions";
+import { shortFolio } from "@/lib/orders/folio-format";
 import { getNextStatus } from "@/lib/orders/state-machine";
 import { AgingIndicator } from "./AgingIndicator";
 import { AllergyIcon } from "./icons";
@@ -190,7 +191,7 @@ export function OrderCard({
       <div className="mb-sm flex items-start justify-between gap-sm">
         <div>
           <div className={`font-display font-bold tabular-nums text-on-surface ${s.folio}`}>
-            {order.orderNumber}
+            {shortFolio(order.orderNumber)}
           </div>
           <div className={`mt-[2px] font-semibold uppercase text-on-surface-muted ${s.tableLabel}`}>
             {order.tableLabel ? dict.table.replace("{code}", order.tableLabel) : dict.takeaway}

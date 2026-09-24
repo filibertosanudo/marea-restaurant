@@ -85,8 +85,8 @@ export function percentile(sorted, p) {
   return sorted[Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1)];
 }
 
-/** Places one real guest order over HTTP (cart cookie, add-to-cart, checkout) and returns its public token. */
-export async function placeOrder({ ids, itemIds, ip, index = 0 }) {
+/** Fills a guest's cart over HTTP and returns the jar holding its cookie, ready for checkout. */
+export async function prepareCart({ ids, itemIds, ip, index = 0 }) {
   const jar = new Jar();
   jar.absorb(await fetch(`${BASE_URL}/menu`, { headers: { "x-forwarded-for": ip } }));
   const lines = 1 + (index % 3);
@@ -101,6 +101,11 @@ export async function placeOrder({ ids, itemIds, ip, index = 0 }) {
     });
     await add.arrayBuffer();
   }
+  return jar;
+}
+
+/** Submits checkout for a prepared cart; resolves to the order's public token, or throws with the response. */
+export async function submitCheckout({ ids, jar, ip, index = 0 }) {
   const res = await callAction({
     id: ids.createOrderAction,
     path: "/menu/checkout",
@@ -113,6 +118,27 @@ export async function placeOrder({ ids, itemIds, ip, index = 0 }) {
   const redirect = res.headers.get("x-action-redirect");
   if (!redirect) throw new Error(`checkout did not redirect: HTTP ${res.status} ${text.slice(0, 200)}`);
   return redirect.split(";")[0].replace("/o/", "");
+}
+
+/** Places one real guest order over HTTP (cart cookie, add-to-cart, checkout) and returns its public token. */
+export async function placeOrder({ ids, itemIds, ip, index = 0 }) {
+  const jar = await prepareCart({ ids, itemIds, ip, index });
+  return submitCheckout({ ids, jar, ip, index });
+}
+
+/** Runs `task(i)` for i in [0, count) with at most `concurrency` in flight; resolves to per-task results in order. */
+export async function runPool(count, concurrency, task) {
+  const results = new Array(count);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, count) }, async () => {
+      while (next < count) {
+        const i = next++;
+        results[i] = await task(i);
+      }
+    })
+  );
+  return results;
 }
 
 /** Deterministic fake client address, so the per-IP rate limit sees each virtual guest as a different person. */

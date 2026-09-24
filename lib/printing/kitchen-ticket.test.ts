@@ -75,6 +75,13 @@ describe("buildKitchenTicketDocument", () => {
     expect(textOf(doc)).toContain("A-0142");
   });
 
+  it("prints a daily folio without its date, so the double-width header line stays as short as before", () => {
+    const doc = buildKitchenTicketDocument({ ...BASE, orderNumber: "A-260909-042" });
+    const header = doc.lines.find((l) => l.type === "text" && l.size === "large");
+    expect(header && "text" in header ? header.text : "").toContain("A-042");
+    expect(textOf(doc)).not.toContain("260909");
+  });
+
   it("strips ESC/GS control bytes from a guest-supplied item note, so it can never be read as a printer command", () => {
     const doc = buildKitchenTicketDocument({
       ...BASE,

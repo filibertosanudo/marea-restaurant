@@ -1,3 +1,4 @@
+import { shortFolio } from "@/lib/orders/folio-format";
 import { toIntlLocale } from "@/lib/dto/money";
 import type { Lang } from "@/lib/i18n/lang";
 import type { PrintDocument, PrintLine } from "@/lib/printing/document";
@@ -57,7 +58,7 @@ export function buildKitchenTicketDocument(input: KitchenTicketInput): PrintDocu
     { type: "text", text: t.title, bold: true, align: "center" },
     { type: "text", text: t.subtitle, align: "center" },
     { type: "rule" },
-    { type: "text", text: sanitizeText(`${input.orderNumber}    ${timeLabel}`), bold: true, size: "large" },
+    { type: "text", text: sanitizeText(`${shortFolio(input.orderNumber)}    ${timeLabel}`), bold: true, size: "large" },
     {
       type: "text",
       text: input.tableLabel ? sanitizeText(input.tableLabel.toUpperCase()) : t.takeaway,

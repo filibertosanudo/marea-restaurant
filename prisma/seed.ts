@@ -832,20 +832,9 @@ async function main() {
     }
   }
 
-  // The scenarios above insert orderNumber directly (A-0001..A-0005)
-  // instead of going through orderSequence's atomic increment — keep the
-  // counter in sync so the first real order placed after seeding doesn't
-  // collide with a folio the seed already used.
-  const businessAfterSeedOrders = await prisma.business.findUniqueOrThrow({
-    where: { id: business.id },
-    select: { orderSequence: true },
-  });
-  if (businessAfterSeedOrders.orderSequence < scenarios.length) {
-    await prisma.business.update({
-      where: { id: business.id },
-      data: { orderSequence: scenarios.length },
-    });
-  }
+  // The scenarios above use the legacy "A-0001".."A-0005" folios. Orders
+  // placed later get "A-YYMMDD-NNN" numbers from OrderCounter, a format that
+  // cannot equal a legacy one, so there is no counter to keep in sync here.
 
   // -------------------------------------------------------------------------
   // 11. Reservaciones — cubren solapamiento y estados
