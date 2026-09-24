@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { getBusinessForRequest, getPublicBusiness } from "@/lib/business";
-import { makeBusiness, makeStaff } from "@/test/factories";
+import { getBusinessForRequest, getPublicBusiness, getPublicBusinessForToken } from "@/lib/business";
+import { prisma } from "@/lib/prisma";
+import { makeBusiness, makeOrder, makeStaff } from "@/test/factories";
 import { setTestSession, sessionUserFromRow } from "@/test/stubs/auth-session";
 import { setTestHost } from "@/test/stubs/next-headers";
+
+// lib/env reads this lazily, on first access, so setting it here still lands.
+process.env.BUSINESS_ROOT_DOMAIN = "localhost";
 
 describe("getPublicBusiness", () => {
   it("resolves each subdomain to its own business", async () => {
@@ -70,5 +74,37 @@ describe("getBusinessForRequest", () => {
     const staff = await makeStaff("BUSINESS_ADMIN");
     setTestSession(sessionUserFromRow(staff, { businessId: "gone" }));
     await expect(getBusinessForRequest()).rejects.toThrow("NOT_FOUND");
+  });
+});
+
+describe("getPublicBusinessForToken", () => {
+  it("sends a token minted on the bare origin to its own business's subdomain", async () => {
+    await makeBusiness({ slug: "marea" });
+    const cala = await makeBusiness({ slug: "cala" });
+    const order = await makeOrder(cala.id);
+
+    setTestHost("localhost:3000");
+    await expect(getPublicBusinessForToken("order", order.publicToken, `/o/${order.publicToken}`)).rejects.toThrow(
+      `REDIRECT:http://cala.localhost:3000/o/${order.publicToken}`
+    );
+  });
+
+  it("finds nothing for an unknown token on the bare origin", async () => {
+    await makeBusiness({ slug: "marea" });
+    await makeBusiness({ slug: "cala" });
+    setTestHost("localhost:3000");
+    await expect(getPublicBusinessForToken("order", "nope", "/o/nope")).rejects.toThrow("NOT_FOUND");
+  });
+
+  it("never lets a token cross businesses on a business's own subdomain", async () => {
+    await makeBusiness({ slug: "marea" });
+    const cala = await makeBusiness({ slug: "cala" });
+    const order = await makeOrder(cala.id);
+
+    setTestHost("marea.localhost:3000");
+    const business = await getPublicBusinessForToken("order", order.publicToken, `/o/${order.publicToken}`);
+    expect(business.slug).toBe("marea");
+    // The page then queries with businessId = marea and finds no such order.
+    expect(await prisma.order.findFirst({ where: { businessId: business.id, publicToken: order.publicToken } })).toBeNull();
   });
 });

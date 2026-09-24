@@ -6,7 +6,7 @@ import { getPublicBusiness } from "@/lib/business";
 import type { Business } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
 import { toIntlLocale } from "@/lib/dto/money";
-import { appOrigin } from "@/lib/env";
+import { businessOrigin } from "@/lib/business-origin";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import { getAvailableSlots, findSlot, localWallClockToUtc } from "./availability";
 import {
@@ -201,7 +201,7 @@ export async function createReservationAction(input: {
               confirmationCode: created.confirmationCode,
               partySize: created.partySize,
               reservedForLabel,
-              reservationUrl: `${appOrigin()}/r/${created.confirmationCode}`,
+              reservationUrl: `${businessOrigin(business)}/r/${created.confirmationCode}`,
             },
             relatedReservationId: created.id,
             dedupeKey: `reservation:${created.id}:PENDING`,

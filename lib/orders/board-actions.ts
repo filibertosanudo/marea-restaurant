@@ -12,7 +12,7 @@ import { computePaymentSummary } from "@/lib/payments/summary";
 import { IllegalPaymentTransitionError } from "@/lib/payments/state-machine";
 import { lockOpenCashSessionForUpdate } from "@/lib/cash-register/queries";
 import type { Prisma } from "@/lib/generated/prisma/client";
-import { appOrigin } from "@/lib/env";
+import { businessOrigin } from "@/lib/business-origin";
 import { syncAvailabilityFromStock } from "@/lib/menu/inventory";
 
 export type BoardActionState = { error?: string } | undefined;
@@ -89,8 +89,8 @@ export async function advanceOrderStatusAction(orderId: string): Promise<BoardAc
           locale: order.locale ?? business.defaultLocale,
           payload: {
             orderNumber: order.orderNumber,
-            orderUrl: `${appOrigin()}/o/${order.publicToken}`,
-            ...(nextStatus === "DELIVERED" ? { reviewUrl: `${appOrigin()}/review/${order.publicToken}` } : {}),
+            orderUrl: `${businessOrigin(business)}/o/${order.publicToken}`,
+            ...(nextStatus === "DELIVERED" ? { reviewUrl: `${businessOrigin(business)}/review/${order.publicToken}` } : {}),
           },
           relatedOrderId: order.id,
           dedupeKey: `order:${order.id}:${nextStatus}`,
@@ -224,7 +224,7 @@ export async function cancelOrderAction(
           locale: order.locale ?? business.defaultLocale,
           payload: {
             orderNumber: order.orderNumber,
-            orderUrl: `${appOrigin()}/o/${order.publicToken}`,
+            orderUrl: `${businessOrigin(business)}/o/${order.publicToken}`,
             reason: trimmedReason,
           },
           relatedOrderId: order.id,

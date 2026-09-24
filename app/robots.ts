@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
 import { appOrigin } from "@/lib/env";
+import { businessOrigin } from "@/lib/business-origin";
+import { findPublicBusiness } from "@/lib/business";
 
 // Without this, Next tries to statically prerender this route at `npm run
 // build` time — the portable Docker build stage has no real env vars yet
@@ -18,8 +20,9 @@ export const dynamic = "force-dynamic";
  * crawler that reaches one (e.g. from a shared link) find that tag and drop
  * it, not blocking the crawl and hoping the URL never surfaces at all.
  */
-export default function robots(): MetadataRoute.Robots {
-  const origin = appOrigin();
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const business = await findPublicBusiness();
+  const origin = business ? businessOrigin(business) : appOrigin();
 
   return {
     rules: {

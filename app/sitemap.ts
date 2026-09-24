@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
 import { appOrigin } from "@/lib/env";
+import { businessOrigin } from "@/lib/business-origin";
+import { findPublicBusiness } from "@/lib/business";
 
 // Without this, Next tries to statically prerender this route at `npm run
 // build` time — the portable Docker build stage has no real env vars yet
@@ -15,8 +17,9 @@ export const dynamic = "force-dynamic";
  * the page itself instead (see each route's own `metadata` export), not a
  * sitemap entry.
  */
-export default function sitemap(): MetadataRoute.Sitemap {
-  const origin = appOrigin();
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const business = await findPublicBusiness();
+  const origin = business ? businessOrigin(business) : appOrigin();
   const now = new Date();
 
   return [

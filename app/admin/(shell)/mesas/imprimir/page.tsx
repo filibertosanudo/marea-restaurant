@@ -2,7 +2,7 @@ import QRCode from "qrcode";
 import { UserRole } from "@/lib/generated/prisma/client";
 import { requirePageRole } from "@/lib/auth/permissions";
 import { getBusinessForRequest } from "@/lib/business";
-import { appOrigin } from "@/lib/env";
+import { businessOrigin } from "@/lib/business-origin";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getTablesForAdmin } from "@/lib/tables/queries";
@@ -16,7 +16,7 @@ export default async function TablesPrintPage() {
   const dict = getDictionary(lang).tables;
   const tables = (await getTablesForAdmin(business.id)).filter((t) => t.isActive);
 
-  const origin = appOrigin();
+  const origin = businessOrigin(business);
   const withQr = await Promise.all(
     tables.map(async (t) => ({
       id: t.id,

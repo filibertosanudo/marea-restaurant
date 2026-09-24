@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { slugFromHost } from "@/lib/business-host";
+import { originFor, slugFromHost } from "@/lib/business-host";
 
 describe("slugFromHost", () => {
   it("takes the one label in front of the root domain", () => {
@@ -19,5 +19,16 @@ describe("slugFromHost", () => {
     expect(slugFromHost("a.marea.example.com", "example.com")).toBeNull();
     expect(slugFromHost("notexample.com", "example.com")).toBeNull();
     expect(slugFromHost("-x.example.com", "example.com")).toBeNull();
+  });
+});
+
+describe("originFor", () => {
+  it("is the single origin when no root domain is configured", () => {
+    expect(originFor("marea", "https://app.example.com", undefined)).toBe("https://app.example.com");
+  });
+
+  it("is the business's own subdomain once one is, keeping scheme and port", () => {
+    expect(originFor("marea", "https://example.com", "example.com")).toBe("https://marea.example.com");
+    expect(originFor("marea", "http://localhost:3000", "localhost")).toBe("http://marea.localhost:3000");
   });
 });

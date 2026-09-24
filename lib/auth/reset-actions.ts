@@ -7,7 +7,7 @@ import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/
 import { requestPasswordResetSchema, resetPasswordSchema } from "@/lib/auth/schemas";
 import { generateResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from "@/lib/auth/reset-token";
 import { getPublicBusiness } from "@/lib/business";
-import { appOrigin } from "@/lib/env";
+import { businessOrigin } from "@/lib/business-origin";
 
 const RESET_REQUEST_MAX_ATTEMPTS = 5;
 const RESET_REQUEST_WINDOW_MS = 60 * 60 * 1000;
@@ -67,7 +67,7 @@ export async function requestPasswordResetAction(
 
   const { token, tokenHash } = generateResetToken();
   const business = await getPublicBusiness();
-  const resetUrl = `${appOrigin()}/admin/reset-password/${token}`;
+  const resetUrl = `${businessOrigin(business)}/admin/reset-password/${token}`;
 
   // Outbox pattern, same as reservation/order confirmations: the job is
   // queued in the same transaction as the token it links to, so a failed

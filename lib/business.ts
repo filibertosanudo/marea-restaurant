@@ -3,9 +3,10 @@ import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { Prisma, type Business } from "@/lib/generated/prisma/client";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { appOrigin, env } from "@/lib/env";
+import { businessOrigin } from "@/lib/business-origin";
 import { slugFromHost } from "@/lib/business-host";
 import { cachedPublicRead, invalidatePublicCache } from "@/lib/cache/public";
 
@@ -88,6 +89,9 @@ async function byHost(): Promise<Business | null> {
   return slug ? bySlug(slug) : onlyBusiness();
 }
 
+/** getPublicBusiness() for callers that must not 404 (robots, sitemap): null when the host names nobody. */
+export const findPublicBusiness = cache(byHost);
+
 /**
  * The business a public request is about, named by the host alone. Never
  * by the session: a staff member's cookie must not turn another business's
@@ -105,6 +109,33 @@ export const getPublicBusiness = cache(async (): Promise<Business> => {
   if (!business) notFound();
   return business;
 });
+
+export type LegacyTokenKind = "table" | "order" | "reservation";
+
+/**
+ * getPublicBusiness() for the pages that a printed QR code or an emailed
+ * link lands on. Those URLs were minted on the deployment's single origin;
+ * once businesses have their own subdomains, that origin names nobody. The
+ * token itself is an unguessable capability (see the schema), so it may
+ * find its business and send the visitor to the right subdomain, keeping
+ * the QR codes already stuck to the tables working. On a host that does
+ * name a business the token must belong to that business, as always.
+ */
+export async function getPublicBusinessForToken(kind: LegacyTokenKind, token: string, path: string): Promise<Business> {
+  const named = await byHost();
+  if (named) return named;
+  if (!env.BUSINESS_ROOT_DOMAIN) notFound();
+
+  const owner =
+    kind === "table"
+      ? await prisma.restaurantTable.findUnique({ where: { qrToken: token }, select: { businessId: true } })
+      : kind === "order"
+        ? await prisma.order.findUnique({ where: { publicToken: token }, select: { businessId: true } })
+        : await prisma.reservation.findUnique({ where: { confirmationCode: token }, select: { businessId: true } });
+  const business = owner ? await byId(owner.businessId) : null;
+  if (!business) notFound();
+  redirect(`${businessOrigin(business)}${path}`);
+}
 
 /**
  * The business an authenticated panel request acts on: the one the session

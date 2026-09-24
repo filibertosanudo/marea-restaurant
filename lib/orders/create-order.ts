@@ -7,7 +7,7 @@ import { pickTranslation } from "@/lib/i18n/translations";
 import { toPublicModifierGroup } from "@/lib/menu/public-menu";
 import { validateModifierSelection } from "@/lib/cart/modifier-validation";
 import { formatMoney } from "@/lib/dto/money";
-import { appOrigin } from "@/lib/env";
+import { businessOrigin } from "@/lib/business-origin";
 import { enqueueKitchenTicket } from "@/lib/printing/queue";
 import { buildKitchenTicketDocument } from "@/lib/printing/kitchen-ticket";
 import { applyPromotions, type PromotionRejectionReason } from "@/lib/promotions/engine";
@@ -209,7 +209,7 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
     // the order insert (see nextFolio).
     const business = await tx.business.findUniqueOrThrow({
       where: { id: businessId },
-      select: { taxRate: true, currency: true, timezone: true },
+      select: { slug: true, taxRate: true, currency: true, timezone: true },
     });
 
     // Not filtered to isActive here on purpose: an entered code matching a
@@ -417,7 +417,7 @@ export async function createOrderFromCart(businessId: string, lang: Lang, guest:
           locale: lang,
           payload: {
             orderNumber: createdOrder.orderNumber,
-            orderUrl: `${appOrigin()}/o/${createdOrder.publicToken}`,
+            orderUrl: `${businessOrigin(business)}/o/${createdOrder.publicToken}`,
             items: lineInputs.map((l) => ({
               name: l.nameSnapshot,
               quantity: l.quantity,
