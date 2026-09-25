@@ -14,6 +14,15 @@ import { env } from "@/lib/env";
  * *_enable_row_level_security). It is not a way around the isolation: it
  * cannot read an order's contents, a menu or a customer. Anything that then
  * needs a business's data goes back through `prisma` inside runInTenant().
+ *
+ * WHAT IT IS NOT: a client for ordinary queries. It is not bound to a
+ * business, so a query written against it "works" and returns rows, tests
+ * included, while walking around the isolation. Nothing enforces its column
+ * grants for you at review time, so two things do: an ESLint rule that
+ * forbids importing this module from anywhere but the files in
+ * config/system-prisma-importers.json, and lib/db/system-importers.test.ts,
+ * which fails when the tree and that list disagree. A new use is a decision
+ * for a reviewer, not a convenience.
  */
 const globalForSystem = globalThis as unknown as { systemPrisma?: PrismaClient };
 
