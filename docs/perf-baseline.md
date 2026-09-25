@@ -313,3 +313,44 @@ was not adopted**, for two reasons and one caveat:
 
 If the deployment ever needs more than about 3 orders a second per business, the
 sequence is the change to make, and this table is the evidence for it.
+
+## Driving one business of several
+
+With more than one business in the database, every script drives one of them:
+`PERF_BUSINESS` (default `marea`) scopes its queries, and `PERF_BASE_URL` must be
+that business's address (default `http://marea.localhost:3100`; `*.localhost` is
+resolved by the scripts themselves). A folio that repeats across businesses is
+not a duplicate, only within one. The measured build runs as the restricted
+`marea_app` role like production does, so the figures include the cost of the
+row level security policies and of stamping the business on each connection.
+
+### The load test again, with two businesses under row level security (module 17)
+
+Same test (`node scripts/perf/load-test.mjs 200 10 5`), same machine, against a
+production build running as the restricted `marea_app` role with `marea` and
+`cala` both in the database and the test driving `marea`.
+
+| | Module 16 | Module 17 |
+|---|---|---|
+| Orders created / failed | 200 / 0 | 200 / 0 |
+| Checkout p50 / p95 / p99 / max | 39 / 91 / 104 / 181 ms | 56 / **83** / 94 / 108 ms |
+| Duplicate folios | 0 | 0 |
+| Background menu and landing requests, errors | 963, 0 | 971, 0 |
+| Postgres connections, min / max | 7 / 10 | 12 / 17 |
+| Updates each board received | 205 | 199 |
+| Orders missing from a board | 0 on all five | **0** on all five |
+| Boards still receiving events at the end | yes | yes |
+
+All four criteria hold, seven checks of seven. Two things moved and are worth
+knowing. The median is up 17 ms: every connection is stamped with the business
+when it is handed out and cleared when it comes back, and every statement is
+checked against a policy. The p95 did not move (it is lower in this run; treat
+the two p95s as equal). Connections went from 7-10 to 12-17: the application pool
+is the same, and the system client (`marea_worker`, at most 3) is new; the rest
+is run to run. Both are bounded and not growing.
+
+The burst benchmark (`checkout-load.mjs 100 20`, all at once) gave a p95 of
+2.5 s against 1.0-1.6 s in the module 16 baseline. It is not a service load and
+no criterion is set on it; it is where the per-connection round trips for the
+business show up first. If a deployment ever needs bursts like that, the place
+to look is that stamp (`lib/db/tenant-pool.ts`), not the policies.

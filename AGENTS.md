@@ -71,6 +71,21 @@ instead of duplicating it here.
   `WORKER_DATABASE_URL` (`LISTEN` needs no table, and does not survive a
   transaction-mode pooler: behind one, it must be a direct connection or
   `REALTIME_MODE=poll`). Do not put `DIRECT_URL` in the running app.
+- **Every script says which business it acts on.** A script runs outside
+  any request, so it has no business unless it is given one, and under row
+  level security a query with none sees nothing (which for a sweep means "no
+  references", so everything looks orphaned). The maintenance scripts, one by
+  one: `storage:sweep` and `privacy:anonymize-guests` list the businesses
+  through `systemPrisma` and act on each inside `runInTenant`;
+  `notifications:worker` claims jobs across businesses as `marea_worker` and
+  renders each with its own business; `rate-limits:purge` and
+  `privacy:purge-ip-data` touch only identity tables (login attempts, rate
+  counters), which are not per business; `tenants`, `db:provision-roles` and
+  `db:seed` need the owner's connection; the `scripts/perf` load scripts take
+  `PERF_BUSINESS`. Order folios come from `OrderCounter`, keyed by business
+  and local day, so two businesses both start at `-001`. A new script that
+  reads or writes business data walks the businesses or takes one on the
+  command line.
 - **Nothing depends on a single cloud provider.** Storage (`lib/storage/`)
   and, going forward, any other external integration go behind an
   interface with at least two implementations — see `lib/storage/driver.ts`
@@ -98,7 +113,9 @@ see [`docs/DEPLOY.md`](docs/DEPLOY.md).
 | `npm test` | Unit + integration tests (vitest) |
 | `npm run lint` | ESLint |
 | `npm run db:migrate` | Apply migrations (dev) |
-| `npm run db:seed` | Seed dev data — refuses against a non-local database |
+| `npm run db:seed` | Seed dev data (two businesses and a chain) — refuses against a non-local database |
+| `npm run tenants -- <cmd>` | Create organizations, businesses and their first admins; needs the owner's connection (see `docs/DEPLOY.md`) |
+| `npm run db:provision-roles` | Give `marea_app` and `marea_worker` their passwords (owner's connection) |
 | `npm run db:studio` | Prisma Studio |
 | `npm run storage:sweep` | Delete storage keys no `MenuItem` row references |
 | `npm run rate-limits:purge` | Delete `RateLimitCounter` rows past every scope's window (`-- --dry-run` to preview) |

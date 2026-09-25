@@ -189,6 +189,52 @@ public comes from the host.
    register". Connecting accounts is module 17b; it must ship before any
    restaurant that is not yours goes live.
 
+### Adding a business to a running deployment
+
+Nobody opens the database. With the stack already up and `BUSINESS_ROOT_DOMAIN`
+set (previous section), run the tenants command as the database owner, the
+same connection the migrations use (it refuses the restricted application role
+rather than fail halfway):
+
+```bash
+# a chain, if the new business belongs to one
+docker compose run --rm --entrypoint "" migrate npx tsx scripts/tenants.ts \
+  create-organization --slug marea-group --name "Marea Group"
+
+# the business, and its first administrator in one go
+docker compose run --rm --entrypoint "" migrate npx tsx scripts/tenants.ts \
+  create-business --slug cala --name Cala --organization marea-group \
+  --timezone America/Hermosillo --currency MXN --locale es \
+  --admin-email ana@cala.mx --admin-name "Ana Cota"
+
+# the owner of the chain, who moves between its businesses
+docker compose run --rm --entrypoint "" migrate npx tsx scripts/tenants.ts \
+  create-org-admin --organization marea-group --email dueno@marea.mx --name "Dueño"
+
+# what exists, and where each business answers
+docker compose run --rm --entrypoint "" migrate npx tsx scripts/tenants.ts list
+```
+
+Each command prints what it made. A temporary password is shown **once**, on
+that terminal, and the person must change it at first sign-in. Then:
+
+1. The business answers at `https://<slug>.<BUSINESS_ROOT_DOMAIN>` straight
+   away (the wildcard record and certificate already cover it). Its slug is a
+   subdomain, so it is one lowercase word with inner hyphens, and a few names
+   (`www`, `admin`, `api`...) are refused.
+2. The administrator signs in there, at `/admin`, and sets up hours, tables and
+   a menu. On a branch of a chain, **Menu → Copy a menu from another branch**
+   fills an empty menu from a sister branch in one click (dishes, categories,
+   modifiers, photos and translations; stock counts start at zero and prices are
+   copied as they are).
+3. Card payments start **off**. From the second business on, one without a
+   Stripe account of its own cannot take cards, and the panel says why.
+
+`npm run tenants` does the same from a checkout with `DIRECT_URL` (or
+`DATABASE_URL`) pointing at the owner. The seed (`npm run db:seed`, local only)
+creates the two-business example the tests use: `marea` and `cala`, one chain,
+and `owner@marea.test` to move between them.
+
 ## Alternatives
 
 ### Managed PaaS (Railway, Render)
