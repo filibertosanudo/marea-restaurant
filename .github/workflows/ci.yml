@@ -100,7 +100,12 @@ jobs:
       APP_DB_PASSWORD: e2e-app-password
       WORKER_DB_PASSWORD: e2e-worker-password
       AUTH_SECRET: ci-test-secret
-      AUTH_URL: http://localhost:3000
+      # The seed makes two businesses, and each answers on its own subdomain:
+      # marea.localhost and cala.localhost resolve to this machine in Chromium,
+      # and BUSINESS_ROOT_DOMAIN tells the app what they hang off. Marea is the
+      # one the specs drive; multi-business-flow.spec.ts derives cala's.
+      AUTH_URL: http://marea.localhost:3000
+      BUSINESS_ROOT_DOMAIN: localhost
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -159,7 +164,7 @@ jobs:
 
       - name: Run E2E tests
         env:
-          E2E_BASE_URL: http://localhost:3000
+          E2E_BASE_URL: http://marea.localhost:3000
           E2E_DATABASE_URL: postgresql://marea:${{ env.POSTGRES_PASSWORD }}@localhost:5434/marea
         run: npm run test:e2e
 
@@ -169,7 +174,7 @@ jobs:
       # throttling is applied rather than simulated). Lighthouse is fetched by
       # npx at a pinned version, so nothing is added to package.json.
       - name: Performance budget (Lighthouse)
-        run: node scripts/perf/lighthouse-budget.mjs http://localhost:3000/ 3
+        run: node scripts/perf/lighthouse-budget.mjs http://marea.localhost:3000/ 3
 
       - name: Upload Playwright report
         if: failure()

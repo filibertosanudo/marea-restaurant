@@ -14,6 +14,9 @@ import { test, expect } from "@playwright/test";
 const ERROR_BOUNDARY = /Algo salió mal cargando esta sección/;
 
 test("an admin works the cash shift, reads the report, settings and team", async ({ page, baseURL }) => {
+  // Twelve screens in one session: generous for a cold `next dev`, and far more
+  // than the production build the CI job runs against needs.
+  test.setTimeout(120_000);
   await page.context().addCookies([{ name: "marea-lang", value: "en", url: baseURL }]);
   await page.goto("/admin/login");
   await page.locator("#email").fill("admin@marea.test");
@@ -48,15 +51,18 @@ test("an admin works the cash shift, reads the report, settings and team", async
     await expect(page.locator("body")).not.toContainText(ERROR_BOUNDARY);
 
     // "month" holds the seeded orders. A report that came back with a header
-    // row only would be a report that cannot see its own business.
+    // row only would be a report that cannot see its own business. Fetched from
+    // inside the page: the business is a subdomain, which the test runner's own
+    // HTTP client may not resolve.
     for (const dataset of ["daily-sales", "dishes-by-units", "payment-methods"]) {
-      const exported = await page.request.get(`/api/admin/reports/export?dataset=${dataset}&range=month`);
-      expect(exported.status(), dataset).toBe(200);
-      expect(exported.headers()["content-type"]).toContain("csv");
+      const exported = await page.evaluate(async (name) => {
+        const res = await fetch(`/api/admin/reports/export?dataset=${name}&range=month`);
+        return { status: res.status, type: res.headers.get("content-type"), text: await res.text() };
+      }, dataset);
+      expect(exported.status, dataset).toBe(200);
+      expect(exported.type).toContain("csv");
+      if (dataset === "dishes-by-units") expect(exported.text.trim().split(/\s*\n\s*/).length).toBeGreaterThan(1);
     }
-    const dishes = await page.request.get("/api/admin/reports/export?dataset=dishes-by-units&range=month");
-    const rows = (await dishes.text()).trim().split(/[\r\n]+/);
-    expect(rows.length).toBeGreaterThan(1);
   });
 
   await test.step("settings and team load their own business's data", async () => {
