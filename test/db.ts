@@ -59,11 +59,21 @@ export function ensureSchemaReady(): void {
   // resolves the plain npx script on Linux CI — execFileSync alone doesn't
   // go through a shell and can't apply either platform's PATH extension
   // rules on its own.
-  execFileSync("npx", ["prisma", "migrate", "deploy"], {
-    env: { ...process.env, DATABASE_URL: scopedUrl, DIRECT_URL: scopedUrl },
-    stdio: "inherit",
-    shell: true,
-  });
+  // `migrate deploy` takes one advisory lock for the whole database, not per
+  // schema, so parallel test files queue behind each other and the CLI gives up
+  // after 10 s with P1002. Nothing is wrong: try again.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      execFileSync("npx", ["prisma", "migrate", "deploy"], {
+        env: { ...process.env, DATABASE_URL: scopedUrl, DIRECT_URL: scopedUrl },
+        stdio: "inherit",
+        shell: true,
+      });
+      break;
+    } catch (err) {
+      if (attempt >= 4) throw err;
+    }
+  }
 
   process.env.DATABASE_URL = scopedUrl;
   process.env.DIRECT_URL = scopedUrl;
