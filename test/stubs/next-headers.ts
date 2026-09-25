@@ -41,6 +41,29 @@ export function runWithCookies<T>(cookiesIn: Record<string, string>, fn: () => T
   return als.run(new Map(Object.entries(cookiesIn)), fn);
 }
 
+// Every test starts on marea.localhost: nearly all of them build their one
+// business with slug "marea" and expect the request to be about it, as the
+// old fixed slug made it. A test with several businesses sets its own host.
+const DEFAULT_TEST_HOST = "marea.localhost";
+let testHost: string = DEFAULT_TEST_HOST;
+
+/** Sets the Host every headers() call reports until clearTestHost(): the test-side equivalent of the request arriving on that subdomain. */
+export function setTestHost(host: string): void {
+  testHost = host;
+}
+
+export function clearTestHost(): void {
+  testHost = DEFAULT_TEST_HOST;
+  testTenantHeader = null;
+}
+
+let testTenantHeader: string | null = null;
+
+/** Sets the x-marea-tenant header proxy.ts would have stamped on the request. */
+export function setTestTenantHeader(businessId: string): void {
+  testTenantHeader = businessId;
+}
+
 export function headers(): Headers {
-  return new Headers();
+  return new Headers({ host: testHost, ...(testTenantHeader ? { "x-marea-tenant": testTenantHeader } : {}) });
 }

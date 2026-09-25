@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusinessForToken } from "@/lib/business";
+import { canTakeOnlinePayments } from "@/lib/payments/availability";
+import { env } from "@/lib/env";
 import { getOrderByPublicToken } from "@/lib/orders/queries";
 import { toTrackedOrderDTO } from "@/lib/orders/dto";
 import { getOrderLang } from "@/lib/i18n/cookie";
@@ -30,7 +32,7 @@ export default async function OrderTrackingPage({
   params: Promise<{ publicToken: string }>;
 }) {
   const { publicToken } = await params;
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusinessForToken("order", publicToken, `/o/${publicToken}`);
   const lang = await getOrderLang(business.defaultLocale === "en" ? "en" : "es");
   const dict = getOrderDictionary(lang);
 
@@ -111,7 +113,8 @@ export default async function OrderTrackingPage({
             total={order.total}
             currency={order.currency}
             lang={lang}
-            acceptsOnlinePayment={business.acceptsOnlinePayment}
+            acceptsOnlinePayment={business.acceptsOnlinePayment && (await canTakeOnlinePayments(business))}
+            publishableKey={env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ""}
             publicToken={publicToken}
             dict={dict}
           />

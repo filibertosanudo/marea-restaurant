@@ -13,6 +13,8 @@
  */
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
+import { systemPrisma } from "../lib/db/system";
+import { runInTenant } from "../lib/tenancy/context";
 
 const RETENTION_MS = 24 * 30 * 24 * 60 * 60 * 1000; // 24 months, treated as 30-day months
 
@@ -22,30 +24,35 @@ async function main() {
 
   const scrubbed = { guestName: "", guestEmail: null, guestPhone: null };
 
-  if (dryRun) {
-    const [orders, reservations] = await Promise.all([
-      prisma.order.count({
-        where: { createdAt: { lt: cutoff }, OR: [{ guestName: { not: null } }, { guestEmail: { not: null } }, { guestPhone: { not: null } }] },
-      }),
-      prisma.reservation.count({
-        where: { createdAt: { lt: cutoff }, OR: [{ guestName: { not: "" } }, { guestEmail: { not: null } }, { guestPhone: { not: null } }] },
-      }),
-    ]);
-    console.log(`Would anonymize ${orders} Order row(s) and ${reservations} Reservation row(s) created before ${cutoff.toISOString()}.`);
-    return;
+  // One business at a time: row level security shows a connection a single
+  // business, so a query with no businessId would touch none of them.
+  const businesses = await systemPrisma.business.findMany({ select: { id: true } });
+  let orders = 0;
+  let reservations = 0;
+  for (const { id: businessId } of businesses) {
+    const orderWhere = {
+      businessId,
+      createdAt: { lt: cutoff },
+      OR: [{ guestName: { not: null } }, { guestEmail: { not: null } }, { guestPhone: { not: null } }],
+    };
+    const reservationWhere = {
+      businessId,
+      createdAt: { lt: cutoff },
+      OR: [{ guestName: { not: "" } }, { guestEmail: { not: null } }, { guestPhone: { not: null } }],
+    };
+    await runInTenant(businessId, async () => {
+      if (dryRun) {
+        orders += await prisma.order.count({ where: orderWhere });
+        reservations += await prisma.reservation.count({ where: reservationWhere });
+      } else {
+        orders += (await prisma.order.updateMany({ where: orderWhere, data: scrubbed })).count;
+        reservations += (await prisma.reservation.updateMany({ where: reservationWhere, data: scrubbed })).count;
+      }
+    });
   }
-
-  const [orders, reservations] = await Promise.all([
-    prisma.order.updateMany({
-      where: { createdAt: { lt: cutoff }, OR: [{ guestName: { not: null } }, { guestEmail: { not: null } }, { guestPhone: { not: null } }] },
-      data: scrubbed,
-    }),
-    prisma.reservation.updateMany({
-      where: { createdAt: { lt: cutoff }, OR: [{ guestName: { not: "" } }, { guestEmail: { not: null } }, { guestPhone: { not: null } }] },
-      data: scrubbed,
-    }),
-  ]);
-  console.log(`Anonymized ${orders.count} Order row(s) and ${reservations.count} Reservation row(s) created before ${cutoff.toISOString()}.`);
+  console.log(
+    `${dryRun ? "Would anonymize" : "Anonymized"} ${orders} Order row(s) and ${reservations} Reservation row(s) created before ${cutoff.toISOString()}.`
+  );
 }
 
 main()

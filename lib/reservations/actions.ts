@@ -2,11 +2,11 @@
 
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusiness } from "@/lib/business";
 import type { Business } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
 import { toIntlLocale } from "@/lib/dto/money";
-import { appOrigin } from "@/lib/env";
+import { businessOrigin } from "@/lib/business-origin";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import { getAvailableSlots, findSlot, localWallClockToUtc } from "./availability";
 import {
@@ -46,7 +46,7 @@ const CANCEL_SCOPE = "reservation:cancel";
  * the create action below (which re-checks the guest's specific pick) can
  * never drift into two different definitions of "available". Takes the
  * already-resolved `business`, not a businessId, since both callers already
- * fetched it — calling getCurrentBusiness() a second time here would be a
+ * fetched it — calling getPublicBusiness() a second time here would be a
  * redundant DB round-trip on every slot lookup and every booking attempt.
  */
 async function loadAvailabilityForDay(business: Business, date: string, partySize: number, now: Date) {
@@ -98,7 +98,7 @@ export async function getReservationSlotsAction(date: string, partySize: number)
   const parsed = reservationSlotsQuerySchema.safeParse({ date, partySize });
   if (!parsed.success) return { ok: false, error: "invalid_input" };
 
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   const now = new Date();
   if (!isWithinBookingHorizon(parseDateParam(parsed.data.date), now, business.timezone)) {
     return { ok: false, error: "invalid_input" };
@@ -151,7 +151,7 @@ export async function createReservationAction(input: {
     return { ok: false, error: "rate_limited" };
   }
 
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   const now = new Date();
   if (!isWithinBookingHorizon(parseDateParam(parsed.data.date), now, business.timezone)) {
     return { ok: false, error: "invalid_input", fieldErrors: { date: "too_far_ahead" } };
@@ -201,7 +201,7 @@ export async function createReservationAction(input: {
               confirmationCode: created.confirmationCode,
               partySize: created.partySize,
               reservedForLabel,
-              reservationUrl: `${appOrigin()}/r/${created.confirmationCode}`,
+              reservationUrl: `${businessOrigin(business)}/r/${created.confirmationCode}`,
             },
             relatedReservationId: created.id,
             dedupeKey: `reservation:${created.id}:PENDING`,
@@ -248,7 +248,7 @@ export async function cancelReservationByCodeAction(confirmationCode: string): P
   if (await isScopeRateLimited(CANCEL_SCOPE, ip)) return { ok: false, error: "not_found" };
   await recordScopeAttempt(CANCEL_SCOPE, ip);
 
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   const reservation = await getReservationByConfirmationCode(business.id, confirmationCode);
   if (!reservation) return { ok: false, error: "not_found" };
 

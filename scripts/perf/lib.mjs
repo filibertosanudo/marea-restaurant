@@ -4,9 +4,28 @@
 // numbers the server can't report about itself.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import dns from "node:dns";
 import pg from "pg";
 
-export const BASE_URL = process.env.PERF_BASE_URL ?? "http://localhost:3100";
+// Each business answers on its own subdomain (marea.localhost), which the
+// operating system may not resolve for Node the way a browser does. Resolve any
+// *.localhost to the loopback address so plain fetch() can use the real host name.
+const lookup = dns.lookup;
+dns.lookup = function (hostname, options, callback) {
+  if (typeof options === "function") {
+    callback = options;
+    options = {};
+  }
+  return lookup.call(dns, String(hostname).endsWith(".localhost") ? "127.0.0.1" : hostname, options, callback);
+};
+
+// With more than one business in the database, every script must say which one
+// it drives: its menu, its orders, its host. PERF_BASE_URL should be that
+// business's address, e.g. http://marea.localhost:3100.
+export const BASE_URL = process.env.PERF_BASE_URL ?? "http://marea.localhost:3100";
+export const PERF_BUSINESS = process.env.PERF_BUSINESS ?? "marea";
+/** SQL for the id of the business being driven, to scope a query to it. */
+export const BID = `(select id from "Business" where slug = '${PERF_BUSINESS}')`;
 const DATABASE_URL = process.env.DATABASE_URL ?? "postgresql://marea:marea_perf@localhost:5440/marea";
 
 export const ADMIN = { email: "admin@marea.test", password: "MareaAdmin123!" };

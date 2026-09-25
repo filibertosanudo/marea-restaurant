@@ -5,7 +5,7 @@ import { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
 import { STAFF_ROLES } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { isUniqueConstraintError } from "@/lib/payments/prisma-errors";
 import { openCashSessionSchema, cashMovementSchema, closeCashSessionSchema } from "./schemas";
 import { lockOpenCashSessionForUpdate, getCashSessionActivityRaw } from "./queries";
@@ -17,7 +17,7 @@ export type CashActionState = { error?: string } | undefined;
 /** Opening a shift is STAFF work, per the matrix — the cashier does this, not the owner. */
 export async function openCashSessionAction(openingFloat: string): Promise<CashActionState> {
   const session = await requireRole(...STAFF_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = openCashSessionSchema.safeParse({ openingFloat });
   if (!parsed.success) return { error: "invalid_amount" };
@@ -54,7 +54,7 @@ export async function recordCashMovementAction(input: {
   reason: string;
 }): Promise<CashActionState> {
   const session = await requireRole(...STAFF_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = cashMovementSchema.safeParse(input);
   if (!parsed.success) return { error: "invalid_input" };
@@ -95,7 +95,7 @@ export async function closeCashSessionAction(input: {
   notes?: string;
 }): Promise<CloseCashSessionResult> {
   const session = await requireRole(...STAFF_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = closeCashSessionSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "invalid_input" };

@@ -34,6 +34,19 @@ const schema = z
     // notification ever arrives, which the listener's heartbeat detects.
     // Missing: DATABASE_URL is used, correct whenever there is no pooler.
     DIRECT_URL: optional(z.string().min(1)),
+    // Direct connection as the `marea_worker` role, for the parts that act on
+    // every business at once because they run outside any request: the
+    // notification queue, the realtime recovery sweep, and the lookups that
+    // find which business a device token, Stripe event or printed token
+    // belongs to. It sees nothing but what those need (see the RLS
+    // migration). Missing: DATABASE_URL, which is right for a database with
+    // no row level security, and for tests.
+    WORKER_DATABASE_URL: optional(z.string().min(1)),
+    // What instrumentation.ts does when DATABASE_URL connects as the table
+    // owner or a superuser, for whom row level security is a no-op: refuse to
+    // start ("enforce", production only), or say so and carry on ("warn").
+    // "off" for a database that has no policies at all.
+    DATABASE_ROLE_CHECK: withDefault(z.enum(["enforce", "warn", "off"]).default("enforce")),
     // "auto" listens for change notifications and falls back to polling by
     // itself when it cannot; "poll" skips LISTEN entirely, for a host where
     // it is known not to work (a pooler with no direct URL to give).
@@ -44,9 +57,10 @@ const schema = z
     // every generated query with whatever schema it's given (defaulting to
     // "public"), and doesn't infer it from the connection's search_path.
     DATABASE_SCHEMA: optional(z.string().min(1)),
-    // Which Business row this deployment serves. Single-tenant only: goes
-    // away when the business is resolved per request (module 17, Fase 2).
-    BUSINESS_SLUG: withDefault(z.string().min(1).default("marea")),
+    // The domain business subdomains hang off (`<slug>.<this>`). Missing:
+    // the host of APP_ORIGIN, which is right whenever the app is served from
+    // the bare root domain.
+    BUSINESS_ROOT_DOMAIN: optional(z.string().min(1)),
     AUTH_SECRET: z.string().min(1),
     AUTH_URL: optional(z.string().url()),
     APP_ORIGIN: optional(z.string().url()),
@@ -77,6 +91,11 @@ const schema = z
     // may turn these into per-business values (Stripe Connect).
     STRIPE_SECRET_KEY: optional(z.string().min(1)),
     STRIPE_WEBHOOK_SECRET: optional(z.string().min(1)),
+    // The publishable key is public by design and inlined into the browser
+    // bundle by Next, which is why it carries the NEXT_PUBLIC_ prefix; it is read
+    // here, on the server, and handed to the card form as a prop. With Stripe
+    // Connect (module 17b) it becomes a per-business value taken from the row.
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: optional(z.string().min(1)),
     // Guards app/api/cron/notifications — the serverless-friendly way to
     // drive the same queue a long-running worker polls, per Fase 3.
     CRON_SECRET: optional(z.string().min(16)),

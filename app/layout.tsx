@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Montserrat_Alternates, Poppins } from "next/font/google";
 import { headers } from "next/headers";
 import { CSP_NONCE_HEADER } from "@/lib/security/csp";
-import { getCurrentBusiness } from "@/lib/business";
+import { findPublicBusiness } from "@/lib/business";
 import { resolveSiteMetadataText } from "@/lib/seo/site-metadata";
 import "./globals.css";
 
@@ -45,7 +45,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const nonce = (await headers()).get(CSP_NONCE_HEADER) ?? undefined;
-  const business = await getCurrentBusiness();
+  // The root layout cannot 404 (Next refuses notFound() here), and a host that
+  // names no business is not an error for it: the admin login, for one, needs
+  // no business. The pages that do need one 404 for themselves.
+  const business = await findPublicBusiness();
 
   return (
     // suppressHydrationWarning: the inline script below sets data-theme
@@ -54,7 +57,7 @@ export default async function RootLayout({
     // visitor's own language choice is known (a cookie or localStorage
     // value this server render has no access to) — this is only ever the
     // business's own default, the best a first paint can do.
-    <html lang={business.defaultLocale} suppressHydrationWarning>
+    <html lang={business?.defaultLocale ?? "es"} suppressHydrationWarning>
       <head>
         <script
           nonce={nonce}

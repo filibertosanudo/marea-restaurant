@@ -19,7 +19,7 @@ function checkout(cart: { sessionToken: string | null }, business: { id: string 
 
 describe("createOrderAction", () => {
   it("returns field errors for invalid input instead of calling the checkout at all", async () => {
-    const business = await makeBusiness({ slug: "marea" }); // createOrderAction calls getCurrentBusiness(), which looks up by this fixed slug
+    const business = await makeBusiness({ slug: "marea" }); // the only business, so the request resolves to it
     const cart = await makeCart(business.id);
 
     const result = await checkout(cart, business, { guestName: "", guestPhone: "" });
@@ -29,7 +29,7 @@ describe("createOrderAction", () => {
   });
 
   it("translates a CheckoutError from createOrderFromCart into the matching state", async () => {
-    const business = await makeBusiness({ slug: "marea" }); // createOrderAction calls getCurrentBusiness(), which looks up by this fixed slug
+    const business = await makeBusiness({ slug: "marea" }); // the only business, so the request resolves to it
     const cart = await makeCart(business.id); // empty cart
 
     const result = await checkout(cart, business, { guestName: "Ana Ruiz", guestPhone: "+52 555 000 0000" });
@@ -38,7 +38,7 @@ describe("createOrderAction", () => {
   });
 
   it("redirects to the public order page once checkout succeeds", async () => {
-    const business = await makeBusiness({ slug: "marea" }); // createOrderAction calls getCurrentBusiness(), which looks up by this fixed slug
+    const business = await makeBusiness({ slug: "marea" }); // the only business, so the request resolves to it
     const category = await makeMenuCategory(business.id);
     const item = await makeMenuItem(business.id, category.id);
     const cart = await makeCart(business.id);
@@ -53,7 +53,7 @@ describe("createOrderAction", () => {
   });
 
   it("translates an invalid promo code, carrying the specific rejection reason through", async () => {
-    const business = await makeBusiness({ slug: "marea" }); // createOrderAction calls getCurrentBusiness(), which looks up by this fixed slug
+    const business = await makeBusiness({ slug: "marea" }); // the only business, so the request resolves to it
     const category = await makeMenuCategory(business.id);
     const item = await makeMenuItem(business.id, category.id);
     const cart = await makeCart(business.id);
@@ -69,7 +69,7 @@ describe("createOrderAction", () => {
   });
 
   it("translates an exhausted promotion into promotion_exhausted", async () => {
-    const business = await makeBusiness({ slug: "marea" }); // createOrderAction calls getCurrentBusiness(), which looks up by this fixed slug
+    const business = await makeBusiness({ slug: "marea" }); // the only business, so the request resolves to it
     const category = await makeMenuCategory(business.id);
     const item = await makeMenuItem(business.id, category.id);
     const cart = await makeCart(business.id);

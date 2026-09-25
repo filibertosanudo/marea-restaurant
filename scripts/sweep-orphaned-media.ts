@@ -9,6 +9,8 @@
  */
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
+import { systemPrisma } from "../lib/db/system";
+import { runInTenant } from "../lib/tenancy/context";
 import { getStorageDriver } from "../lib/storage";
 
 const PREFIX = "menu-items/";
@@ -17,12 +19,22 @@ async function main() {
   const dryRun = process.argv.includes("--dry-run");
   const driver = getStorageDriver();
 
+  // Row level security shows a connection one business at a time, so the
+  // references are gathered business by business. Reading them all at once
+  // would see none, and every stored key would look orphaned.
+  const businesses = await systemPrisma.business.findMany({ select: { id: true } });
   const [storedKeys, referenced] = await Promise.all([
     driver.list(PREFIX),
-    prisma.menuItem.findMany({
-      where: { imageUrl: { not: null } },
-      select: { imageUrl: true },
-    }),
+    Promise.all(
+      businesses.map((business) =>
+        runInTenant(business.id, () =>
+          prisma.menuItem.findMany({
+            where: { businessId: business.id, imageUrl: { not: null } },
+            select: { imageUrl: true },
+          })
+        )
+      )
+    ).then((perBusiness) => perBusiness.flat()),
   ]);
 
   const referencedKeys = new Set(

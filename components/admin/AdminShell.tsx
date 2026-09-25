@@ -18,6 +18,8 @@ type AdminShellProps = {
   dict: AdminDictionary;
   lang: Lang;
   user: { name: string; email: string };
+  businesses: Array<{ id: string; name: string }>;
+  activeBusinessId: string | null;
 };
 
 function SidebarLinks({
@@ -80,6 +82,8 @@ export function AdminShell({
   dict,
   lang,
   user,
+  businesses,
+  activeBusinessId,
 }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
@@ -165,6 +169,10 @@ export function AdminShell({
               name={user.name}
               email={user.email}
               signOutLabel={dict.shell.signOut}
+              businesses={businesses}
+              activeBusinessId={activeBusinessId}
+              switchLabel={dict.shell.switchBusiness}
+              switchErrorLabel={dict.shell.switchBusinessError}
             />
           </div>
         </header>

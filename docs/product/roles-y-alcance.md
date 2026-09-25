@@ -100,6 +100,18 @@ registre como mesero.
 `SUPER_ADMIN` es una bandera en `User.role` que salta el filtro por
 `businessId`. En la v1 eres tú y no necesita ni una pantalla propia.
 
+`ORG_ADMIN` (módulo 17) es el dueño de una cadena: `User.role = ORG_ADMIN` más
+`User.organizationId`, sin membresías. Actúa en **un negocio a la vez**, el
+activo de su sesión, y ahí tiene exactamente los permisos de `BUSINESS_ADMIN`
+(por eso la matriz de arriba no cambia: la sesión lleva el rol que se tiene
+*en* el negocio activo). Puede cambiar de negocio sin volver a entrar, sólo entre
+los de su organización; eso, el inicio de sesión y la revalidación de cada
+minuto pasan por una sola función, `authorizeBusiness`
+(`lib/auth/business-access.ts`). Lo único que cruza sucursales es el reporte
+"Todas las sucursales", que corre el reporte de siempre una vez por sucursal y
+suma. No existe rol que vea varios negocios a la vez, y `SUPER_ADMIN` sigue
+siendo el operador de la plataforma, no una cadena.
+
 ## 4. Orden de construcción propuesto
 
 | # | Módulo | Por qué en ese lugar |

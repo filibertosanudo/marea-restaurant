@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusiness } from "@/lib/business";
 import { getPublicMenuItemRaw } from "@/lib/menu/queries";
 import { toPublicModifierGroup } from "@/lib/menu/public-menu";
 import { getTableById } from "@/lib/tables/queries";
@@ -28,7 +28,7 @@ const MUTATE_WINDOW_MS = 15 * 60 * 1000;
  * endpoint a client could call with an arbitrary id.
  */
 export async function setTableCookieAction(tableId: string) {
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   const table = await getTableById(business.id, tableId);
   if (!table) return;
   await setTableIdCookie(table.id);
@@ -60,7 +60,7 @@ export async function addToCartAction(
     return { error: "rate_limited" };
   }
 
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   const item = await getPublicMenuItemRaw(business.id, parsed.data.menuItemId);
   if (!item || !item.isAvailable) {
     return { error: "item_unavailable" };
@@ -105,7 +105,7 @@ export async function updateCartItemQuantityAction(cartItemId: string, quantity:
   const ip = getClientIp(await headers());
   if (await isScopeRateLimited(MUTATE_SCOPE, ip, MUTATE_MAX_ATTEMPTS, MUTATE_WINDOW_MS)) return;
 
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   const cart = await getOrCreateCartForMutation(business.id);
   const existing = await getCartItemForMutation(cart.id, parsed.data.cartItemId);
   if (!existing) return;
@@ -127,7 +127,7 @@ export async function removeCartItemAction(cartItemId: string) {
   const ip = getClientIp(await headers());
   if (await isScopeRateLimited(MUTATE_SCOPE, ip, MUTATE_MAX_ATTEMPTS, MUTATE_WINDOW_MS)) return;
 
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   const cart = await getOrCreateCartForMutation(business.id);
   const existing = await getCartItemForMutation(cart.id, cartItemId);
   if (!existing) return;

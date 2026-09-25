@@ -35,7 +35,7 @@ that changes.
    cp .env.example .env
    ```
 
-   Fill in at least `POSTGRES_PASSWORD`, `AUTH_SECRET` (generate with
+   Fill in at least `POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `WORKER_DB_PASSWORD`, `AUTH_SECRET` (generate with
    `openssl rand -base64 32`), and `APP_ORIGIN` (your real domain,
    `https://...` — the app refuses to start in production without it, see
    `.env.example` for why). See `.env.example` for every other variable and
@@ -118,6 +118,122 @@ Set `TRUSTED_PROXY_COUNT=0` — the app then trusts nothing from
 `x-forwarded-for`/`x-real-ip` and falls back to a shared rate-limit bucket
 for that dimension. The per-email limit is unaffected either way and stays
 the primary defense.
+
+## Database roles and row level security
+
+Every business table has a Postgres row level security policy tying its rows
+to a business: a query that forgets `where: { businessId }`, or filters by the
+wrong one, gets nothing back instead of another business's data. The
+application still filters by business on every query; the policy is what
+saves the day it does not.
+
+**A policy only binds a role that does not own the tables.** The role that ran
+the migrations owns them, and for an owner (or a superuser) row level security
+does nothing at all, with no error and every policy looking correct. So the
+stack uses three roles:
+
+| Role | Used by | Can |
+|---|---|---|
+| `marea` (owner) | `migrate`, `seed`, manual maintenance | everything; never used by the running app |
+| `marea_app` | the web app (`DATABASE_URL`) | read and write business data, bound by the policies; no schema changes |
+| `marea_worker` | the notification worker, the realtime sweep and LISTEN, and the lookups that find which business a token belongs to (`WORKER_DATABASE_URL`) | the notification queue, plus ids and business ids of a few tables; not an order, a menu or a customer |
+
+The migration creates `marea_app` and `marea_worker` without a login. Set
+`APP_DB_PASSWORD` and `WORKER_DB_PASSWORD` in `.env` and the compose `migrate`
+service gives them one on every start (`npm run db:provision-roles` does the
+same by hand, and is how you rotate a password). On a managed database, run
+the migrations as the admin user and set `DATABASE_URL` to `marea_app` and
+`WORKER_DATABASE_URL` to `marea_worker`, both direct connections.
+
+**Upgrading a running deployment:** run the migration and the provisioning
+step first, then switch `DATABASE_URL` and add `WORKER_DATABASE_URL`, then
+restart. The app checks at boot which role it connects as and refuses to
+start in production if it is the owner, a superuser or has `BYPASSRLS`
+(`DATABASE_ROLE_CHECK=warn` logs instead, for the day of the switch only).
+
+To confirm by hand what the running app connects as:
+
+```sql
+SELECT current_user, r.rolsuper, r.rolbypassrls
+FROM pg_roles r WHERE r.rolname = current_user;
+```
+
+Maintenance scripts (`storage:sweep`, `privacy:anonymize-guests`) go through
+the same client and walk the businesses one at a time; they need no owner
+connection.
+
+## More than one business on one deployment
+
+Each business answers on its own subdomain: `marea.example.com`,
+`cala.example.com`. The panel's business comes from the session; everything
+public comes from the host.
+
+1. **DNS and certificate.** A wildcard record `*.example.com` pointing at the
+   proxy, and a wildcard certificate for it. Custom domains (`reservas.marea.mx`)
+   are not supported yet: each needs its own certificate.
+2. **Set `BUSINESS_ROOT_DOMAIN=example.com`.** Without it the deployment is
+   single-origin: its only business answers on every hostname, and as soon as
+   a second business exists the bare domain names nobody (404).
+3. **The proxy must pass the original `Host` through** (`proxy_set_header Host
+   $host;`, already in the nginx config above). The business is resolved from it.
+4. **QR codes and emailed links already out in the world keep working.** They
+   were minted on `APP_ORIGIN`; a request for one on the bare domain is
+   redirected to the owning business's subdomain (the token is an unguessable
+   capability, so it identifies its business). New QR codes, emails and the
+   sitemap use the subdomain directly. Nobody needs to reprint tables.
+5. **Card payments need a Stripe account per business.** All cards go through
+   the platform's single `STRIPE_SECRET_KEY`, which is fine while there is one
+   business. From the second one on, a business without its own
+   `stripeAccountId` cannot enable card payments (the panel says why) and
+   guests of a business that had them enabled are sent to "pay at the
+   register". Connecting accounts is module 17b; it must ship before any
+   restaurant that is not yours goes live.
+
+### Adding a business to a running deployment
+
+Nobody opens the database. With the stack already up and `BUSINESS_ROOT_DOMAIN`
+set (previous section), run the tenants command as the database owner, the
+same connection the migrations use (it refuses the restricted application role
+rather than fail halfway):
+
+```bash
+# a chain, if the new business belongs to one
+docker compose run --rm --entrypoint "" migrate npx tsx scripts/tenants.ts \
+  create-organization --slug marea-group --name "Marea Group"
+
+# the business, and its first administrator in one go
+docker compose run --rm --entrypoint "" migrate npx tsx scripts/tenants.ts \
+  create-business --slug cala --name Cala --organization marea-group \
+  --timezone America/Hermosillo --currency MXN --locale es \
+  --admin-email ana@cala.mx --admin-name "Ana Cota"
+
+# the owner of the chain, who moves between its businesses
+docker compose run --rm --entrypoint "" migrate npx tsx scripts/tenants.ts \
+  create-org-admin --organization marea-group --email dueno@marea.mx --name "Dueño"
+
+# what exists, and where each business answers
+docker compose run --rm --entrypoint "" migrate npx tsx scripts/tenants.ts list
+```
+
+Each command prints what it made. A temporary password is shown **once**, on
+that terminal, and the person must change it at first sign-in. Then:
+
+1. The business answers at `https://<slug>.<BUSINESS_ROOT_DOMAIN>` straight
+   away (the wildcard record and certificate already cover it). Its slug is a
+   subdomain, so it is one lowercase word with inner hyphens, and a few names
+   (`www`, `admin`, `api`...) are refused.
+2. The administrator signs in there, at `/admin`, and sets up hours, tables and
+   a menu. On a branch of a chain, **Menu → Copy a menu from another branch**
+   fills an empty menu from a sister branch in one click (dishes, categories,
+   modifiers, photos and translations; stock counts start at zero and prices are
+   copied as they are).
+3. Card payments start **off**. From the second business on, one without a
+   Stripe account of its own cannot take cards, and the panel says why.
+
+`npm run tenants` does the same from a checkout with `DIRECT_URL` (or
+`DATABASE_URL`) pointing at the owner. The seed (`npm run db:seed`, local only)
+creates the two-business example the tests use: `marea` and `cala`, one chain,
+and `owner@marea.test` to move between them.
 
 ## Alternatives
 

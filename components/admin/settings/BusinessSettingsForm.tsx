@@ -16,6 +16,8 @@ export type BusinessSettings = {
   defaultReservationMinutes: number;
   maxPartySize: number;
   acceptsOnlinePayment: boolean;
+  /** False when the business has no Stripe account of its own and shares a deployment with others. */
+  onlinePaymentAllowed: boolean;
   minBookingLeadMinutes: number;
   minCancelLeadMinutes: number;
   addressLine1: string | null;
@@ -170,13 +172,19 @@ export function BusinessSettingsForm({ dict, business }: { dict: SettingsDict; b
           <div>
             <div className="text-[13px] font-medium text-on-surface">{dict.onlinePaymentLabel}</div>
             <div className="text-[11.5px] text-on-surface-muted">{dict.onlinePaymentHint}</div>
+            {!business.onlinePaymentAllowed && (
+              <div role="note" className="mt-[4px] text-[11.5px] text-warning">
+                {dict.onlinePaymentNeedsAccount}
+              </div>
+            )}
           </div>
           <button
             type="button"
             role="switch"
+            disabled={!business.onlinePaymentAllowed}
             aria-checked={acceptsOnlinePayment}
             onClick={() => setAcceptsOnlinePayment((v) => !v)}
-            className={`relative h-[20px] w-[34px] shrink-0 rounded-full transition-colors ${
+            className={`relative h-[20px] w-[34px] shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
               acceptsOnlinePayment ? "bg-success" : "bg-border"
             }`}
           >

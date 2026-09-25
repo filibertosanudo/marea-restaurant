@@ -130,4 +130,36 @@ describe("listening", () => {
     expect(board.filter((e) => e.kind === "order")).toHaveLength(2);
     expect(tracked.filter((e) => e.kind === "order").map((e) => (e.kind === "order" ? e.orderId : null))).toEqual([mine.id]);
   });
+
+  it("never delivers one business's changes to another business's screens, through the real triggers", async () => {
+    const marea = await makeBusiness({ slug: "marea" });
+    const cala = await makeBusiness({ slug: "cala" });
+    const mareaOrder = await makeOrder(marea.id);
+    const calaOrder = await makeOrder(cala.id);
+    const hub = makeHub("auto", () => createListenClient() as unknown as ListenClient);
+    const mareaBoard: RealtimeEvent[] = [];
+    const calaBoard: RealtimeEvent[] = [];
+    const calaTracksMarea: RealtimeEvent[] = [];
+    unsubscribers.push(hub.subscribe({ businessId: marea.id }, (e) => mareaBoard.push(e)));
+    unsubscribers.push(hub.subscribe({ businessId: cala.id }, (e) => calaBoard.push(e)));
+    // A subscription naming another business's order id, as a forged token
+    // would: still scoped to its own business, so it hears nothing.
+    unsubscribers.push(hub.subscribe({ businessId: cala.id, orderId: mareaOrder.id }, (e) => calaTracksMarea.push(e)));
+    await until(() => hub.mode === "listen");
+    await sleep(400);
+    mareaBoard.length = 0;
+    calaBoard.length = 0;
+    calaTracksMarea.length = 0;
+
+    await prisma.orderStatusEvent.create({ data: { orderId: mareaOrder.id, toStatus: "PREPARING" } });
+    await prisma.orderStatusEvent.create({ data: { orderId: calaOrder.id, toStatus: "READY" } });
+    await until(() => mareaBoard.length > 0 && calaBoard.length > 0);
+    await sleep(100);
+
+    const orders = (events: RealtimeEvent[]) =>
+      events.filter((e) => e.kind === "order").map((e) => (e.kind === "order" ? e.orderId : null));
+    expect(orders(mareaBoard)).toEqual([mareaOrder.id]);
+    expect(orders(calaBoard)).toEqual([calaOrder.id]);
+    expect(calaTracksMarea).toEqual([]);
+  });
 });

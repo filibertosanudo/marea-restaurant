@@ -5,7 +5,7 @@ import { invalidatePublicCache } from "@/lib/cache/public";
 import { prisma } from "@/lib/prisma";
 import { Prisma, UserRole } from "@/lib/generated/prisma/client";
 import { requireRole } from "@/lib/auth/permissions";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 
 const ADMIN_ROLES = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
 const TESTIMONIALS_PATH = "/admin/testimonios";
@@ -19,7 +19,7 @@ export type ModerationResult = { success: true } | { error: "not_found" };
 
 export async function approveTestimonialAction(id: string): Promise<ModerationResult> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   try {
     await prisma.testimonial.update({
       where: { id, businessId: business.id },
@@ -37,7 +37,7 @@ export async function approveTestimonialAction(id: string): Promise<ModerationRe
 /** Rejecting never edits or deletes the customer's words — it only moves the row out of the pending queue. */
 export async function rejectTestimonialAction(id: string): Promise<ModerationResult> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   try {
     await prisma.testimonial.update({
       where: { id, businessId: business.id },
@@ -57,7 +57,7 @@ export async function toggleFeaturedTestimonialAction(
   isFeatured: boolean
 ): Promise<ModerationResult> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   try {
     await prisma.testimonial.update({
       where: { id, businessId: business.id },
@@ -80,7 +80,7 @@ export async function toggleFeaturedTestimonialAction(
  */
 export async function reorderTestimonialsAction(orderedIds: string[]): Promise<ModerationResult> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   try {
     await prisma.$transaction(
       orderedIds.map((id, index) =>

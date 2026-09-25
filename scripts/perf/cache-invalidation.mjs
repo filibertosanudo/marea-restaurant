@@ -1,7 +1,7 @@
 // End-to-end check of the public cache: an edit made through the real admin
 // Server Action must show on /menu on the very next request, and an
 // unrelated request must be served from the cache in between.
-import { pool, actionIds, login, callAction, BASE_URL, fakeIp } from "./lib.mjs";
+import { pool, actionIds, login, callAction, BASE_URL, fakeIp, BID } from "./lib.mjs";
 
 const db = pool();
 const ids = actionIds();
@@ -9,7 +9,7 @@ const admin = await login();
 
 const { rows } = await db.query(
   `select i.id, t.name from "MenuItem" i join "MenuItemTranslation" t on t."menuItemId" = i.id and t.locale = 'en'
-   where i."isAvailable" and i."deletedAt" is null and i."trackInventory" = false order by i.id limit 1`
+   where i."businessId" = ${BID} and i."isAvailable" and i."deletedAt" is null and i."trackInventory" = false order by i.id limit 1`
 );
 const { id, name } = rows[0];
 

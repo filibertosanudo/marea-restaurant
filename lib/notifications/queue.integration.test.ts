@@ -33,6 +33,30 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+describe("processQueue across businesses", () => {
+  it("renders each job with the name and address of the business that queued it", async () => {
+    const marea = await makeBusiness({ slug: "marea", name: "Marea", addressLine1: "Av. del Mar 123" });
+    const cala = await makeBusiness({ slug: "cala", name: "Cala", addressLine1: "Calle Roca 9" });
+    await makeQueuedJob(marea.id, { recipientEmail: "a@example.com" });
+    await makeQueuedJob(cala.id, { recipientEmail: "b@example.com" });
+    const sent: Record<string, string> = {};
+    vi.mocked(getMailer).mockReturnValue({
+      send: vi.fn(async (msg: { to: string; text: string }) => {
+        sent[msg.to] = msg.text;
+        return { providerMessageId: null };
+      }),
+    });
+
+    const result = await processQueue(20);
+
+    expect(result).toEqual({ claimed: 2, sent: 2, failed: 0 });
+    expect(sent["a@example.com"]).toContain("Marea");
+    expect(sent["a@example.com"]).not.toContain("Cala");
+    expect(sent["b@example.com"]).toContain("Cala");
+    expect(sent["b@example.com"]).not.toContain("Marea");
+  });
+});
+
 describe("processQueue", () => {
   it("sends a due job and marks it SENT", async () => {
     const business = await makeCurrentBusiness();

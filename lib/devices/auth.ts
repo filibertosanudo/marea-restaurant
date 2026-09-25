@@ -1,6 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { hashDeviceToken } from "@/lib/devices/token";
+import { businessIdForDeviceTokenHash } from "@/lib/tenancy/discover";
+import { runInTenant } from "@/lib/tenancy/context";
 import type { Device } from "@/lib/generated/prisma/client";
 
 export class DeviceAuthError extends Error {
@@ -36,4 +38,22 @@ export async function requireDevice(request: Request): Promise<Device> {
   });
 
   return device;
+}
+
+/**
+ * requireDevice() plus everything the route does afterwards, acting for the
+ * device's business. The token is the only thing the agent presents, so the
+ * business is found from it first (lib/tenancy/discover.ts) and the rest of
+ * the request runs inside that business, under the row level security
+ * policies like any other request.
+ */
+export async function withDevice<T>(request: Request, handler: (device: Device) => Promise<T>): Promise<T> {
+  const auth = request.headers.get("authorization") ?? "";
+  const [scheme, token] = auth.split(" ");
+  if (scheme !== "Bearer" || !token) {
+    throw new DeviceAuthError("Missing bearer token");
+  }
+  const businessId = await businessIdForDeviceTokenHash(hashDeviceToken(token));
+  if (!businessId) throw new DeviceAuthError("Invalid or inactive device token");
+  return runInTenant(businessId, async () => handler(await requireDevice(request)));
 }

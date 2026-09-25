@@ -1,6 +1,8 @@
 import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
+import { runInTenant } from "@/lib/tenancy/context";
+import { businessIdForPaymentIntent } from "@/lib/tenancy/discover";
 import { stripe } from "@/lib/stripe/client";
 import { applyStripeEvent, resolveChargeDetailsForEvent, resolveRefundsForEvent } from "@/lib/payments/webhook-handlers";
 import { isUniqueConstraintError } from "@/lib/payments/prisma-errors";
@@ -46,8 +48,16 @@ export async function POST(request: Request) {
   }
   const refunds = await resolveRefundsForEvent(event);
 
+  // The event is signed, so the PaymentIntent it names is trustworthy; the
+  // business it belongs to is found from it, and the write happens inside
+  // that business like any other. An event that names no known payment acts
+  // for nobody and so changes nothing but its own idempotency record.
+  const intentId = paymentIntentIdOf(event);
+  const businessId = intentId ? await businessIdForPaymentIntent(intentId) : null;
+  const inBusiness = <T,>(fn: () => Promise<T>) => (businessId ? runInTenant(businessId, fn) : fn());
+
   try {
-    await prisma.$transaction(async (tx) => {
+    await inBusiness(() => prisma.$transaction(async (tx) => {
       await tx.stripeWebhookEvent.create({
         data: {
           eventId: event.id,
@@ -57,7 +67,7 @@ export async function POST(request: Request) {
         },
       });
       await applyStripeEvent(tx, event, chargeDetails, refunds);
-    });
+    }));
   } catch (err) {
     if (isUniqueConstraintError(err)) {
       // Already processed this event id — a Stripe redelivery. 2xx, no-op.
@@ -68,4 +78,13 @@ export async function POST(request: Request) {
   }
 
   return Response.json({ received: true });
+}
+
+/** The PaymentIntent an event is about, whichever object it carries: the intent itself, or a charge or refund that points at one. */
+function paymentIntentIdOf(event: Stripe.Event): string | null {
+  const object = event.data.object as { object?: string; id?: string; payment_intent?: string | { id: string } | null };
+  if (object.object === "payment_intent") return object.id ?? null;
+  const ref = object.payment_intent;
+  if (typeof ref === "string") return ref;
+  return ref?.id ?? null;
 }

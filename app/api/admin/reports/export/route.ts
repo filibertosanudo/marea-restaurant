@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { resolveReportRange } from "@/lib/reports/date-range";
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
   const datasetParam = params.get("dataset");
   if (!isDataset(datasetParam)) return new Response("Unknown dataset", { status: 400 });
 
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
   const lang = await getAdminLang();
   const dict = getDictionary(lang);
 

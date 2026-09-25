@@ -7,7 +7,7 @@
 //   node scripts/perf/place-orders.mjs 60
 //   node scripts/perf/board-drill.mjs
 import { chromium } from "@playwright/test";
-import { login, BASE_URL, pool, actionIds, callAction } from "./lib.mjs";
+import { login, BASE_URL, pool, actionIds, callAction, BID } from "./lib.mjs";
 
 const jar = await login();
 const ids = actionIds();
@@ -23,7 +23,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Something delivered inside the 12 h window, so the lazy column has cards to load.
 {
-  const { rows } = await db.query(`select id from "Order" where status = 'PENDING' and "placedAt" > now() - interval '6 hours' order by "placedAt" limit 3`);
+  const { rows } = await db.query(`select id from "Order" where "businessId" = ${BID} and status = 'PENDING' and "placedAt" > now() - interval '6 hours' order by "placedAt" limit 3`);
   for (const row of rows) for (let step = 0; step < 3; step++) await (await callAction({ id: ids.advanceOrderStatusAction, path: "/admin/pedidos", args: [row.id], jar })).arrayBuffer();
 }
 
@@ -87,7 +87,7 @@ console.log("\n== /admin/pedidos");
   check("'ver más' loads the rest of the column", p2.cards === p2.badge && p2.more === null, `${p2.badge}/${p2.cards}`);
 
   // a change made elsewhere arrives as one card, not a page render
-  const { rows } = await db.query(`select id from "Order" where status = 'PENDING' order by "placedAt" asc limit 1`);
+  const { rows } = await db.query(`select id from "Order" where "businessId" = ${BID} and status = 'PENDING' order by "placedAt" asc limit 1`);
   const before = Date.now();
   await (await callAction({ id: ids.advanceOrderStatusAction, path: "/admin/pedidos", args: [rows[0].id], jar })).arrayBuffer();
   await sleep(1200);
@@ -166,7 +166,7 @@ console.log("\n== /admin/cocina");
   check("READY cards on the kitchen screen show no empty button", await page.evaluate(() => [...document.querySelectorAll("div.flex.min-w-0.flex-1.flex-col.bg-surface-subtle")[2].querySelectorAll("button")].every((b) => b.textContent.trim() !== "")), `${ready.badge} ready`);
   check("kitchen never asked for the delivered column", !log.requests.some((r) => r.url.includes("status=DELIVERED")));
 
-  const { rows } = await db.query(`select id from "Order" where status = 'PENDING' order by "placedAt" desc limit 1`);
+  const { rows } = await db.query(`select id from "Order" where "businessId" = ${BID} and status = 'PENDING' order by "placedAt" desc limit 1`);
   const before = Date.now();
   await (await callAction({ id: ids.advanceOrderStatusAction, path: "/admin/pedidos", args: [rows[0].id], jar })).arrayBuffer();
   await sleep(1200);
@@ -196,7 +196,7 @@ console.log("\n== reconcile");
 // ------------------------------------------------------------ public page
 console.log("\n== /o/<token> (order tracking)");
 {
-  const { rows } = await db.query(`select id, "publicToken" from "Order" where status = 'PENDING' order by "placedAt" desc limit 1`);
+  const { rows } = await db.query(`select id, "publicToken" from "Order" where "businessId" = ${BID} and status = 'PENDING' order by "placedAt" desc limit 1`);
   const { page, log } = await open(`/o/${rows[0].publicToken}`);
   await sleep(1500);
   const before = await page.locator("main, body").first().innerText();

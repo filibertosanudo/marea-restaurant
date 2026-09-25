@@ -10,6 +10,7 @@ export const authMock = {
   signIn: vi.fn(),
   signOut: vi.fn(),
   auth: vi.fn(),
+  unstable_update: vi.fn(),
   // app/api/auth/[...nextauth]/route.ts destructures GET/POST off this —
   // no current *.integration.test.ts imports that route, but the shape
   // should match every @/auth call site, not just the ones exercised today.

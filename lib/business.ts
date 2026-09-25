@@ -2,11 +2,15 @@ import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { Prisma, type Business } from "@/lib/generated/prisma/client";
-import { env } from "@/lib/env";
+import { headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
+import { getSession } from "@/lib/auth/session";
+import { appOrigin, env } from "@/lib/env";
+import { businessOrigin } from "@/lib/business-origin";
+import { runInTenant } from "@/lib/tenancy/context";
+import { businessIdForSlug, businessIdForToken, onlyBusinessId } from "@/lib/tenancy/discover";
+import { slugFromHost } from "@/lib/business-host";
 import { cachedPublicRead, invalidatePublicCache } from "@/lib/cache/public";
-
-/** Tag scope for the business row: its id isn't known until the row is read, so the slug stands in. Read lazily: lib/env validates on first access, not at import. */
-export const businessRowCacheScope = (): string => env.BUSINESS_SLUG;
 
 // The data cache stores JSON, which turns Date and Decimal columns into
 // strings. Converting them explicitly, both ways, keeps `Business` honest
@@ -37,36 +41,133 @@ export function fromCacheable(c: ReturnType<typeof toCacheable>): Business {
   };
 }
 
-/** Expires the row (by slug) and everything keyed by business id; Server Actions only. */
-export function invalidateBusinessCache(businessId: string): void {
-  invalidatePublicCache("business", businessRowCacheScope());
-  invalidatePublicCache("business", businessId);
+// Three cache scopes, one per way a request can name a business. Every tag
+// carries the business (its id, its slug, or the literal "default" for the
+// bare-domain fallback) so two businesses never share an entry.
+const idScope = (id: string) => id;
+const slugScope = (slug: string) => `slug:${slug}`;
+const DEFAULT_SCOPE = "default";
+
+/** Expires every cached way of reaching this business's row; Server Actions only. */
+export function invalidateBusinessCache(business: Pick<Business, "id" | "slug">): void {
+  invalidatePublicCache("business", idScope(business.id));
+  invalidatePublicCache("business", slugScope(business.slug));
+  invalidatePublicCache("business", DEFAULT_SCOPE);
+}
+
+/** The domain subdomains hang off: BUSINESS_ROOT_DOMAIN, or the host of this deployment's own origin. */
+function rootDomain(): string {
+  return env.BUSINESS_ROOT_DOMAIN ?? new URL(appOrigin()).hostname;
+}
+
+async function loadRow(id: string): Promise<Business | null> {
+  // The Business table is scoped like any other: its row is visible to the
+  // business it belongs to, so it is read from inside that business.
+  return runInTenant(id, () => prisma.business.findFirst({ where: { id, deletedAt: null } }));
+}
+
+async function byId(id: string): Promise<Business | null> {
+  const cached = await cachedPublicRead("business", "business-row", idScope(id), async () => {
+    const row = await loadRow(id);
+    return row ? toCacheable(row) : null;
+  });
+  return cached ? fromCacheable(cached) : null;
+}
+
+async function bySlug(slug: string): Promise<Business | null> {
+  const cached = await cachedPublicRead(
+    "business",
+    "business-row",
+    slugScope(slug),
+    async () => {
+      const id = await businessIdForSlug(slug);
+      const row = id ? await loadRow(id) : null;
+      return row ? toCacheable(row) : null;
+    },
+    { tenantScoped: false }
+  );
+  return cached ? fromCacheable(cached) : null;
+}
+
+/** The only business, when there is exactly one: keeps a single-tenant deployment working on any hostname. Two or more and a bare domain names nobody. */
+async function onlyBusiness(): Promise<Business | null> {
+  const cached = await cachedPublicRead(
+    "business",
+    "business-row",
+    DEFAULT_SCOPE,
+    async () => {
+      const id = await onlyBusinessId();
+      const row = id ? await loadRow(id) : null;
+      return row ? toCacheable(row) : null;
+    },
+    { tenantScoped: false }
+  );
+  return cached ? fromCacheable(cached) : null;
+}
+
+async function byHost(): Promise<Business | null> {
+  const host = (await headers()).get("host") ?? "";
+  const slug = slugFromHost(host, rootDomain());
+  return slug ? bySlug(slug) : onlyBusiness();
+}
+
+/** getPublicBusiness() for callers that must not 404 (robots, sitemap): null when the host names nobody. */
+export const findPublicBusiness = cache(byHost);
+
+/**
+ * The business a public request is about, named by the host alone. Never
+ * by the session: a staff member's cookie must not turn another business's
+ * public page into their own (and an order placed there into theirs).
+ * Anything reachable without requireRole uses this.
+ *
+ * Two levels, and they are not the same thing: React's cache() deduplicates
+ * within one request, and the data cache underneath keeps the row across
+ * requests, so the first call is usually not a query either. The row's own
+ * `orderSequence` is stale in the cache by design; only the checkout
+ * transaction reads it, and it reads it from the row it just locked.
+ */
+export const getPublicBusiness = cache(async (): Promise<Business> => {
+  const business = await byHost();
+  if (!business) notFound();
+  return business;
+});
+
+export type LegacyTokenKind = "table" | "order" | "reservation";
+
+/**
+ * getPublicBusiness() for the pages that a printed QR code or an emailed
+ * link lands on. Those URLs were minted on the deployment's single origin;
+ * once businesses have their own subdomains, that origin names nobody. The
+ * token itself is an unguessable capability (see the schema), so it may
+ * find its business and send the visitor to the right subdomain, keeping
+ * the QR codes already stuck to the tables working. On a host that does
+ * name a business the token must belong to that business, as always.
+ */
+export async function getPublicBusinessForToken(kind: LegacyTokenKind, token: string, path: string): Promise<Business> {
+  const named = await byHost();
+  if (named) return named;
+  if (!env.BUSINESS_ROOT_DOMAIN) notFound();
+
+  const ownerId = await businessIdForToken(kind, token);
+  const business = ownerId ? await byId(ownerId) : null;
+  if (!business) notFound();
+  redirect(`${businessOrigin(business)}${path}`);
 }
 
 /**
- * v1 is single-tenant: one Business row. Every catalog query still goes
- * through this instead of a hardcoded id so multi-tenant later is a filter
- * change, not a rewrite — see docs/DATABASE.md.
- *
- * Two levels, and they are not the same thing: React's cache() deduplicates
- * within one request (root layout.tsx's generateMetadata, its own render and
- * the page it wraps each call this and only the first goes further, same as
- * lib/auth/session.ts's getSession()), and the data cache underneath keeps
- * the row across requests, so that first call is usually not a query either.
- * The row's own `orderSequence` is stale in the cache by design; only the
- * checkout transaction reads it, and it reads it from the row it just locked.
+ * The business an authenticated panel request acts on: the one the session
+ * was issued for. The JWT's businessId is re-checked against the
+ * membership every 60 s (auth.ts), which is what makes it safe to trust
+ * here. A session with no business (SUPER_ADMIN without a membership)
+ * falls back to the host, like a public request. Call it after
+ * requireRole/requirePageRole, never instead of them.
  */
-export const getCurrentBusiness = cache(async (): Promise<Business> => {
-  const cached = await cachedPublicRead("business", "business-row", businessRowCacheScope(), async () => {
-    const business = await prisma.business.findUnique({
-      where: { slug: env.BUSINESS_SLUG },
-    });
-    if (!business) {
-      throw new Error(`Business "${env.BUSINESS_SLUG}" not found — did you run the seed?`);
-    }
-    return toCacheable(business);
-  });
-  return fromCacheable(cached);
+export const getBusinessForRequest = cache(async (): Promise<Business> => {
+  const session = await getSession();
+  const sessionBusinessId = session?.user?.businessId;
+  const business = sessionBusinessId ? await byId(sessionBusinessId) : await byHost();
+  if (!business) notFound();
+  return business;
 });
 
 const translationSelect = {

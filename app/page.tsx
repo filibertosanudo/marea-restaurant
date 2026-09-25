@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { MareaLandingPage } from "@/components/marea-landing/MareaLandingPage";
-import { getCurrentBusiness, getPublicBusinessTranslations } from "@/lib/business";
+import { getPublicBusiness, getPublicBusinessTranslations } from "@/lib/business";
 import { getPublicMenuByLang, getRepresentativeMenuImageUrl } from "@/lib/menu/queries";
 import { listFeaturedPromotionsForLanding } from "@/lib/promotions/queries";
 import { listFeaturedTestimonialsForLanding } from "@/lib/testimonials/queries";
@@ -8,10 +8,10 @@ import { getPublicOpeningHours } from "@/lib/reservations/queries";
 import { toLandingContentByLang } from "@/lib/dto/landing";
 import { resolveSiteMetadataText } from "@/lib/seo/site-metadata";
 import { buildRestaurantJsonLd } from "@/lib/seo/restaurant-jsonld";
-import { appOrigin } from "@/lib/env";
+import { businessOrigin } from "@/lib/business-origin";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   const [{ title, description }, image] = await Promise.all([
     resolveSiteMetadataText(),
     getRepresentativeMenuImageUrl(business.id),
@@ -23,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title,
       description,
-      url: appOrigin(),
+      url: businessOrigin(business),
       siteName: business.name,
       type: "website",
       ...(image ? { images: [{ url: image }] } : {}),
@@ -38,7 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home() {
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
 
   const [menuByLang, promotions, testimonials, businessTranslations, openingHours, image, { description }] =
     await Promise.all([
@@ -62,7 +62,7 @@ export default async function Home() {
   const jsonLd = buildRestaurantJsonLd({
     name: business.name,
     description,
-    url: appOrigin(),
+    url: businessOrigin(business),
     image,
     addressLine1: business.addressLine1,
     addressLine2: business.addressLine2,
@@ -71,7 +71,7 @@ export default async function Home() {
     phone: business.phone,
     email: business.email,
     openingHours,
-    menuUrl: `${appOrigin()}/menu`,
+    menuUrl: `${businessOrigin(business)}/menu`,
   });
 
   return (

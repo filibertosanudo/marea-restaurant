@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { getOrderPaymentDetailRaw } from "@/lib/orders/queries";
 import { toOrderPaymentDetailDTO, type OrderPaymentDetailDTO } from "@/lib/orders/dto";
 import { stripe } from "@/lib/stripe/client";
@@ -191,7 +191,7 @@ export async function createRefundAction(
   input: { mode: "FULL" | "PARTIAL"; amount: string; reason: string }
 ): Promise<CreateRefundResult> {
   const session = await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const trimmedReason = input.reason.trim();
   if (!trimmedReason) return { ok: false, error: "reason_required" };

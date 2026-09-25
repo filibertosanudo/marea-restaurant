@@ -1,12 +1,12 @@
 "use server";
 
-import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
 import { isAdminRole } from "@/lib/auth/roles";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { hashPassword } from "@/lib/auth/password";
+import { generateTemporaryPassword } from "@/lib/auth/temporary-password";
 import { teamMemberSchema } from "@/lib/team/schemas";
 import { UserRole } from "@/lib/generated/prisma/client";
 
@@ -26,23 +26,12 @@ export type TeamFormState =
   | { error: string; fieldErrors?: Record<string, string> }
   | undefined;
 
-// Not meant to be memorable — the admin hands it to the employee once, who
-// changes it on first login (mustChangePassword). Excludes visually
-// ambiguous characters (0/O, 1/l/I).
-function generateTemporaryPassword() {
-  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  const bytes = randomBytes(12);
-  let out = "";
-  for (const byte of bytes) out += alphabet[byte % alphabet.length];
-  return `${out}!`;
-}
-
 export async function createTeamMemberAction(
   _prevState: TeamFormState,
   formData: FormData
 ): Promise<TeamFormState> {
   await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const parsed = teamMemberSchema.safeParse({
     name: String(formData.get("name") ?? ""),
@@ -83,7 +72,7 @@ export async function createTeamMemberAction(
 
 export async function setTeamMemberActiveAction(membershipId: string, isActive: boolean): Promise<TeamMutationResult> {
   const session = await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const membership = await prisma.businessMembership.findFirst({
     where: { id: membershipId, businessId: business.id },
@@ -131,7 +120,7 @@ export async function setTeamMemberRoleAction(
   role: "STAFF" | "BUSINESS_ADMIN"
 ): Promise<TeamMutationResult> {
   const session = await requireRole(...ADMIN_ROLES);
-  const business = await getCurrentBusiness();
+  const business = await getBusinessForRequest();
 
   const membership = await prisma.businessMembership.findFirst({
     where: { id: membershipId, businessId: business.id },

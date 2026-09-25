@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/lib/generated/prisma/client";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusiness } from "@/lib/business";
 import { getOrderForReviewByPublicToken } from "@/lib/orders/queries";
 import { resolveOrderAuthorName } from "@/lib/orders/dto";
 import { getOrderLang } from "@/lib/i18n/cookie";
@@ -42,7 +42,7 @@ export async function submitTestimonialAction(
     return { ok: false, error: "rate_limited" };
   }
 
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   const order = await getOrderForReviewByPublicToken(business.id, publicToken);
   if (!order) return { ok: false, error: "not_found" };
   if (order.status !== "DELIVERED") return { ok: false, error: "not_reviewable" };

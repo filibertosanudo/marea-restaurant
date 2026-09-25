@@ -18,13 +18,19 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "./generated/prisma/client";
 import { env } from "./env";
+import { TenantPool } from "./db/tenant-pool";
+import { currentTenant } from "./tenancy/request-tenant";
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
 function createPrismaClient(): PrismaClient {
-  const adapter = new PrismaPg(
+  // The application's own client: connects as the restricted `marea_app`
+  // role and stamps the current business onto every connection it hands out,
+  // which is what the row level security policies compare against (see
+  // lib/db/tenant-pool.ts and docs/DEPLOY.md). Never the table owner.
+  const pool = new TenantPool(
     {
       connectionString: env.DATABASE_URL,
       // Outside serverless the app is a long-lived process with its own pool
@@ -33,8 +39,9 @@ function createPrismaClient(): PrismaClient {
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 5_000,
     },
-    env.DATABASE_SCHEMA ? { schema: env.DATABASE_SCHEMA } : undefined
+    currentTenant
   );
+  const adapter = new PrismaPg(pool, env.DATABASE_SCHEMA ? { schema: env.DATABASE_SCHEMA } : undefined);
   return new PrismaClient({ adapter });
 }
 

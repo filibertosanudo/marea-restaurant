@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusinessForToken } from "@/lib/business";
 import { getOrderForReviewByPublicToken } from "@/lib/orders/queries";
 import { toReviewableOrderDTO } from "@/lib/orders/dto";
 import { getOrderLang } from "@/lib/i18n/cookie";
@@ -16,7 +16,7 @@ export default async function ReviewPage({
   params: Promise<{ publicToken: string }>;
 }) {
   const { publicToken } = await params;
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusinessForToken("order", publicToken, `/review/${publicToken}`);
   const lang = await getOrderLang(business.defaultLocale === "en" ? "en" : "es");
   const dict = getReviewDictionary(lang);
 

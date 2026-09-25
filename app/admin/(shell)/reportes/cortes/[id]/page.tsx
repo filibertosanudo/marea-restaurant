@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { UserRole } from "@/lib/generated/prisma/client";
 import { requirePageRole } from "@/lib/auth/permissions";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getCashSessionDetailRaw, getCashSessionActivityRaw } from "@/lib/cash-register/queries";
@@ -19,7 +19,7 @@ export default async function CashSessionReceiptPage({ params }: { params: Promi
   await requirePageRole("/admin/login", UserRole.STAFF, UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN);
 
   const { id } = await params;
-  const [business, lang] = await Promise.all([getCurrentBusiness(), getAdminLang()]);
+  const [business, lang] = await Promise.all([getBusinessForRequest(), getAdminLang()]);
   const dict = getDictionary(lang).cashRegister;
 
   const raw = await getCashSessionDetailRaw(business.id, id);

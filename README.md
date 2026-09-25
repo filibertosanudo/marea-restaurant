@@ -129,6 +129,12 @@ Dev accounts (seeded, password hash regenerated on every `npm run db:seed`):
 | `super@marea.test` | `MareaSuper123!` | SUPER_ADMIN |
 | `admin@marea.test` | `MareaAdmin123!` | BUSINESS_ADMIN |
 | `mesero@marea.test` | `MareaTemp123!` | STAFF — forces a password change on first login |
+| `owner@marea.test` | `MareaOwner123!` | ORG_ADMIN — owner of the "Marea Group" chain: Marea and Cala, switchable |
+| `admin@cala.test` | `CalaAdmin123!` | BUSINESS_ADMIN of Cala only |
+
+The seed creates two businesses, so the bare address (`localhost:3000`) names
+neither: use `marea.localhost:3000` and `cala.localhost:3000`, with
+`BUSINESS_ROOT_DOMAIN=localhost` in `.env` (browsers resolve `*.localhost`).
 
 Never reuse these outside a local/dev environment.
 

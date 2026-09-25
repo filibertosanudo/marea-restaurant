@@ -10,7 +10,7 @@
 // Needs pg_stat_statements on the database being measured; all counts are
 // "statements the app ran", not "connections", so they hold under any pooler.
 import zlib from "node:zlib";
-import { pool, login, BASE_URL, percentile, fakeIp } from "./lib.mjs";
+import { pool, login, BASE_URL, percentile, fakeIp, BID } from "./lib.mjs";
 
 const [command, ...rest] = process.argv.slice(2);
 const db = pool();
@@ -87,7 +87,7 @@ async function payload() {
   const jar = await login();
   const cookie = { cookie: jar.header() };
   const { rows } = await db.query(
-    `select count(*)::int n from "Order" where status not in ('DELIVERED','CANCELLED')`
+    `select count(*)::int n from "Order" where "businessId" = ${BID} and status not in ('DELIVERED','CANCELLED')`
   );
   await reset();
   const html = await fetchSize(`${BASE_URL}/admin/pedidos`, cookie);
@@ -104,14 +104,14 @@ async function payload() {
 async function event() {
   const jar = await login();
   const cookie = { cookie: jar.header() };
-  const { rows } = await db.query(`select id from "Order" where status = 'PENDING' order by "placedAt" limit 1`);
+  const { rows } = await db.query(`select id from "Order" where "businessId" = ${BID} and status = 'PENDING' order by "placedAt" limit 1`);
   await reset();
   const card = await fetchSize(`${BASE_URL}/api/orders/board?ids=${rows[0].id}`, cookie);
   const cardStatements = await statementCount();
   await reset();
   const page = await fetchSize(`${BASE_URL}/admin/pedidos`, { ...cookie, rsc: "1" });
   const pageStatements = await statementCount();
-  const live = await db.query(`select count(*)::int n from "Order" where status in ('PENDING','PREPARING','READY')`);
+  const live = await db.query(`select count(*)::int n from "Order" where "businessId" = ${BID} and status in ('PENDING','PREPARING','READY')`);
   console.log(JSON.stringify({ liveOrders: live.rows[0].n, card: { ...card, statements: cardStatements }, page: { ...page, statements: pageStatements } }));
 }
 

@@ -13,6 +13,7 @@ function sessionUser(role: UserRole, overrides: { revoked?: boolean; mustChangeP
     name: "Test Staff",
     role,
     businessId: null,
+    orgAdmin: false,
     mustChangePassword: overrides.mustChangePassword ?? false,
     revoked: overrides.revoked ?? false,
   };

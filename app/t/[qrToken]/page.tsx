@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusinessForToken } from "@/lib/business";
 import { getTableByQrToken } from "@/lib/tables/queries";
 import { getMenuPageData } from "@/lib/menu/page-data";
 import { MenuBrowser } from "@/components/order/MenuBrowser";
@@ -15,7 +15,7 @@ export default async function TablePage({
   params: Promise<{ qrToken: string }>;
 }) {
   const { qrToken } = await params;
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusinessForToken("table", qrToken, `/t/${qrToken}`);
   const table = await getTableByQrToken(business.id, qrToken);
 
   if (!table) {

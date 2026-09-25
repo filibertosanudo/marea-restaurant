@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe/client";
 import { createPaymentIntentAction } from "./stripe-actions";
 import { makeBusiness, makeOrder } from "@/test/factories";
+import { setTestHost } from "@/test/stubs/next-headers";
+
+process.env.BUSINESS_ROOT_DOMAIN = "localhost";
 import { runConcurrently, partitionSettled } from "@/test/concurrency";
 
 afterEach(() => {
@@ -17,6 +20,19 @@ describe("createPaymentIntentAction", () => {
     const result = await createPaymentIntentAction(order.publicToken);
 
     expect(result).toEqual({ ok: false, error: "online_payment_disabled" });
+  });
+
+  it("refuses a business with no Stripe account of its own once another business shares the deployment", async () => {
+    const marea = await makeBusiness({ slug: "marea", acceptsOnlinePayment: true });
+    await makeBusiness({ slug: "cala", acceptsOnlinePayment: true });
+    const order = await makeOrder(marea.id, { total: "23.19" });
+    setTestHost("marea.localhost:3000");
+    const createSpy = vi.spyOn(stripe.paymentIntents, "create");
+
+    const result = await createPaymentIntentAction(order.publicToken);
+
+    expect(result).toEqual({ ok: false, error: "online_payment_disabled" });
+    expect(createSpy).not.toHaveBeenCalled();
   });
 
   it("reports not_found for an unknown public token", async () => {

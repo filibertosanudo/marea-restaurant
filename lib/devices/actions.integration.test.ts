@@ -5,7 +5,7 @@ import { setTestSession, sessionUserFromRow } from "@/test/stubs/auth-session";
 import { createDeviceAction, rotateDeviceTokenAction, setDeviceActiveAction, getPrinterStatusAction } from "./actions";
 import { hashDeviceToken } from "./token";
 
-// getCurrentBusiness() resolves by a fixed slug, same as board-actions.ts.
+// With one business and no session businessId, the request resolves to it, same as board-actions.ts.
 function makeCurrentBusiness() {
   return makeBusiness({ slug: "marea" });
 }

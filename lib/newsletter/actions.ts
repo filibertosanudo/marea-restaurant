@@ -2,8 +2,8 @@
 
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/business";
-import { appOrigin } from "@/lib/env";
+import { getPublicBusiness } from "@/lib/business";
+import { businessOrigin } from "@/lib/business-origin";
 import type { Lang } from "@/lib/i18n/lang";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import { subscribeSchema } from "@/lib/newsletter/schemas";
@@ -36,7 +36,7 @@ export async function subscribeAction(email: string, lang: Lang): Promise<Subscr
   }
   await recordScopeAttempt(SUBSCRIBE_SCOPE, ip);
 
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
 
   await prisma.$transaction(async (tx) => {
     const existing = await tx.newsletterSubscriber.findUnique({
@@ -72,7 +72,7 @@ export async function subscribeAction(email: string, lang: Lang): Promise<Subscr
         recipientEmail: subscriber.email,
         locale: lang,
         payload: {
-          confirmUrl: `${appOrigin()}/newsletter/confirm/${subscriber.unsubscribeToken}`,
+          confirmUrl: `${businessOrigin(business)}/newsletter/confirm/${subscriber.unsubscribeToken}`,
         },
         // Scoped to this write, not just the subscriber, since the same
         // address can legitimately go through this cycle more than once

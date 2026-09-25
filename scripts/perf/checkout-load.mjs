@@ -3,7 +3,7 @@
 // what is measured is order creation under contention, not cart building.
 //
 //   node scripts/perf/checkout-load.mjs [orders=100] [concurrency=20]
-import { pool, actionIds, prepareCart, submitCheckout, runPool, percentile, fakeIp } from "./lib.mjs";
+import { pool, actionIds, prepareCart, submitCheckout, runPool, percentile, fakeIp, BID } from "./lib.mjs";
 
 const orders = Number(process.argv[2] ?? 100);
 const concurrency = Number(process.argv[3] ?? 20);
@@ -14,10 +14,10 @@ const ids = actionIds();
 const db = pool();
 
 const { rows: dishes } = await db.query(
-  `select id from "MenuItem" where "isAvailable" and "deletedAt" is null and "trackInventory" = false order by id`
+  `select id from "MenuItem" where "businessId" = ${BID} and "isAvailable" and "deletedAt" is null and "trackInventory" = false order by id`
 );
 const itemIds = dishes.map((r) => r.id);
-const before = (await db.query(`select count(*)::int n from "Order"`)).rows[0].n;
+const before = (await db.query(`select count(*)::int n from "Order" where "businessId" = ${BID}`)).rows[0].n;
 
 const jars = await runPool(orders, 10, (i) => prepareCart({ ids, itemIds, ip: fakeIp(ipBase + i), index: i }));
 
@@ -41,9 +41,9 @@ const seconds = (performance.now() - startedAt) / 1000;
 clearInterval(sampler);
 
 const latencies = results.filter((r) => r.ok).map((r) => r.ms).sort((a, b) => a - b);
-const after = (await db.query(`select count(*)::int n from "Order"`)).rows[0].n;
+const after = (await db.query(`select count(*)::int n from "Order" where "businessId" = ${BID}`)).rows[0].n;
 const duplicates = (
-  await db.query(`select count(*)::int n from (select "orderNumber" from "Order" group by 1 having count(*) > 1) d`)
+  await db.query(`select count(*)::int n from (select "orderNumber" from "Order" group by "businessId", "orderNumber" having count(*) > 1) d`)
 ).rows[0].n;
 const failures = results.filter((r) => !r.ok);
 

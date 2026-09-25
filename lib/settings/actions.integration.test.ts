@@ -125,6 +125,31 @@ describe("updateBusinessSettingsAction", () => {
     expect(updated.maxPartySize).toBe(8);
   });
 
+  it("refuses to enable card payments for a business with no Stripe account once another shares the deployment", async () => {
+    const business = await makeBusiness({ slug: "marea", acceptsOnlinePayment: false });
+    await makeBusiness({ slug: "cala" });
+    setTestSession(sessionUserFromRow(await makeStaff("BUSINESS_ADMIN"), { businessId: business.id }));
+
+    const fields = {
+      defaultLocale: "en",
+      currency: "USD",
+      timezone: "America/Tijuana",
+      defaultReservationMinutes: "60",
+      maxPartySize: "8",
+      minBookingLeadMinutes: "15",
+      minCancelLeadMinutes: "60",
+    };
+    const refused = await updateBusinessSettingsAction(undefined, closureForm({ ...fields, acceptsOnlinePayment: "on" }));
+
+    expect(refused).toEqual({ error: "invalid", fieldErrors: { acceptsOnlinePayment: "no_connected_account" } });
+    expect((await prisma.business.findUniqueOrThrow({ where: { id: business.id } })).acceptsOnlinePayment).toBe(false);
+
+    // With an account of its own it may.
+    await prisma.business.update({ where: { id: business.id }, data: { stripeAccountId: "acct_test" } });
+    const allowed = await updateBusinessSettingsAction(undefined, closureForm({ ...fields, acceptsOnlinePayment: "on" }));
+    expect(allowed).toEqual({ success: true });
+  });
+
   it("rejects a booking lead time longer than the cancel lead time", async () => {
     await makeBusiness({ slug: "marea" });
     await loginAsAdmin();

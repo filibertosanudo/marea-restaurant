@@ -79,6 +79,29 @@ export function makeOrder(businessId: string, overrides: Partial<Prisma.OrderUnc
   });
 }
 
+export function makeOrganization(overrides: Partial<Prisma.OrganizationCreateInput> = {}) {
+  return prisma.organization.create({
+    data: {
+      slug: `org-${createId()}`,
+      name: "Test Organization",
+      ...overrides,
+    },
+  });
+}
+
+/** An ORG_ADMIN and the organization they administer, the pair the database requires together. */
+export function makeOrgAdmin(organizationId: string, overrides: Partial<Prisma.UserUncheckedCreateInput> = {}) {
+  return makeStaff("ORG_ADMIN", { organizationId, ...overrides });
+}
+
+export function makeMembership(
+  userId: string,
+  businessId: string,
+  overrides: Partial<Prisma.BusinessMembershipUncheckedCreateInput> = {}
+) {
+  return prisma.businessMembership.create({ data: { userId, businessId, ...overrides } });
+}
+
 export function makeStaff(role: UserRole, overrides: Partial<Prisma.UserUncheckedCreateInput> = {}) {
   return prisma.user.create({
     data: {

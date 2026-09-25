@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { UserRole } from "@/lib/generated/prisma/client";
 import { requirePageRole } from "@/lib/auth/permissions";
-import { getCurrentBusiness } from "@/lib/business";
+import { getBusinessForRequest } from "@/lib/business";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { resolveReportRange, type ReportRangeKey, type CalendarDate } from "@/lib/reports/date-range";
@@ -33,32 +33,39 @@ function formatDelta(pct: number | null): string | null {
 }
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  await requirePageRole("/admin/menu", UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN);
+  const session = await requirePageRole("/admin/menu", UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN);
 
   const params = await searchParams;
-  const [business, lang] = await Promise.all([getCurrentBusiness(), getAdminLang()]);
+  const [business, lang] = await Promise.all([getBusinessForRequest(), getAdminLang()]);
   const dict = getDictionary(lang).reports;
   const locale = toIntlLocale(lang);
 
   const view = params.view === "cortes" ? "cortes" : "ventas";
   const viewTabs = (
-    <div className="flex gap-[4px] rounded-full border border-border bg-surface-subtle p-[3px]">
-      <Link
-        href="/admin/reportes?view=ventas"
-        className={`rounded-full px-md py-[6px] text-[12.5px] font-medium transition-colors ${
-          view === "ventas" ? "bg-primary text-on-primary" : "text-on-surface-muted hover:bg-surface"
-        }`}
-      >
-        {dict.viewSalesTab}
-      </Link>
-      <Link
-        href="/admin/reportes?view=cortes"
-        className={`rounded-full px-md py-[6px] text-[12.5px] font-medium transition-colors ${
-          view === "cortes" ? "bg-primary text-on-primary" : "text-on-surface-muted hover:bg-surface"
-        }`}
-      >
-        {dict.viewCortesTab}
-      </Link>
+    <div className="flex flex-wrap items-center gap-md">
+      {session.user.orgAdmin && (
+        <Link href="/admin/reportes/organizacion" className="text-[12.5px] font-medium text-primary hover:underline">
+          {dict.orgReportLink}
+        </Link>
+      )}
+      <div className="flex gap-[4px] rounded-full border border-border bg-surface-subtle p-[3px]">
+        <Link
+          href="/admin/reportes?view=ventas"
+          className={`rounded-full px-md py-[6px] text-[12.5px] font-medium transition-colors ${
+            view === "ventas" ? "bg-primary text-on-primary" : "text-on-surface-muted hover:bg-surface"
+          }`}
+        >
+          {dict.viewSalesTab}
+        </Link>
+        <Link
+          href="/admin/reportes?view=cortes"
+          className={`rounded-full px-md py-[6px] text-[12.5px] font-medium transition-colors ${
+            view === "cortes" ? "bg-primary text-on-primary" : "text-on-surface-muted hover:bg-surface"
+          }`}
+        >
+          {dict.viewCortesTab}
+        </Link>
+      </div>
     </div>
   );
 

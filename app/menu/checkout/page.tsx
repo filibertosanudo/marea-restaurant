@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusiness } from "@/lib/business";
 import { getCartWithLivePrices } from "@/lib/cart/queries";
 import { getOrderLang } from "@/lib/i18n/cookie";
 import { getOrderDictionary } from "@/lib/i18n/dictionaries";
@@ -9,7 +9,7 @@ import { Prisma } from "@/lib/generated/prisma/client";
 import { CheckoutForm } from "@/components/order/CheckoutForm";
 
 export default async function CheckoutPage() {
-  const business = await getCurrentBusiness();
+  const business = await getPublicBusiness();
   const lang = await getOrderLang(business.defaultLocale === "en" ? "en" : "es");
   const dict = getOrderDictionary(lang);
   const cart = await getCartWithLivePrices(business.id, lang);

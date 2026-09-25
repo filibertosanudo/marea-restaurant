@@ -61,11 +61,13 @@ function readColorToken(name: string, fallback: string): string {
  * webhook-driven success screen lives one level up, in PaymentSection.
  */
 export function CardPaymentPanel({
+  publishableKey,
   clientSecret,
   amountLabel,
   onSwitchToCash,
   dict,
 }: {
+  publishableKey: string;
   clientSecret: string;
   amountLabel: string;
   onSwitchToCash?: () => void;
@@ -124,7 +126,7 @@ export function CardPaymentPanel({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setElementReady(false);
 
-    getStripe().then((stripeInstance) => {
+    getStripe(publishableKey).then((stripeInstance) => {
       if (cancelled || !stripeInstance || !mountNodeRef.current) return;
       stripeRef.current = stripeInstance;
 

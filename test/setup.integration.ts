@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, vi } from "vitest";
 import { ensureSchemaReady, resetDb, dropSchema } from "./db";
 import { clearTestSession } from "./stubs/auth-session";
+import { clearTestHost } from "./stubs/next-headers";
 
 // There's no live Next.js request to back either of these outside one —
 // see the stubs' own header comments. vi.mock (not a static resolve.alias)
@@ -80,6 +81,7 @@ ensureSchemaReady();
 beforeEach(async () => {
   await resetDb();
   clearTestSession();
+  clearTestHost();
 });
 
 afterAll(async () => {

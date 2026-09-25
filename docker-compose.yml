@@ -31,15 +31,22 @@ services:
       - "1025:1025"
       - "8025:8025"
 
-  # One-shot: applies migrations, then exits. `app` won't start until this
-  # succeeds. Never runs the seed — that stays a command someone types.
+  # One-shot: applies migrations and gives the application roles their
+  # passwords, then exits. `app` won't start until this succeeds. Never runs
+  # the seed — that stays a command someone types. Runs as the database
+  # owner, the only service that does besides `seed`: the running app and
+  # worker connect as marea_app / marea_worker, which row level security
+  # binds (see docs/DEPLOY.md).
   migrate:
     image: marea-migrate:local
     build:
       context: .
       target: migrate
+    command: ["sh", "-c", "npx prisma migrate deploy && npx tsx scripts/provision-db-roles.ts"]
     environment:
       DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      WORKER_DB_PASSWORD: ${WORKER_DB_PASSWORD}
     depends_on:
       db:
         condition: service_healthy
@@ -74,7 +81,10 @@ services:
       context: .
       target: runner
     environment:
-      DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
+      DATABASE_URL: postgresql://marea_app:${APP_DB_PASSWORD}@db:5432/marea
+      # The notification queue, the realtime sweep and the LISTEN connection.
+      WORKER_DATABASE_URL: postgresql://marea_worker:${WORKER_DB_PASSWORD}@db:5432/marea
+      BUSINESS_ROOT_DOMAIN: ${BUSINESS_ROOT_DOMAIN:-}
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_URL: ${AUTH_URL}
       APP_ORIGIN: ${APP_ORIGIN:-}
@@ -107,7 +117,7 @@ services:
       context: .
       target: worker
     environment:
-      DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
+      DATABASE_URL: postgresql://marea_worker:${WORKER_DB_PASSWORD}@db:5432/marea
       AUTH_SECRET: ${AUTH_SECRET}
       MAIL_DRIVER: smtp
       MAIL_FROM_EMAIL: ${MAIL_FROM_EMAIL:-notifications@marea.local}
