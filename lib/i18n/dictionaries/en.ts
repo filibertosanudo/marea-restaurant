@@ -60,6 +60,8 @@ export const en = {
       darkMode: "Dark mode",
       account: "Account",
       signOut: "Sign out",
+      switchBusiness: "Switch business",
+      switchBusinessError: "You can't switch to that business.",
       menuLabel: "Menu",
       categories: "Categories",
       dishes: "Dishes",

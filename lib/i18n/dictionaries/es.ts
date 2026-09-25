@@ -64,6 +64,8 @@ export const es = {
       darkMode: "Modo oscuro",
       account: "Cuenta",
       signOut: "Cerrar sesión",
+      switchBusiness: "Cambiar de negocio",
+      switchBusinessError: "No puedes cambiar a ese negocio.",
       menuLabel: "Menú",
       categories: "Categorías",
       dishes: "Platillos",

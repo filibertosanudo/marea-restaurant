@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { navItemsForRole } from "@/components/admin/nav-config";
+import { listAccessibleBusinesses } from "@/lib/auth/business-access";
 import { AdminShell } from "@/components/admin/AdminShell";
 
 export default async function AdminShellLayout({
@@ -22,6 +23,9 @@ export default async function AdminShellLayout({
   const lang = await getAdminLang();
   const dict = getDictionary(lang);
   const navItems = navItemsForRole(session.user.role);
+  // What the switcher offers: every business this user may act on, each one
+  // re-authorised (lib/auth/business-access.ts).
+  const businesses = await listAccessibleBusinesses(session.user.id);
 
   return (
     <AdminShell
@@ -29,6 +33,8 @@ export default async function AdminShellLayout({
       dict={dict}
       lang={lang}
       user={{ name: session.user.name ?? "", email: session.user.email }}
+      businesses={businesses.map((b) => ({ id: b.id, name: b.name }))}
+      activeBusinessId={session.user.businessId}
     >
       {children}
     </AdminShell>
