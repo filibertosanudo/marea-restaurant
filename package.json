@@ -24,6 +24,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
+    "db:provision-roles": "tsx scripts/provision-db-roles.ts",
     "db:reset": "prisma migrate reset",
     "storage:sweep": "tsx --conditions=react-server scripts/sweep-orphaned-media.ts",
     "rate-limits:purge": "tsx --conditions=react-server scripts/purge-rate-limits.ts",

@@ -419,13 +419,17 @@ Postgres a secas, sin proveedor administrado de por medio:
   imagen `postgres:17-alpine` que usa el `docker-compose.yml` de este
   proyecto.
 - **RLS.** Row-Level Security es de Postgres desde la versión 9.5, no de
-  Supabase — cualquier Postgres la soporta igual. Hoy no está en uso: todo
-  pasa por Server Actions y route handlers de Next.js con una sola conexión
-  de aplicación, así que `businessId` es el único aislamiento entre negocios
-  y basta mientras el acceso a la base nunca se exponga directo al cliente.
-  Activar RLS (políticas por tabla, atadas a `businessId`) es el plan del
-  módulo 16, cuando el proyecto pase a multi-tenant real — no una
-  limitación de haber dejado Supabase.
+  Supabase — cualquier Postgres la soporta igual. Está activa desde el módulo
+  17 (fase 3): cada tabla de negocio tiene una política atada a `businessId`
+  (las que no lo llevan, como `OrderItem` o `Refund`, heredan de su fila
+  padre), y el filtro `where: { businessId }` de cada consulta sigue ahí: la
+  política es la red, no el sustituto. Una política **no aplica al dueño de
+  las tablas ni a un superusuario**, así que la app se conecta como
+  `marea_app` y no como el rol que corrió las migraciones; el worker y las
+  búsquedas de "¿de qué negocio es este token?" usan `marea_worker`, con
+  permisos por columna. Las tablas de identidad (`User`, `Session`,
+  `BusinessMembership`...) quedan fuera a propósito: un usuario puede tener
+  membresías en varios negocios. Ver `docs/DEPLOY.md`.
 
 ---
 

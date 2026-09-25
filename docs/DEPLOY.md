@@ -35,7 +35,7 @@ that changes.
    cp .env.example .env
    ```
 
-   Fill in at least `POSTGRES_PASSWORD`, `AUTH_SECRET` (generate with
+   Fill in at least `POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `WORKER_DB_PASSWORD`, `AUTH_SECRET` (generate with
    `openssl rand -base64 32`), and `APP_ORIGIN` (your real domain,
    `https://...` — the app refuses to start in production without it, see
    `.env.example` for why). See `.env.example` for every other variable and
@@ -118,6 +118,49 @@ Set `TRUSTED_PROXY_COUNT=0` — the app then trusts nothing from
 `x-forwarded-for`/`x-real-ip` and falls back to a shared rate-limit bucket
 for that dimension. The per-email limit is unaffected either way and stays
 the primary defense.
+
+## Database roles and row level security
+
+Every business table has a Postgres row level security policy tying its rows
+to a business: a query that forgets `where: { businessId }`, or filters by the
+wrong one, gets nothing back instead of another business's data. The
+application still filters by business on every query; the policy is what
+saves the day it does not.
+
+**A policy only binds a role that does not own the tables.** The role that ran
+the migrations owns them, and for an owner (or a superuser) row level security
+does nothing at all, with no error and every policy looking correct. So the
+stack uses three roles:
+
+| Role | Used by | Can |
+|---|---|---|
+| `marea` (owner) | `migrate`, `seed`, manual maintenance | everything; never used by the running app |
+| `marea_app` | the web app (`DATABASE_URL`) | read and write business data, bound by the policies; no schema changes |
+| `marea_worker` | the notification worker, the realtime sweep and LISTEN, and the lookups that find which business a token belongs to (`WORKER_DATABASE_URL`) | the notification queue, plus ids and business ids of a few tables; not an order, a menu or a customer |
+
+The migration creates `marea_app` and `marea_worker` without a login. Set
+`APP_DB_PASSWORD` and `WORKER_DB_PASSWORD` in `.env` and the compose `migrate`
+service gives them one on every start (`npm run db:provision-roles` does the
+same by hand, and is how you rotate a password). On a managed database, run
+the migrations as the admin user and set `DATABASE_URL` to `marea_app` and
+`WORKER_DATABASE_URL` to `marea_worker`, both direct connections.
+
+**Upgrading a running deployment:** run the migration and the provisioning
+step first, then switch `DATABASE_URL` and add `WORKER_DATABASE_URL`, then
+restart. The app checks at boot which role it connects as and refuses to
+start in production if it is the owner, a superuser or has `BYPASSRLS`
+(`DATABASE_ROLE_CHECK=warn` logs instead, for the day of the switch only).
+
+To confirm by hand what the running app connects as:
+
+```sql
+SELECT current_user, r.rolsuper, r.rolbypassrls
+FROM pg_roles r WHERE r.rolname = current_user;
+```
+
+Maintenance scripts (`storage:sweep`, `privacy:anonymize-guests`) go through
+the same client and walk the businesses one at a time; they need no owner
+connection.
 
 ## More than one business on one deployment
 

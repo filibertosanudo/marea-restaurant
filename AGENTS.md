@@ -39,12 +39,31 @@ instead of duplicating it here.
   older timestamp, which is what `RECOVERY_WINDOW_MS` covers. That window is
   derived from Prisma's 5 s transaction timeout: do not pass a longer one to a
   `$transaction` without revisiting it (`lib/realtime/timing.test.ts` fails).
-- **`DIRECT_URL` has two readers on purpose.** `prisma.config.ts` runs outside
-  Next and cannot import the server-only `lib/env.ts`, so it reads
-  `process.env`; the realtime listener goes through `lib/env.ts`. Do not
-  "fix" the duplication. `LISTEN` does not survive a transaction-mode pooler
-  (it connects and never delivers), so behind one, `DIRECT_URL` must be a
-  direct connection or `REALTIME_MODE=poll` must be set.
+- **The app never connects as the table owner.** Row level security binds
+  neither an owner nor a superuser, so as that role every policy is a silent
+  no-op. `DATABASE_URL` is `marea_app`; `WORKER_DATABASE_URL` is
+  `marea_worker`; the owner is for `migrate` and `seed` only, and
+  `instrumentation.ts` refuses a production boot as anything else
+  (`lib/db/role-check.ts`). Migrations that add a business table add its
+  policy in the same migration (see `..._enable_row_level_security`).
+- **The business reaches Postgres through the pool, not through queries.**
+  `lib/db/tenant-pool.ts` stamps `app.business_id` on each connection as it is
+  handed out, from `runInTenant()` or from the `x-marea-tenant` header
+  `proxy.ts` sets. Outside a request (worker, scripts, an agent, a webhook)
+  there is no business unless you pass one: `runInTenant(id, fn)`. No business
+  means no rows. Queries still carry `where: { businessId }`; the policy is
+  what saves you when one does not. `runInTenant` awaits `fn` inside the
+  scope on purpose: a Prisma query is lazy.
+- **Work that has no business uses `systemPrisma`** (`lib/db/system.ts`,
+  role `marea_worker`): the notification queue, the realtime sweep and
+  `lib/tenancy/discover.ts`, which finds a business from a device token,
+  Stripe event or printed token. That role holds column grants, not tables;
+  do not widen it to read business data.
+- **`DIRECT_URL` is the migrations' (owner) connection.** `prisma.config.ts`
+  runs outside Next and reads `process.env`. The realtime listener uses
+  `WORKER_DATABASE_URL` (`LISTEN` needs no table, and does not survive a
+  transaction-mode pooler: behind one, it must be a direct connection or
+  `REALTIME_MODE=poll`). Do not put `DIRECT_URL` in the running app.
 - **Nothing depends on a single cloud provider.** Storage (`lib/storage/`)
   and, going forward, any other external integration go behind an
   interface with at least two implementations — see `lib/storage/driver.ts`

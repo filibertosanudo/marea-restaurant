@@ -97,6 +97,8 @@ jobs:
     timeout-minutes: 8
     env:
       POSTGRES_PASSWORD: e2e-test-password
+      APP_DB_PASSWORD: e2e-app-password
+      WORKER_DB_PASSWORD: e2e-worker-password
       AUTH_SECRET: ci-test-secret
       AUTH_URL: http://localhost:3000
     steps:
