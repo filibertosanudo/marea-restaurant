@@ -119,6 +119,33 @@ Set `TRUSTED_PROXY_COUNT=0` — the app then trusts nothing from
 for that dimension. The per-email limit is unaffected either way and stays
 the primary defense.
 
+## More than one business on one deployment
+
+Each business answers on its own subdomain: `marea.example.com`,
+`cala.example.com`. The panel's business comes from the session; everything
+public comes from the host.
+
+1. **DNS and certificate.** A wildcard record `*.example.com` pointing at the
+   proxy, and a wildcard certificate for it. Custom domains (`reservas.marea.mx`)
+   are not supported yet: each needs its own certificate.
+2. **Set `BUSINESS_ROOT_DOMAIN=example.com`.** Without it the deployment is
+   single-origin: its only business answers on every hostname, and as soon as
+   a second business exists the bare domain names nobody (404).
+3. **The proxy must pass the original `Host` through** (`proxy_set_header Host
+   $host;`, already in the nginx config above). The business is resolved from it.
+4. **QR codes and emailed links already out in the world keep working.** They
+   were minted on `APP_ORIGIN`; a request for one on the bare domain is
+   redirected to the owning business's subdomain (the token is an unguessable
+   capability, so it identifies its business). New QR codes, emails and the
+   sitemap use the subdomain directly. Nobody needs to reprint tables.
+5. **Card payments need a Stripe account per business.** All cards go through
+   the platform's single `STRIPE_SECRET_KEY`, which is fine while there is one
+   business. From the second one on, a business without its own
+   `stripeAccountId` cannot enable card payments (the panel says why) and
+   guests of a business that had them enabled are sent to "pay at the
+   register". Connecting accounts is module 17b; it must ship before any
+   restaurant that is not yours goes live.
+
 ## Alternatives
 
 ### Managed PaaS (Railway, Render)
