@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
+import { env } from "@/lib/env";
 import { stripe } from "@/lib/stripe/client";
 import { applyStripeEvent, resolveChargeDetailsForEvent, resolveRefundsForEvent } from "@/lib/payments/webhook-handlers";
 import { isUniqueConstraintError } from "@/lib/payments/prisma-errors";
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET ?? "");
+    event = stripe.webhooks.constructEvent(rawBody, signature, env.STRIPE_WEBHOOK_SECRET ?? "");
   } catch {
     return new Response("Invalid signature", { status: 400 });
   }
