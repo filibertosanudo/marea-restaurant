@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { CSP_NONCE_HEADER, buildCsp, generateCspNonce } from "@/lib/security/csp";
+import { TENANT_HEADER } from "@/lib/tenancy/context";
+import { tenantForRequest } from "@/lib/tenancy/proxy-tenant";
 
 const LOGIN_PATH = "/admin/login";
 const CHANGE_PASSWORD_PATH = "/admin/change-password";
@@ -19,12 +21,23 @@ function withSecurityHeaders(response: NextResponse, nonce: string): NextRespons
   return response;
 }
 
-export default auth((req) => {
+export default auth(async (req) => {
   const { pathname } = req.nextUrl;
   const nonce = generateCspNonce();
 
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set(CSP_NONCE_HEADER, nonce);
+
+  // Which business the database should let this request see (row level
+  // security). Always overwritten, never taken from the client: a header a
+  // visitor sends must not pick the tenant.
+  requestHeaders.delete(TENANT_HEADER);
+  const sessionUser = req.auth?.user;
+  const tenant = await tenantForRequest({
+    sessionBusinessId: sessionUser && !sessionUser.revoked ? sessionUser.businessId : null,
+    host: req.headers.get("host") ?? "",
+  });
+  if (tenant) requestHeaders.set(TENANT_HEADER, tenant);
 
   if (!pathname.startsWith("/admin")) {
     return withSecurityHeaders(NextResponse.next({ request: { headers: requestHeaders } }), nonce);

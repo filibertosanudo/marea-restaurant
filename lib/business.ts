@@ -7,6 +7,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { appOrigin, env } from "@/lib/env";
 import { businessOrigin } from "@/lib/business-origin";
+import { businessIdForToken } from "@/lib/tenancy/discover";
 import { slugFromHost } from "@/lib/business-host";
 import { cachedPublicRead, invalidatePublicCache } from "@/lib/cache/public";
 
@@ -62,7 +63,7 @@ async function byId(id: string): Promise<Business | null> {
   const cached = await cachedPublicRead("business", "business-row", idScope(id), async () => {
     const row = await prisma.business.findFirst({ where: { id, deletedAt: null } });
     return row ? toCacheable(row) : null;
-  });
+  }, { tenantScoped: false });
   return cached ? fromCacheable(cached) : null;
 }
 
@@ -70,7 +71,7 @@ async function bySlug(slug: string): Promise<Business | null> {
   const cached = await cachedPublicRead("business", "business-row", slugScope(slug), async () => {
     const row = await prisma.business.findFirst({ where: { slug, deletedAt: null } });
     return row ? toCacheable(row) : null;
-  });
+  }, { tenantScoped: false });
   return cached ? fromCacheable(cached) : null;
 }
 
@@ -79,7 +80,7 @@ async function onlyBusiness(): Promise<Business | null> {
   const cached = await cachedPublicRead("business", "business-row", DEFAULT_SCOPE, async () => {
     const rows = await prisma.business.findMany({ where: { deletedAt: null }, take: 2 });
     return rows.length === 1 ? toCacheable(rows[0]) : null;
-  });
+  }, { tenantScoped: false });
   return cached ? fromCacheable(cached) : null;
 }
 
@@ -126,13 +127,8 @@ export async function getPublicBusinessForToken(kind: LegacyTokenKind, token: st
   if (named) return named;
   if (!env.BUSINESS_ROOT_DOMAIN) notFound();
 
-  const owner =
-    kind === "table"
-      ? await prisma.restaurantTable.findUnique({ where: { qrToken: token }, select: { businessId: true } })
-      : kind === "order"
-        ? await prisma.order.findUnique({ where: { publicToken: token }, select: { businessId: true } })
-        : await prisma.reservation.findUnique({ where: { confirmationCode: token }, select: { businessId: true } });
-  const business = owner ? await byId(owner.businessId) : null;
+  const ownerId = await businessIdForToken(kind, token);
+  const business = ownerId ? await byId(ownerId) : null;
   if (!business) notFound();
   redirect(`${businessOrigin(business)}${path}`);
 }

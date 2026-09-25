@@ -34,6 +34,19 @@ const schema = z
     // notification ever arrives, which the listener's heartbeat detects.
     // Missing: DATABASE_URL is used, correct whenever there is no pooler.
     DIRECT_URL: optional(z.string().min(1)),
+    // Direct connection as the `marea_worker` role, for the parts that act on
+    // every business at once because they run outside any request: the
+    // notification queue, the realtime recovery sweep, and the lookups that
+    // find which business a device token, Stripe event or printed token
+    // belongs to. It sees nothing but what those need (see the RLS
+    // migration). Missing: DATABASE_URL, which is right for a database with
+    // no row level security, and for tests.
+    WORKER_DATABASE_URL: optional(z.string().min(1)),
+    // What instrumentation.ts does when DATABASE_URL connects as the table
+    // owner or a superuser, for whom row level security is a no-op: refuse to
+    // start ("enforce", production only), or say so and carry on ("warn").
+    // "off" for a database that has no policies at all.
+    DATABASE_ROLE_CHECK: withDefault(z.enum(["enforce", "warn", "off"]).default("enforce")),
     // "auto" listens for change notifications and falls back to polling by
     // itself when it cannot; "poll" skips LISTEN entirely, for a host where
     // it is known not to work (a pooler with no direct URL to give).

@@ -1,5 +1,6 @@
 import "server-only";
 import { unstable_cache, updateTag } from "next/cache";
+import { runInTenant, runWithoutTenant } from "@/lib/tenancy/context";
 
 /**
  * The public site's read cache: the landing and menu are read thousands of
@@ -34,13 +35,22 @@ export function publicCacheTag(kind: PublicCacheKind, scope: string): string {
  */
 export type JsonSafe = string | number | boolean | null | JsonSafe[] | { [key: string]: JsonSafe };
 
+/**
+ * `scope` is the business id for everything except the business row's own
+ * lookups (by slug, by id, the default), which pass `tenantScoped: false`: the
+ * Business table is readable without a business. A tenant-scoped loader runs
+ * inside runInTenant(scope), because the data cache may refill an entry in
+ * the background, long after the request whose context set the business.
+ */
 export function cachedPublicRead<T extends JsonSafe>(
   kind: PublicCacheKind,
   name: string,
   scope: string,
-  load: () => Promise<T>
+  load: () => Promise<T>,
+  { tenantScoped = true }: { tenantScoped?: boolean } = {}
 ): Promise<T> {
-  return unstable_cache(load, [name, scope], {
+  const run = tenantScoped ? () => runInTenant(scope, load) : () => runWithoutTenant(load);
+  return unstable_cache(run, [name, scope], {
     tags: [publicCacheTag(kind, scope)],
     revalidate: PUBLIC_CACHE_TTL_SECONDS,
   })();
