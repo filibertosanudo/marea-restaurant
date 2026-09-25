@@ -68,6 +68,18 @@ export const en = {
       modifiers: "Modifiers",
     },
     menu: {
+      copyMenuTitle: "Copy a menu from another branch",
+      copyMenuLead:
+        "This branch has no menu yet. Copy another branch's dishes, categories, modifiers and photos, then adjust prices and availability here. Later changes stay in each branch.",
+      copyMenuFrom: "Copy from",
+      copyMenuButton: "Copy menu",
+      copyMenuDone: "Copied {dishes} dishes.",
+      copyMenuErrors: {
+        forbidden: "You can't copy from that branch.",
+        same_business: "Pick a different branch.",
+        target_not_empty: "This branch already has a menu, so nothing was copied.",
+        source_empty: "That branch has no menu to copy.",
+      },
       title: "Menu · Dishes",
       newDish: "New dish",
       editDish: "Edit dish",

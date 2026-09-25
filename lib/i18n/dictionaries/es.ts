@@ -72,6 +72,18 @@ export const es = {
       modifiers: "Modificadores",
     },
     menu: {
+      copyMenuTitle: "Copiar el menú de otra sucursal",
+      copyMenuLead:
+        "Esta sucursal aún no tiene menú. Copia los platillos, categorías, modificadores y fotos de otra y ajusta aquí precios y disponibilidad. Los cambios posteriores quedan en cada sucursal.",
+      copyMenuFrom: "Copiar de",
+      copyMenuButton: "Copiar menú",
+      copyMenuDone: "Se copiaron {dishes} platillos.",
+      copyMenuErrors: {
+        forbidden: "No puedes copiar de esa sucursal.",
+        same_business: "Elige otra sucursal.",
+        target_not_empty: "Esta sucursal ya tiene menú, así que no se copió nada.",
+        source_empty: "Esa sucursal no tiene menú que copiar.",
+      },
       title: "Menú · Platillos",
       newDish: "Nuevo platillo",
       editDish: "Editar platillo",

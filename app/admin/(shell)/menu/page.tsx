@@ -1,6 +1,7 @@
 import { UserRole } from "@/lib/generated/prisma/client";
 import { requirePageRole } from "@/lib/auth/permissions";
 import { getBusinessForRequest } from "@/lib/business";
+import { listAccessibleBusinesses } from "@/lib/auth/business-access";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import {
@@ -17,6 +18,7 @@ import {
 } from "@/lib/dto/menu";
 import { MenuSectionTabs } from "@/components/admin/menu/MenuSectionTabs";
 import { ItemTable } from "@/components/admin/menu/ItemTable";
+import { CopyMenuPanel } from "@/components/admin/menu/CopyMenuPanel";
 import type { Lang } from "@/lib/i18n/lang";
 
 const PAGE_SIZE = 8;
@@ -64,9 +66,17 @@ export default async function MenuItemsPage({
     listModifierGroupsRaw(business.id),
   ]);
 
+  // A branch with no menu, run by someone who runs another one too, can copy
+  // that one's menu instead of typing it again (lib/menu/copy.ts).
+  const menuIsEmpty = canManage && categories.length === 0 && total === 0;
+  const copySources = menuIsEmpty
+    ? (await listAccessibleBusinesses(session.user.id)).filter((b) => b.id !== business.id)
+    : [];
+
   return (
     <div className="flex h-full flex-col">
       <MenuSectionTabs active="items" dict={dict} />
+      {copySources.length > 0 && <CopyMenuPanel dict={dict.menu} sources={copySources.map((b) => ({ id: b.id, name: b.name }))} />}
       <ItemTable
         items={items.map((i) => toMenuItemListDTO(i, lang))}
         total={total}
