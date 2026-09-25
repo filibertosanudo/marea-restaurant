@@ -1,7 +1,7 @@
 // Fills the dev database with a board that looks like a busy service: `live`
 // orders spread across the live columns, plus a few delivered ones. Placed
 // through the real checkout, advanced through the real board action.
-import { pool, actionIds, login, callAction, placeOrder, fakeIp } from "./lib.mjs";
+import { pool, actionIds, login, callAction, placeOrder, fakeIp, BID } from "./lib.mjs";
 
 const live = Number(process.argv[2] ?? 50);
 const delivered = Number(process.argv[3] ?? 10);
@@ -10,7 +10,7 @@ const db = pool();
 const admin = await login();
 
 const { rows: dishes } = await db.query(
-  `select id from "MenuItem" where "isAvailable" and "deletedAt" is null and "trackInventory" = false order by id`
+  `select id from "MenuItem" where "businessId" = ${BID} and "isAvailable" and "deletedAt" is null and "trackInventory" = false order by id`
 );
 const itemIds = dishes.map((r) => r.id);
 
@@ -29,6 +29,6 @@ for (const [i, { id }] of orders.entries()) {
     await res.arrayBuffer();
   }
 }
-const { rows } = await db.query(`select status, count(*)::int n from "Order" group by status order by status`);
+const { rows } = await db.query(`select status, count(*)::int n from "Order" where "businessId" = ${BID} group by status order by status`);
 console.log(JSON.stringify(rows));
 await db.end();

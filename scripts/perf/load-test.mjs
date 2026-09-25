@@ -14,7 +14,7 @@
 // --legacy is for the build before module 16, whose stream sends a bare "update"
 // with no order ids: the per-order coverage check is skipped (it cannot be
 // made) and the rest is the same.
-import { pool, actionIds, login, prepareCart, submitCheckout, percentile, fakeIp, BASE_URL } from "./lib.mjs";
+import { pool, actionIds, login, prepareCart, submitCheckout, percentile, fakeIp, BASE_URL, BID } from "./lib.mjs";
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const legacy = process.argv.includes("--legacy");
@@ -32,7 +32,7 @@ const startedAt = Date.now();
 const elapsed = () => Math.round((Date.now() - startedAt) / 1000);
 
 const { rows: dishes } = await db.query(
-  `select id from "MenuItem" where "isAvailable" and "deletedAt" is null and "trackInventory" = false order by id`
+  `select id from "MenuItem" where "businessId" = ${BID} and "isAvailable" and "deletedAt" is null and "trackInventory" = false order by id`
 );
 const itemIds = dishes.map((r) => r.id);
 
@@ -154,7 +154,7 @@ await sleep(4000); // let the last events reach the screens
 const tokens = results.filter((r) => r.ok).map((r) => r.token);
 const { rows: created } = await db.query(`select id, "orderNumber" from "Order" where "publicToken" = any($1)`, [tokens]);
 const { rows: dupes } = await db.query(
-  `select "orderNumber", count(*)::int n from "Order" group by 1 having count(*) > 1`
+  `select "orderNumber", count(*)::int n from "Order" group by "businessId", "orderNumber" having count(*) > 1`
 );
 const createdIds = created.map((r) => r.id);
 const missing = boards.map((b) => createdIds.filter((id) => !b.seen.has(id)).length);

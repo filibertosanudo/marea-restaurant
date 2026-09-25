@@ -12,7 +12,7 @@
 // `kill` is the manual version of recovery.integration.test.ts: it terminates
 // the server's LISTEN backend, changes an order while nobody is listening, and
 // shows the screen still learns about it.
-import { pool, actionIds, login, callAction, placeOrder, fakeIp, BASE_URL } from "./lib.mjs";
+import { pool, actionIds, login, callAction, placeOrder, fakeIp, BASE_URL, BID } from "./lib.mjs";
 
 const mode = process.argv[2] ?? "latency";
 const ids = actionIds();
@@ -54,7 +54,7 @@ async function waitFor(condition, timeoutMs, label) {
 }
 
 const { rows: dishes } = await db.query(
-  `select id from "MenuItem" where "isAvailable" and "deletedAt" is null and "trackInventory" = false order by id`
+  `select id from "MenuItem" where "businessId" = ${BID} and "isAvailable" and "deletedAt" is null and "trackInventory" = false order by id`
 );
 const itemIds = dishes.map((r) => r.id);
 const advance = (orderId) =>
