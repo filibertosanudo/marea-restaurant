@@ -79,6 +79,7 @@ enum UserRole {
   CUSTOMER // cliente final
   STAFF // mesero / cocina / caja
   BUSINESS_ADMIN // dueño o gerente del negocio
+  ORG_ADMIN // dueño de una cadena: administra todas las sucursales de su Organization
   SUPER_ADMIN // administrador de la plataforma (todos los negocios)
 }
 
@@ -207,6 +208,20 @@ enum JobStatus {
 //  TENANCY — el negocio
 // ============================================================================
 
+/// Una cadena: varias sucursales (Business) de un mismo dueño. Sólo agrupa —
+/// no es un inquilino de nada: el aislamiento (RLS) sigue siendo por Business.
+/// Un Business sin organización es un negocio suelto, como hasta ahora.
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  businesses Business[]
+  /// Usuarios ORG_ADMIN de esta organización (User.organizationId).
+  admins     User[]
+}
+
 /// El "tenant". En v1 hay exactamente una fila (Marea) y el código puede
 /// resolverla por slug o por env var. Todo lo demás cuelga de aquí, así que
 /// activar multi-tenant después es agregar el filtro, no rehacer tablas.
@@ -285,7 +300,13 @@ model Business {
   devices        Device[]
   printJobs      PrintJob[]
 
+  /// La cadena a la que pertenece, si tiene una. Sólo agrupa: RLS sigue
+  /// siendo por negocio y la pertenencia se lee con marea_business_org().
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   @@index([isActive])
+  @@index([organizationId])
 }
 
 /// Textos del negocio que sí cambian por idioma (tagline, "sobre nosotros").
@@ -382,6 +403,12 @@ model User {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime? // baja de cuenta sin romper pedidos históricos
 
+  /// Sólo para role = ORG_ADMIN (una migración lo exige): la cadena que
+  /// administra. Un ORG_ADMIN no tiene membresías; actúa sobre cualquier
+  /// negocio cuya organizationId coincida con ésta.
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   accounts            Account[]
   sessions            Session[]
   memberships         BusinessMembership[]
@@ -401,6 +428,7 @@ model User {
   stockMovements      StockMovement[]
 
   @@index([role])
+  @@index([organizationId])
 }
 
 /// Auth.js exige estos nombres de campo en snake_case — no los renombres

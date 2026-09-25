@@ -10,7 +10,7 @@ import { businessIdForPaymentIntent, businessIdForToken, businessIdForDeviceToke
 import { currentTenant } from "@/lib/tenancy/request-tenant";
 import { setTestTenantHeader } from "@/test/stubs/next-headers";
 import { testSchema } from "@/test/db";
-import { makeBusiness, makeMenuCategory, makeMenuItem, makeOrder } from "@/test/factories";
+import { makeBusiness, makeMenuCategory, makeMenuItem, makeOrder, makeOrganization } from "@/test/factories";
 
 // Row level security does nothing for the role that owns the tables, so every
 // assertion here goes through a client that connects as `marea_app` (or
@@ -267,6 +267,34 @@ describe("the business of a request", () => {
 
     const inside = await runInTenant(cala.id, () => app.order.findMany());
     expect(inside.map((o) => o.id)).toEqual([calaOrder.id]);
+  });
+});
+
+describe("organizations under the application role", () => {
+  it("answers which organization a business is in, with no business set, and shows nothing else", async () => {
+    const org = await makeOrganization({ name: "Chain" });
+    const inChain = await makeBusiness({ slug: "in-chain", organizationId: org.id });
+    const standalone = await makeBusiness({ slug: "standalone" });
+    const app = appClient();
+
+    const [chain] = await app.$queryRaw<Array<{ organization_id: string | null }>>`SELECT organization_id FROM marea_business_org(${inChain.id})`;
+    const [alone] = await app.$queryRaw<Array<{ organization_id: string | null }>>`SELECT organization_id FROM marea_business_org(${standalone.id})`;
+    const missing = await app.$queryRaw<unknown[]>`SELECT organization_id FROM marea_business_org('nope')`;
+    expect(chain.organization_id).toBe(org.id);
+    expect(alone.organization_id).toBeNull();
+    expect(missing).toEqual([]);
+    // The Business table itself is still not readable from outside the business.
+    expect(await app.business.count()).toBe(0);
+  });
+
+  it("can read an organization but neither create, rename nor delete one", async () => {
+    const org = await makeOrganization({ name: "Chain" });
+    const app = appClient();
+
+    expect((await app.organization.findUnique({ where: { id: org.id } }))?.name).toBe("Chain");
+    await expect(app.organization.create({ data: { name: "Mine", slug: "mine" } })).rejects.toThrow(/permission denied/);
+    await expect(app.organization.update({ where: { id: org.id }, data: { name: "Hijacked" } })).rejects.toThrow(/permission denied/);
+    await expect(app.organization.delete({ where: { id: org.id } })).rejects.toThrow(/permission denied/);
   });
 });
 
