@@ -24,3 +24,23 @@ export function originFor(slug: string, appOrigin: string, rootDomain: string | 
   const port = base.port ? `:${base.port}` : "";
   return `${base.protocol}//${slug}.${rootDomain}${port}`;
 }
+
+// Names that would be confusing or dangerous as a subdomain: infrastructure a
+// deployment may serve on the same domain, and words that read as the platform.
+const RESERVED_SLUGS = new Set([
+  "www", "admin", "api", "app", "auth", "mail", "smtp", "imap", "ftp", "static", "assets", "cdn", "media",
+  "status", "docs", "help", "support", "billing", "dashboard", "login", "signup", "root", "localhost", "test",
+]);
+
+/**
+ * Why a slug cannot be used, or null when it can. A slug is a business's
+ * subdomain, so it is a single lowercase DNS label: letters, digits and inner
+ * hyphens, at most 32 characters, and not one of the names reserved above.
+ */
+export function validateSlug(slug: string): string | null {
+  if (!/^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$/.test(slug)) {
+    return "use 1 to 32 lowercase letters, digits and inner hyphens";
+  }
+  if (RESERVED_SLUGS.has(slug)) return "that name is reserved";
+  return null;
+}
