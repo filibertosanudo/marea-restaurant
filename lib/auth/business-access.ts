@@ -87,3 +87,28 @@ export async function listAccessibleBusinesses(userId: string): Promise<Accessib
     prisma.$queryRaw<AccessibleBusiness[]>`SELECT id, name, slug FROM marea_business_summaries(${allowed}::text[])`
   );
 }
+
+/**
+ * The branches of this user's organization, each one authorised: what the
+ * consolidated report may name. An empty list for anyone who is not an
+ * ORG_ADMIN.
+ */
+export async function listOrganizationBusinesses(userId: string): Promise<AccessibleBusiness[]> {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null, role: "ORG_ADMIN" },
+    select: { organizationId: true },
+  });
+  if (!user?.organizationId) return [];
+
+  const ids = await runWithoutTenant(() =>
+    prisma.$queryRaw<Array<{ id: string }>>`SELECT t.id FROM marea_organization_business_ids(${user.organizationId}::text) AS t(id)`
+  );
+  const allowed: string[] = [];
+  for (const { id } of ids) {
+    if (await authorizeBusiness(userId, id)) allowed.push(id);
+  }
+  if (allowed.length === 0) return [];
+  return runWithoutTenant(() =>
+    prisma.$queryRaw<AccessibleBusiness[]>`SELECT id, name, slug FROM marea_business_summaries(${allowed}::text[])`
+  );
+}
