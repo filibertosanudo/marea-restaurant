@@ -6,6 +6,7 @@ import { prisma as owner } from "@/lib/prisma";
 import { TenantPool } from "@/lib/db/tenant-pool";
 import { findRoleProblem } from "@/lib/db/role-check";
 import { runInTenant, explicitTenant } from "@/lib/tenancy/context";
+import { businessIdForPaymentIntent, businessIdForToken, businessIdForDeviceTokenHash } from "@/lib/tenancy/discover";
 import { currentTenant } from "@/lib/tenancy/request-tenant";
 import { setTestTenantHeader } from "@/test/stubs/next-headers";
 import { testSchema } from "@/test/db";
@@ -24,6 +25,11 @@ function urlAs(role: string): string {
   url.searchParams.set("options", `-c search_path=${testSchema} -c role=${role}`);
   return url.toString();
 }
+
+// The lookups in lib/tenancy/discover.ts go through systemPrisma, which reads
+// this. Set at load, before anything touches lib/env, so they run as the worker
+// role like they do in the web process.
+process.env.WORKER_DATABASE_URL = urlAs("marea_worker");
 
 const pools: Array<{ end: () => Promise<void> }> = [];
 
@@ -135,19 +141,39 @@ describe("row level security on the application role", () => {
     });
   });
 
-  it("lets everyone read the Business table but only the caller's own row change", async () => {
+  it("shows each business only its own Business row, and lets only that row change", async () => {
     const { marea, cala } = await twoBusinessesWithOrders();
     const app = appClient();
 
+    // Nobody set: nothing, not even the public name.
+    expect(await app.business.findMany()).toEqual([]);
+
     await runInTenant(marea.id, async () => {
-      expect((await app.business.findMany({ select: { slug: true }, orderBy: { slug: "asc" } })).map((b) => b.slug)).toEqual([
-        "cala",
-        "marea",
-      ]);
+      expect((await app.business.findMany({ select: { slug: true } })).map((b) => b.slug)).toEqual(["marea"]);
+      expect(await app.business.findUnique({ where: { id: cala.id } })).toBeNull();
       expect((await app.business.updateMany({ where: { id: cala.id }, data: { name: "Hijacked" } })).count).toBe(0);
       expect((await app.business.updateMany({ where: { id: marea.id }, data: { name: "Renamed" } })).count).toBe(1);
       await expect(app.business.create({ data: { name: "Third", slug: "third" } as never })).rejects.toThrow();
     });
+  });
+
+  it("resolves a host to an id, and only an id, before any business is known", async () => {
+    const { marea, cala } = await twoBusinessesWithOrders();
+    await owner.business.update({ where: { id: cala.id }, data: { email: "owner@cala.example", stripeAccountId: "acct_secret" } });
+    const app = appClient();
+
+    // Outside any business the table shows nothing...
+    expect(await app.business.count()).toBe(0);
+    // ...and the functions answer with an id or a count, no columns.
+    const [bySlug] = await app.$queryRaw<Array<{ id: string | null }>>`SELECT marea_business_id_by_slug('cala') AS id`;
+    const [unknown] = await app.$queryRaw<Array<{ id: string | null }>>`SELECT marea_business_id_by_slug('nope') AS id`;
+    const [only] = await app.$queryRaw<Array<{ id: string | null }>>`SELECT marea_only_business_id() AS id`;
+    const [count] = await app.$queryRaw<Array<{ n: number }>>`SELECT marea_business_count() AS n`;
+    expect(bySlug.id).toBe(cala.id);
+    expect(unknown.id).toBeNull();
+    expect(only.id).toBeNull(); // two businesses: no default
+    expect(count.n).toBe(2);
+    expect(marea.id).not.toBe(cala.id);
   });
 
   it("keeps the business inside an interactive transaction", async () => {
@@ -241,6 +267,25 @@ describe("the business of a request", () => {
 
     const inside = await runInTenant(cala.id, () => app.order.findMany());
     expect(inside.map((o) => o.id)).toEqual([calaOrder.id]);
+  });
+});
+
+describe("finding the business of a capability, from the web process", () => {
+  it("resolves a Stripe PaymentIntent, a printed token and a device token to their business", async () => {
+    const { marea, cala, mareaOrder, calaOrder } = await twoBusinessesWithOrders();
+    await owner.payment.create({
+      data: { businessId: cala.id, orderId: calaOrder.id, provider: "STRIPE", status: "PENDING", amount: "10.00", stripePaymentIntentId: "pi_cala" },
+    });
+    await owner.device.create({
+      data: { businessId: marea.id, name: "Kitchen", kind: "PRINTER", tokenHash: "hash-marea" } as never,
+    });
+
+    // The Stripe webhook runs in the web process with no host and no session:
+    // all it has is the PaymentIntent the signed event names.
+    expect(await businessIdForPaymentIntent("pi_cala")).toBe(cala.id);
+    expect(await businessIdForPaymentIntent("pi_unknown")).toBeNull();
+    expect(await businessIdForToken("order", mareaOrder.publicToken)).toBe(marea.id);
+    expect(await businessIdForDeviceTokenHash("hash-marea")).toBe(marea.id);
   });
 });
 

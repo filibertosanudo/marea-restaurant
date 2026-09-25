@@ -7,7 +7,8 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { appOrigin, env } from "@/lib/env";
 import { businessOrigin } from "@/lib/business-origin";
-import { businessIdForToken } from "@/lib/tenancy/discover";
+import { runInTenant } from "@/lib/tenancy/context";
+import { businessIdForSlug, businessIdForToken, onlyBusinessId } from "@/lib/tenancy/discover";
 import { slugFromHost } from "@/lib/business-host";
 import { cachedPublicRead, invalidatePublicCache } from "@/lib/cache/public";
 
@@ -59,28 +60,48 @@ function rootDomain(): string {
   return env.BUSINESS_ROOT_DOMAIN ?? new URL(appOrigin()).hostname;
 }
 
+async function loadRow(id: string): Promise<Business | null> {
+  // The Business table is scoped like any other: its row is visible to the
+  // business it belongs to, so it is read from inside that business.
+  return runInTenant(id, () => prisma.business.findFirst({ where: { id, deletedAt: null } }));
+}
+
 async function byId(id: string): Promise<Business | null> {
   const cached = await cachedPublicRead("business", "business-row", idScope(id), async () => {
-    const row = await prisma.business.findFirst({ where: { id, deletedAt: null } });
+    const row = await loadRow(id);
     return row ? toCacheable(row) : null;
-  }, { tenantScoped: false });
+  });
   return cached ? fromCacheable(cached) : null;
 }
 
 async function bySlug(slug: string): Promise<Business | null> {
-  const cached = await cachedPublicRead("business", "business-row", slugScope(slug), async () => {
-    const row = await prisma.business.findFirst({ where: { slug, deletedAt: null } });
-    return row ? toCacheable(row) : null;
-  }, { tenantScoped: false });
+  const cached = await cachedPublicRead(
+    "business",
+    "business-row",
+    slugScope(slug),
+    async () => {
+      const id = await businessIdForSlug(slug);
+      const row = id ? await loadRow(id) : null;
+      return row ? toCacheable(row) : null;
+    },
+    { tenantScoped: false }
+  );
   return cached ? fromCacheable(cached) : null;
 }
 
 /** The only business, when there is exactly one: keeps a single-tenant deployment working on any hostname. Two or more and a bare domain names nobody. */
 async function onlyBusiness(): Promise<Business | null> {
-  const cached = await cachedPublicRead("business", "business-row", DEFAULT_SCOPE, async () => {
-    const rows = await prisma.business.findMany({ where: { deletedAt: null }, take: 2 });
-    return rows.length === 1 ? toCacheable(rows[0]) : null;
-  }, { tenantScoped: false });
+  const cached = await cachedPublicRead(
+    "business",
+    "business-row",
+    DEFAULT_SCOPE,
+    async () => {
+      const id = await onlyBusinessId();
+      const row = id ? await loadRow(id) : null;
+      return row ? toCacheable(row) : null;
+    },
+    { tenantScoped: false }
+  );
   return cached ? fromCacheable(cached) : null;
 }
 

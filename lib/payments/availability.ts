@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/prisma";
+import { businessCount } from "@/lib/tenancy/discover";
 import type { Business } from "@/lib/generated/prisma/client";
 
 /**
@@ -16,6 +16,5 @@ import type { Business } from "@/lib/generated/prisma/client";
  */
 export async function canTakeOnlinePayments(business: Pick<Business, "stripeAccountId">): Promise<boolean> {
   if (business.stripeAccountId) return true;
-  const businesses = await prisma.business.count({ where: { deletedAt: null } });
-  return businesses <= 1;
+  return (await businessCount()) <= 1;
 }

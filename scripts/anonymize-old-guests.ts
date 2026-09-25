@@ -13,6 +13,7 @@
  */
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
+import { systemPrisma } from "../lib/db/system";
 import { runInTenant } from "../lib/tenancy/context";
 
 const RETENTION_MS = 24 * 30 * 24 * 60 * 60 * 1000; // 24 months, treated as 30-day months
@@ -25,7 +26,7 @@ async function main() {
 
   // One business at a time: row level security shows a connection a single
   // business, so a query with no businessId would touch none of them.
-  const businesses = await prisma.business.findMany({ select: { id: true } });
+  const businesses = await systemPrisma.business.findMany({ select: { id: true } });
   let orders = 0;
   let reservations = 0;
   for (const { id: businessId } of businesses) {

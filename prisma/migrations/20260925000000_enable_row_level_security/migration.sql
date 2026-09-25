@@ -34,8 +34,9 @@
 -- VerificationToken, LoginAttempt, RateLimitCounter, PasswordResetToken,
 -- MembershipEvent, BusinessMembership) are keyed by user, not by business: a
 -- login must find a user's memberships in every business. StripeWebhookEvent is
--- platform-level. Business is readable by everyone (it is the public site) and
--- writable only for its own row.
+-- platform-level. Business is scoped like the rest (each caller sees and
+-- changes only its own row); before a business is known it is reachable only
+-- through three functions that return an id or a count.
 --
 -- Revert with: ALTER TABLE ... DISABLE ROW LEVEL SECURITY on each table below
 -- and DROP POLICY IF EXISTS on each policy; the roles can stay.
@@ -235,21 +236,46 @@ CREATE POLICY tenant_isolation ON "TestimonialTranslation" TO marea_app
   USING (EXISTS (SELECT 1 FROM "Testimonial" parent WHERE parent.id = "TestimonialTranslation"."testimonialId"));
 
 -- ---------------------------------------------------------------------------
--- Business: public to read, writable only for the caller's own row. No INSERT
--- or DELETE policy, so the application cannot create or remove a business.
+-- Business: each caller reads and writes only its own row. The row carries the
+-- contact details, the tax rate and the Stripe account, and gains more over
+-- time, so it is not public to the application as a whole.
+--
+-- The one thing needed before a business is known, "which business does this
+-- host name?", is answered by three functions that return an id (or a count)
+-- and nothing else. They run as the table owner (SECURITY DEFINER), so they see
+-- past the policy, but they take no column list and no filter beyond their own.
+-- No INSERT or DELETE policy: the application cannot create or remove one.
 -- ---------------------------------------------------------------------------
 ALTER TABLE "Business" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY business_read ON "Business" FOR SELECT TO marea_app USING (true);
+CREATE POLICY business_own ON "Business" FOR SELECT TO marea_app
+  USING (id = current_setting('app.business_id', true));
 CREATE POLICY business_update ON "Business" FOR UPDATE TO marea_app
   USING (id = current_setting('app.business_id', true))
   WITH CHECK (id = current_setting('app.business_id', true));
+
+CREATE FUNCTION marea_business_id_by_slug(business_slug text) RETURNS text
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path FROM CURRENT AS
+$$ SELECT id FROM "Business" WHERE slug = business_slug AND "deletedAt" IS NULL $$;
+
+-- The only business, when there is exactly one; NULL for none or several.
+CREATE FUNCTION marea_only_business_id() RETURNS text
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path FROM CURRENT AS
+$$ SELECT CASE WHEN count(*) = 1 THEN min(id) END FROM "Business" WHERE "deletedAt" IS NULL $$;
+
+CREATE FUNCTION marea_business_count() RETURNS integer
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path FROM CURRENT AS
+$$ SELECT count(*)::integer FROM "Business" WHERE "deletedAt" IS NULL $$;
+
+REVOKE ALL ON FUNCTION marea_business_id_by_slug(text), marea_only_business_id(), marea_business_count() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION marea_business_id_by_slug(text), marea_only_business_id(), marea_business_count() TO marea_app;
 
 -- ---------------------------------------------------------------------------
 -- marea_worker. Reads and updates the notification queue, reads Business, and
 -- gets column-level SELECT on the rest: enough to sweep for changes and to
 -- discover which business a token belongs to, never a row's contents.
 -- ---------------------------------------------------------------------------
-GRANT SELECT ON "Business" TO marea_worker;
+-- Enough to render an email (name, address, phone) and to list businesses.
+GRANT SELECT ("id", "slug", "name", "addressLine1", "addressLine2", "city", "phone") ON "Business" TO marea_worker;
 CREATE POLICY worker_read ON "Business" FOR SELECT TO marea_worker USING (true);
 
 GRANT SELECT, UPDATE ON "NotificationJob" TO marea_worker;

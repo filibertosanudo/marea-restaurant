@@ -141,7 +141,10 @@ export async function processQueue(limit: number): Promise<ProcessQueueResult> {
   // each job names its own, and the email it renders carries that business's
   // name, address and phone. Loaded once per business in the batch.
   const businessIds = [...new Set(jobs.map((job) => job.businessId))];
-  const businesses = await systemPrisma.business.findMany({ where: { id: { in: businessIds } } });
+  const businesses = await systemPrisma.business.findMany({
+    where: { id: { in: businessIds } },
+    select: { id: true, name: true, addressLine1: true, addressLine2: true, city: true, phone: true },
+  });
   const templateBusinesses = new Map<string, TemplateBusiness>(
     businesses.map((b) => [
       b.id,

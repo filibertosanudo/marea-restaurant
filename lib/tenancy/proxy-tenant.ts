@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/prisma";
+import { businessIdForSlug, onlyBusinessId } from "@/lib/tenancy/discover";
 import { appOrigin, env } from "@/lib/env";
 import { slugFromHost } from "@/lib/business-host";
 
@@ -37,13 +37,7 @@ export async function tenantForRequest(input: {
   const root = env.BUSINESS_ROOT_DOMAIN ?? new URL(appOrigin()).hostname;
   const slug = slugFromHost(input.host, root);
   if (slug) {
-    return remembered(`slug:${slug}`, async () => {
-      const row = await prisma.business.findFirst({ where: { slug, deletedAt: null }, select: { id: true } });
-      return row?.id ?? null;
-    });
+    return remembered(`slug:${slug}`, () => businessIdForSlug(slug));
   }
-  return remembered("default", async () => {
-    const rows = await prisma.business.findMany({ where: { deletedAt: null }, select: { id: true }, take: 2 });
-    return rows.length === 1 ? rows[0].id : null;
-  });
+  return remembered("default", onlyBusinessId);
 }
