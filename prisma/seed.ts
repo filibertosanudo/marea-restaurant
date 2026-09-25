@@ -24,6 +24,9 @@ const DEV_PASSWORDS: Record<string, string> = {
   "super@marea.test": "MareaSuper123!",
   "admin@marea.test": "MareaAdmin123!",
   "mesero@marea.test": "MareaTemp123!", // mustChangePassword: true — ver abajo
+  // Segundo negocio y su cadena (ver seedSecondBusiness).
+  "owner@marea.test": "MareaOwner123!", // ORG_ADMIN de la cadena "Marea Group"
+  "admin@cala.test": "CalaAdmin123!", // BUSINESS_ADMIN sólo de Cala
 };
 
 // Deliberately just loopback addresses, not a Docker Compose service name
@@ -296,6 +299,174 @@ const TESTIMONIALS = [
     es: "Desde las ostras hasta el postre, todo se sintió cuidadosamente elaborado. Volveremos.",
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Segundo negocio: Cala, en la misma cadena que Marea
+// ---------------------------------------------------------------------------
+//
+// Existe para que el aislamiento entre negocios se pruebe contra datos
+// reales y no contra un solo inquilino: los mismos folios ("A-0001"), otro
+// menú, otras mesas, otro personal. Marea y Cala forman la cadena "Marea
+// Group", cuyo dueño es owner@marea.test (ORG_ADMIN); nadie más ve las dos.
+
+const CALA_SLUG = "cala";
+
+const CALA_CATEGORIES = [
+  { slug: "coffee", sortOrder: 1, en: "Coffee", es: "Café" },
+  { slug: "bites", sortOrder: 2, en: "Bites", es: "Bocados" },
+];
+
+const CALA_DISHES = [
+  { slug: "flat-white", category: "coffee", price: "4.50", en: { name: "Flat White", desc: "Double ristretto with silky steamed milk." }, es: { name: "Flat White", desc: "Doble ristretto con leche vaporizada sedosa." } },
+  { slug: "cold-brew", category: "coffee", price: "5.00", en: { name: "Cold Brew", desc: "Steeped for eighteen hours, served over ice." }, es: { name: "Cold Brew", desc: "Reposado dieciocho horas, servido con hielo." } },
+  { slug: "avocado-toast", category: "bites", price: "9.00", en: { name: "Avocado Toast", desc: "Sourdough, smashed avocado, lime and chili flakes." }, es: { name: "Pan con Aguacate", desc: "Masa madre, aguacate, limón y hojuelas de chile." } },
+  { slug: "conchas", category: "bites", price: "3.50", en: { name: "Conchas", desc: "Two house-made sweet rolls, still warm." }, es: { name: "Conchas", desc: "Dos conchas hechas en casa, todavía tibias." } },
+];
+
+async function seedSecondBusiness(marea: { id: string }) {
+  const organization = await prisma.organization.upsert({
+    where: { slug: "marea-group" },
+    update: {},
+    create: { slug: "marea-group", name: "Marea Group" },
+  });
+  await prisma.business.update({ where: { id: marea.id }, data: { organizationId: organization.id } });
+
+  const cala = await prisma.business.upsert({
+    where: { slug: CALA_SLUG },
+    update: { organizationId: organization.id },
+    create: {
+      slug: CALA_SLUG,
+      name: "Cala",
+      type: "CAFE",
+      defaultLocale: "es",
+      supportedLocales: ["en", "es"],
+      currency: "USD",
+      timezone: "America/Hermosillo",
+      taxRate: D("0.1600"),
+      email: "hola@cala.test",
+      phone: "+1 555 000 1111",
+      addressLine1: "9 Salt Lane",
+      addressLine2: "Old Town, Portside 90210",
+      acceptsOnlinePayment: false, // sin cuenta de Stripe propia todavía (módulo 17b)
+      acceptsPayAtCounter: true,
+      organizationId: organization.id,
+    },
+  });
+
+  for (const [locale, tagline] of [["en", "Small coffee, big mornings."], ["es", "Café pequeño, mañanas grandes."]] as const) {
+    await prisma.businessTranslation.upsert({
+      where: { businessId_locale: { businessId: cala.id, locale } },
+      update: {},
+      create: { businessId: cala.id, locale, tagline, shortBlurb: tagline, aboutTitle: "Cala", aboutBody: tagline, metaTitle: "Cala", metaDescription: tagline },
+    });
+  }
+
+  // Abierto todos los días de 7:00 a 15:00.
+  for (let day = 0; day <= 6; day++) {
+    await prisma.openingHour.upsert({
+      where: { businessId_dayOfWeek_opensAt: { businessId: cala.id, dayOfWeek: day, opensAt: 420 } },
+      update: {},
+      create: { businessId: cala.id, dayOfWeek: day, opensAt: 420, closesAt: 900 },
+    });
+  }
+
+  const categoryIds = new Map<string, string>();
+  for (const c of CALA_CATEGORIES) {
+    const category = await prisma.menuCategory.upsert({
+      where: { businessId_slug: { businessId: cala.id, slug: c.slug } },
+      update: { sortOrder: c.sortOrder },
+      create: { businessId: cala.id, slug: c.slug, sortOrder: c.sortOrder },
+    });
+    categoryIds.set(c.slug, category.id);
+    for (const [locale, name] of [["en", c.en], ["es", c.es]] as const) {
+      await prisma.menuCategoryTranslation.upsert({
+        where: { categoryId_locale: { categoryId: category.id, locale } },
+        update: { name },
+        create: { categoryId: category.id, locale, name },
+      });
+    }
+  }
+
+  const dishIds = new Map<string, string>();
+  for (const [i, d] of CALA_DISHES.entries()) {
+    const item = await prisma.menuItem.upsert({
+      where: { businessId_slug: { businessId: cala.id, slug: d.slug } },
+      update: { basePrice: D(d.price), isAvailable: true },
+      create: { businessId: cala.id, categoryId: categoryIds.get(d.category)!, slug: d.slug, basePrice: D(d.price), preparationMinutes: 5, sortOrder: i },
+    });
+    dishIds.set(d.slug, item.id);
+    for (const [locale, tr] of [["en", d.en], ["es", d.es]] as const) {
+      await prisma.menuItemTranslation.upsert({
+        where: { menuItemId_locale: { menuItemId: item.id, locale } },
+        update: { name: tr.name, description: tr.desc },
+        create: { menuItemId: item.id, locale, name: tr.name, description: tr.desc, imageAlt: tr.name },
+      });
+    }
+  }
+
+  const tableIds: string[] = [];
+  for (let n = 1; n <= 4; n++) {
+    const code = `C-${String(n).padStart(2, "0")}`;
+    const table = await prisma.restaurantTable.upsert({
+      where: { businessId_code: { businessId: cala.id, code } },
+      update: {},
+      create: { businessId: cala.id, code, zone: "Salón", seats: 2, sortOrder: n },
+    });
+    tableIds.push(table.id);
+  }
+
+  // Personal: un administrador propio de Cala, y el dueño de la cadena.
+  const staff = await Promise.all(
+    [
+      { email: "admin@cala.test", name: "Valeria Cota", role: "BUSINESS_ADMIN" as const, organizationId: null },
+      { email: "owner@marea.test", name: "Marea Group Owner", role: "ORG_ADMIN" as const, organizationId: organization.id },
+    ].map(async (u) => {
+      const passwordHash = await hashPassword(DEV_PASSWORDS[u.email]);
+      return prisma.user.upsert({
+        where: { email: u.email },
+        update: { passwordHash, mustChangePassword: false },
+        create: { email: u.email, name: u.name, role: u.role, organizationId: u.organizationId, emailVerified: new Date(), locale: "es", passwordHash },
+      });
+    })
+  );
+  const [calaAdmin] = staff;
+  await prisma.businessMembership.upsert({
+    where: { userId_businessId: { userId: calaAdmin.id, businessId: cala.id } },
+    update: {},
+    create: { userId: calaAdmin.id, businessId: cala.id, role: "BUSINESS_ADMIN" },
+  });
+
+  // Un pedido con el MISMO folio que el primero de Marea: los folios son por
+  // negocio, y es la forma más barata de notarlo si algo los mezcla.
+  const exists = await prisma.order.findUnique({
+    where: { businessId_orderNumber: { businessId: cala.id, orderNumber: "A-0001" } },
+  });
+  if (!exists) {
+    const unit = D("4.50");
+    const subtotal = unit.mul(2);
+    const tax = subtotal.mul(D("0.16")).toDecimalPlaces(2);
+    const order = await prisma.order.create({
+      data: {
+        businessId: cala.id,
+        orderNumber: "A-0001",
+        type: "DINE_IN",
+        status: "PENDING",
+        tableId: tableIds[0],
+        guestName: "Cliente de Cala",
+        guestCount: 1,
+        subtotal,
+        taxTotal: tax,
+        total: subtotal.add(tax),
+        currency: "USD",
+        items: { create: [{ menuItemId: dishIds.get("flat-white")!, nameSnapshot: "Flat White", unitPrice: unit, quantity: 2, lineTotal: subtotal }] },
+        statusEvents: { create: [{ toStatus: "PENDING" }] },
+      },
+    });
+    await prisma.payment.create({
+      data: { businessId: cala.id, orderId: order.id, provider: "CASH_REGISTER", status: "PENDING", amount: order.total, currency: "USD" },
+    });
+  }
+}
 
 async function main() {
   console.log("🌊 Seeding Marea…");
@@ -873,9 +1044,12 @@ async function main() {
     });
   }
 
+  await seedSecondBusiness(business);
+
   console.log("✅ Seed listo:");
   console.log(`   ${CATEGORIES.length} categorías · ${DISHES.length} platillos · ${PROMOS.length} promociones`);
   console.log(`   ${TESTIMONIALS.length} testimonios · ${tableIds.length} mesas · ${scenarios.length} pedidos · ${RESERVATIONS.length} reservaciones`);
+  console.log("   + Cala (misma cadena, Marea Group): 2 categorías · 4 platillos · 4 mesas · 1 pedido");
 }
 
 main()
