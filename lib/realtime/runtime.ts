@@ -1,6 +1,7 @@
 import "server-only";
 import pg from "pg";
 import { env } from "@/lib/env";
+import { runInTenant } from "@/lib/tenancy/context";
 import { RealtimeHub } from "@/lib/realtime/hub";
 import { ListenSource } from "@/lib/realtime/listen-source";
 import { PollSource } from "@/lib/realtime/poll-source";
@@ -20,7 +21,9 @@ export const LISTEN_APPLICATION_NAME = "marea_realtime_listen";
  */
 export function createListenClient(applicationName: string = LISTEN_APPLICATION_NAME): pg.Client {
   return new pg.Client({
-    connectionString: env.DIRECT_URL ?? env.DATABASE_URL,
+    // The worker role, direct: LISTEN needs no table at all. DIRECT_URL is the
+    // migrations' (owner) connection and does not belong in a running app.
+    connectionString: env.WORKER_DATABASE_URL ?? env.DIRECT_URL ?? env.DATABASE_URL,
     application_name: applicationName,
     keepAlive: true,
     connectionTimeoutMillis: 5_000,
@@ -44,7 +47,9 @@ export function getRealtimeHub(): RealtimeHub {
       createPoll: (businesses, emit) =>
         new PollSource({
           businesses,
-          signature: getBoardSignature,
+          // Polling has no request to take a business from, so each read acts for
+          // the business being watched.
+          signature: (businessId) => runInTenant(businessId, () => getBoardSignature(businessId)),
           onChange: emit,
           intervalMs: POLL_FALLBACK_INTERVAL_MS,
         }),

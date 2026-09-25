@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/prisma";
+import { systemPrisma } from "@/lib/db/system";
 import { SWEEP_EVENT_LIMIT } from "@/lib/realtime/timing";
 import type { RealtimeEvent } from "@/lib/realtime/events";
 
@@ -10,7 +10,8 @@ type Row = { kind: "order" | "payment" | "cash"; businessId: string; orderId: st
  * from the tables. Notifications sent while nobody was listening are gone, so
  * this is the only way to learn what a dropped connection missed.
  *
- * Runs on the regular Prisma pool, never on the LISTEN connection, which does
+ * Runs on the system client (it reads every business at once and only ever
+ * ids, see lib/db/system.ts), never on the LISTEN connection, which does
  * nothing else. `since` is compared as a UTC wall-clock: Prisma stores UTC in
  * these `timestamp` columns, and casting the ISO string drops its "Z" rather
  * than shifting it by the session's time zone.
@@ -21,7 +22,7 @@ type Row = { kind: "order" | "payment" | "cash"; businessId: string; orderId: st
  */
 export async function sweepChangesSince(since: Date): Promise<RealtimeEvent[]> {
   const from = since.toISOString();
-  const rows = await prisma.$queryRaw<Row[]>`
+  const rows = await systemPrisma.$queryRaw<Row[]>`
     SELECT DISTINCT kind, "businessId", "orderId" FROM (
       SELECT 'order' AS kind, o."businessId", e."orderId"
         FROM "OrderStatusEvent" e JOIN "Order" o ON o.id = e."orderId"

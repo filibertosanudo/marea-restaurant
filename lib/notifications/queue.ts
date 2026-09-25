@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
+import { systemPrisma } from "@/lib/db/system";
 import type { NotificationJob } from "@/lib/generated/prisma/client";
 import { getMailer } from "@/lib/notifications";
 import { MailerError } from "@/lib/notifications/mailer";
@@ -38,7 +39,7 @@ type ClaimedJob = NotificationJob;
  * that can take thirty seconds.
  */
 async function claimBatch(limit: number, workerId: string): Promise<ClaimedJob[]> {
-  return prisma.$transaction(async (tx) => {
+  return systemPrisma.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<{ id: string }[]>`
       SELECT id FROM "NotificationJob"
       WHERE channel = 'EMAIL'
@@ -88,7 +89,7 @@ async function sendOne(job: ClaimedJob, business: TemplateBusiness): Promise<voi
 }
 
 async function markSent(jobId: string): Promise<void> {
-  await prisma.notificationJob.update({
+  await systemPrisma.notificationJob.update({
     where: { id: jobId },
     data: { status: "SENT", sentAt: new Date(), lockedAt: null, lockedBy: null },
   });
@@ -100,7 +101,7 @@ async function markFailedOrRetry(job: ClaimedJob, err: unknown): Promise<void> {
   const attempts = job.attempts + 1;
 
   if (permanent || attempts >= job.maxAttempts) {
-    await prisma.notificationJob.update({
+    await systemPrisma.notificationJob.update({
       where: { id: job.id },
       data: { status: "FAILED", attempts, lastError: message, lockedAt: null, lockedBy: null },
     });
@@ -110,7 +111,7 @@ async function markFailedOrRetry(job: ClaimedJob, err: unknown): Promise<void> {
     return;
   }
 
-  await prisma.notificationJob.update({
+  await systemPrisma.notificationJob.update({
     where: { id: job.id },
     data: {
       status: "QUEUED",
@@ -140,7 +141,7 @@ export async function processQueue(limit: number): Promise<ProcessQueueResult> {
   // each job names its own, and the email it renders carries that business's
   // name, address and phone. Loaded once per business in the batch.
   const businessIds = [...new Set(jobs.map((job) => job.businessId))];
-  const businesses = await prisma.business.findMany({ where: { id: { in: businessIds } } });
+  const businesses = await systemPrisma.business.findMany({ where: { id: { in: businessIds } } });
   const templateBusinesses = new Map<string, TemplateBusiness>(
     businesses.map((b) => [
       b.id,
