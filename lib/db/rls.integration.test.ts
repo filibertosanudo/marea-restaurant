@@ -182,6 +182,30 @@ describe("row level security on the application role", () => {
     expect(await ids(marea.id)).toEqual([mareaOrder.id]);
   });
 
+  it("leaves no business on a connection that goes back to the pool, so forgetting to set one sees nothing", async () => {
+    const { marea, mareaOrder } = await twoBusinessesWithOrders();
+    const pool = new TenantPool({ connectionString: urlAs("marea_app"), max: 1 }, () => explicitTenant());
+    pools.push(pool);
+    const app = new PrismaClient({ adapter: new PrismaPg(pool, { schema: testSchema }) });
+
+    // Business A uses the only connection there is, and it goes back.
+    await runInTenant(marea.id, async () => {
+      expect((await app.order.findMany()).map((o) => o.id)).toEqual([mareaOrder.id]);
+    });
+
+    // A path that does not set a business: the pool's own connect, skipping
+    // TenantPool's. It is handed the very same connection.
+    const forgetful = await (pg.Pool.prototype.connect as () => Promise<pg.PoolClient>).call(pool);
+    try {
+      const setting = await forgetful.query("SELECT current_setting('app.business_id', true) AS value");
+      expect(setting.rows[0].value).toBe("");
+      const visible = await forgetful.query(`SELECT count(*)::int AS n FROM "${testSchema}"."Order"`);
+      expect(visible.rows[0].n).toBe(0);
+    } finally {
+      forgetful.release();
+    }
+  });
+
   it("keeps concurrent callers of different businesses apart", async () => {
     const { marea, cala, mareaOrder, calaOrder } = await twoBusinessesWithOrders();
     const app = appClient(2);

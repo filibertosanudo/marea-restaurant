@@ -18,6 +18,38 @@ async function applyTenant(client: pg.PoolClient, tenant: string | null | undefi
 }
 
 /**
+ * An idle connection must carry no business. The business is set when a
+ * connection is handed out; this clears it when the connection comes back, so
+ * that a path that never sets one (another client, a raw connection, a bug)
+ * finds "nothing" and never finds the last caller's business.
+ *
+ * pg-pool gives every checkout a fresh `release`, so this wraps it each time.
+ * The clearing statement is queued on the connection ahead of whatever the
+ * next holder sends, and the connection only goes back to the pool once it has
+ * run, so nobody can be handed it half-cleared. The caller is not kept waiting:
+ * pg-pool answers the query before it releases.
+ */
+function clearOnRelease(client: pg.PoolClient): void {
+  const release = client.release.bind(client);
+  client.release = (error?: Error | boolean) => {
+    if (error) {
+      applied.delete(client);
+      return release(error);
+    }
+    client.query("SELECT set_config($1, '', false)", [TENANT_SETTING]).then(
+      () => {
+        applied.set(client, "");
+        release();
+      },
+      (err: Error) => {
+        applied.delete(client);
+        release(err);
+      }
+    );
+  };
+}
+
+/**
  * A pool that stamps the business onto each connection as it is handed out.
  *
  * Row level security reads a Postgres setting, and with a pool the setting
@@ -28,6 +60,8 @@ async function applyTenant(client: pg.PoolClient, tenant: string | null | undefi
  *     what the connection was last told against what this caller needs and
  *     overwrites it when they differ, before any query runs. A caller with
  *     no business gets the empty string, which matches no row.
+ *   - A value left behind on an idle connection: cleared on release, see
+ *     clearOnRelease(), so forgetting to set one fails closed.
  *   - A value that only lives inside a transaction (`set_config(..., true)`).
  *     A single Prisma query is its own implicit transaction and an
  *     interactive `$transaction` opens one, so a transaction-local value
@@ -55,6 +89,7 @@ export class TenantPool extends pg.Pool {
     const acquire = super.connect() as Promise<pg.PoolClient>;
 
     const ready = Promise.all([acquire, tenant]).then(async ([client, resolved]) => {
+      clearOnRelease(client);
       try {
         await applyTenant(client, resolved);
       } catch (err) {
