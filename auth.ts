@@ -5,9 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { UserRole } from "@/lib/generated/prisma/client";
 import { loginSchema } from "@/lib/auth/schemas";
 import { DUMMY_HASH, verifyPassword } from "@/lib/auth/password";
-import { getEffectiveRole } from "@/lib/auth/roles";
+import { claimsForSignIn, revalidateClaims, tokenAfterUpdate } from "@/lib/auth/token-claims";
+import { firstBusinessFor } from "@/lib/auth/business-access";
 import { isRateLimited, recordLoginAttempt, getClientIp } from "@/lib/auth/rate-limit";
-import { isRevokedByPasswordChange } from "@/lib/auth/token-revalidation";
 
 // How long a token is trusted before the next request re-checks the
 // membership in the database. Amortizes the cost (not a query per request)
@@ -23,6 +23,9 @@ declare module "next-auth" {
       name: string | null;
       role: UserRole;
       businessId: string | null;
+      /// The user administers a chain (ORG_ADMIN). `role` is still the one
+      /// they hold at the active business.
+      orgAdmin: boolean;
       mustChangePassword: boolean;
       /// true once a DB revalidation finds the account gone or the
       /// membership deactivated. Every auth guard treats this as "logged
@@ -36,6 +39,7 @@ declare module "next-auth" {
   interface User {
     role?: UserRole;
     businessId?: string | null;
+    orgAdmin?: boolean;
     mustChangePassword?: boolean;
   }
 }
@@ -44,6 +48,7 @@ declare module "@auth/core/jwt" {
   interface JWT {
     role: UserRole;
     businessId: string | null;
+    orgAdmin: boolean;
     mustChangePassword: boolean;
     revoked?: boolean;
     /// Timestamp (ms) of the last time this token was checked against the
@@ -52,7 +57,7 @@ declare module "@auth/core/jwt" {
   }
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   adapter: PrismaAdapter(prisma),
   // A shift, not a month: the previous default (30 days from Auth.js) let a
   // fired employee's token outlive their last shift by weeks.
@@ -74,10 +79,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (await isRateLimited(email, ipAddress)) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { email, deletedAt: null },
-          include: { memberships: { where: { isActive: true } } },
-        });
+        const user = await prisma.user.findUnique({ where: { email, deletedAt: null } });
 
         const hashToCheck = user?.passwordHash ?? DUMMY_HASH;
         const validPassword = await verifyPassword(hashToCheck, password);
@@ -87,9 +89,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        // Only staff sign in through this form.
-        const role = getEffectiveRole(user);
-        if (role !== UserRole.STAFF && role !== UserRole.BUSINESS_ADMIN && role !== UserRole.SUPER_ADMIN) {
+        // Only staff sign in through this form, and only on a business they
+        // may act on (lib/auth/business-access.ts): the first of their own
+        // memberships, or of their organization's businesses.
+        const claims = await claimsForSignIn(user.id, await firstBusinessFor(user.id));
+        if (!claims) {
           await recordLoginAttempt(email, ipAddress, false);
           return null;
         }
@@ -100,18 +104,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: user.id,
           email: user.email ?? email,
           name: user.name,
-          role,
-          businessId: user.memberships[0]?.businessId ?? null,
-          mustChangePassword: user.mustChangePassword,
+          role: claims.role,
+          businessId: claims.businessId,
+          orgAdmin: claims.orgAdmin,
+          mustChangePassword: claims.mustChangePassword,
         };
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.role = user.role ?? UserRole.CUSTOMER;
         token.businessId = user.businessId ?? null;
+        token.orgAdmin = user.orgAdmin ?? false;
         token.mustChangePassword = user.mustChangePassword ?? false;
         token.revoked = false;
         token.checkedAt = Date.now();
@@ -120,48 +126,32 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       if (token.revoked) return token;
 
+      // A request to change business. The payload comes from whoever called
+      // update(): the switch action, but also anything the browser can post to
+      // the session endpoint. It is a request, not a fact; see tokenAfterUpdate.
+      if (trigger === "update") return tokenAfterUpdate(token, session);
+
       const isStale = Date.now() - (token.checkedAt ?? 0) > REVALIDATE_INTERVAL_MS;
       if (!isStale) return token;
 
-      const dbUser = await prisma.user.findUnique({
-        where: { id: token.sub },
-        // Scoped to the business this token was issued for — an active
-        // membership at a DIFFERENT business must not keep this session
-        // alive if the membership at THIS one was deactivated. Falls back
-        // to "any active membership" only when the token has no businessId
-        // yet (SUPER_ADMIN, whose role doesn't depend on a membership).
-        include: {
-          memberships: {
-            where: token.businessId
-              ? { isActive: true, businessId: token.businessId }
-              : { isActive: true },
-          },
-        },
+      // Re-authorises the token's business, not just the user: an account that
+      // is gone, a password changed since the token was issued, or a user who
+      // may no longer act on this business (membership deactivated, or the
+      // business left their organization) ends the session here.
+      const claims = await revalidateClaims({
+        sub: token.sub as string,
+        businessId: token.businessId,
+        iat: token.iat,
       });
-
-      if (!dbUser || dbUser.deletedAt) {
+      if (!claims) {
         token.revoked = true;
         return token;
       }
 
-      if (isRevokedByPasswordChange(dbUser.passwordChangedAt, token.iat)) {
-        token.revoked = true;
-        return token;
-      }
-
-      const role = getEffectiveRole(dbUser);
-      // The membership this token was issued for is no longer active (or
-      // was never re-granted since) — same as being deactivated mid-shift.
-      const stillStaff =
-        role === UserRole.STAFF || role === UserRole.BUSINESS_ADMIN || role === UserRole.SUPER_ADMIN;
-      if (!stillStaff) {
-        token.revoked = true;
-        return token;
-      }
-
-      token.role = role;
-      token.businessId = dbUser.memberships[0]?.businessId ?? token.businessId;
-      token.mustChangePassword = dbUser.mustChangePassword;
+      token.role = claims.role;
+      token.businessId = claims.businessId;
+      token.orgAdmin = claims.orgAdmin;
+      token.mustChangePassword = claims.mustChangePassword;
       token.checkedAt = Date.now();
       return token;
     },
@@ -169,6 +159,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = token.sub as string;
       session.user.role = token.role;
       session.user.businessId = token.businessId;
+      session.user.orgAdmin = token.orgAdmin ?? false;
       session.user.mustChangePassword = token.mustChangePassword;
       session.user.revoked = token.revoked ?? false;
       return session;

@@ -32,6 +32,7 @@ export function sessionUserFromRow(
     name: user.name,
     role: user.role,
     businessId: null,
+    orgAdmin: false,
     mustChangePassword: user.mustChangePassword,
     revoked: false,
     ...overrides,
