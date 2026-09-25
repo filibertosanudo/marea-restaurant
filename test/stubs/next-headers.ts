@@ -54,8 +54,16 @@ export function setTestHost(host: string): void {
 
 export function clearTestHost(): void {
   testHost = DEFAULT_TEST_HOST;
+  testTenantHeader = null;
+}
+
+let testTenantHeader: string | null = null;
+
+/** Sets the x-marea-tenant header proxy.ts would have stamped on the request. */
+export function setTestTenantHeader(businessId: string): void {
+  testTenantHeader = businessId;
 }
 
 export function headers(): Headers {
-  return new Headers({ host: testHost });
+  return new Headers({ host: testHost, ...(testTenantHeader ? { "x-marea-tenant": testTenantHeader } : {}) });
 }
