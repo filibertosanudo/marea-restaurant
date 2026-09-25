@@ -56,7 +56,8 @@ al proyecto después de un tiempo fuera.
 | 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | **Terminada.** Reportes y corte de caja (módulo 12, fusionado en `main`) y comanda impresa + KDS (módulo 13, fusionado en `main`, PRs #54, #56–#58). No probado contra una impresora térmica física — verificado contra un emulador ESC/POS, ver el módulo 13 |
 | 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | **Terminada.** Inventario y promociones (módulo 14, fusionado en `main`) y testimonios + landing desde la base (módulo 15, fusionado en `main`, PRs #65, #67, #68, #71) |
 | 6 · Rendimiento y tiempo real | 16 | **Terminada** (PRs #73–#79 y la del cierre). Cinco pantallas quietas de 605 a 2 sentencias por minuto, cambios en ~130 ms, prueba de carga de 200 pedidos sin errores. Dos criterios se cumplen distinto a como se escribieron: ver el módulo 16 |
-| 7 · Multi-sucursal | 17 | Sin empezar |
+| 7 · Multi-sucursal | 17 | **Terminada** (PRs #81, #82–#86, sin fusionar). Un negocio por petición, RLS con `marea_app`, organización y `ORG_ADMIN`, alta de negocios sin tocar la base. Los pagos multi-negocio salieron a la 7b: ver abajo |
+| 7b · Stripe Connect | 17b | Sin empezar. **Condición, no pendiente:** tiene que estar hecho antes de que entre cualquier restaurante que no sea tuyo. Con una sola llave global y dos negocios sin relación, el dinero del segundo cae en tu cuenta y estás reteniendo fondos ajenos. Mientras tanto un negocio sin `stripeAccountId` no puede activar tarjeta (lo impide el servidor, con prueba) |
 | 8 · Producto vendible | 18 | Sin empezar |
 
 ### Pospuesto a propósito
@@ -1761,13 +1762,21 @@ de veinte, en menos de dos. Criterio numérico, no intuición: cuando
 
 ## Criterio de terminado — Fase 7
 
-- [ ] Dos negocios en la misma base, con sus dominios, sin fugas de datos.
-- [ ] Test que intenta leer un pedido de otro negocio con una sesión válida y
-      **falla por RLS**, con el filtro de la query desactivado a propósito.
-- [ ] Un usuario con membresía en dos sucursales cambia entre ellas sin volver a
-      autenticarse.
-- [ ] `getCurrentBusiness` ya no existe en el código.
-- [ ] `BUSINESS_SLUG` desaparece del `.env`.
+- [x] Dos negocios en la misma base, con sus dominios, sin fugas de datos.
+      (Marea y Cala en el seed; specs de Playwright de aislamiento.)
+- [x] Test que intenta leer un pedido de otro negocio con una sesión válida y
+      **falla por RLS**, con el filtro de la query desactivado a propósito
+      (`lib/db/rls.integration.test.ts`, conectado como `marea_app`).
+- [x] Un usuario con membresía en dos sucursales cambia entre ellas sin volver a
+      autenticarse, y no puede asignarse una que no es suya
+      (`authorizeBusiness`; el cruce entre organizaciones tiene prueba).
+- [x] `getCurrentBusiness` ya no existe en el código.
+- [x] `BUSINESS_SLUG` desaparece del `.env`.
+- [x] La aplicación no conecta como dueño de las tablas; arrancar así en
+      producción se rechaza (`DATABASE_ROLE_CHECK`).
+- [x] La prueba de carga del módulo 16 pasa con dos negocios y el rol
+      restringido (7 de 7; p95 83 ms).
+- [ ] Stripe Connect (módulo 17b), antes del primer restaurante ajeno.
 
 ---
 
@@ -1852,7 +1861,7 @@ Constrúyelo cuando un cliente real lo pida. Antes de eso es especulación cara.
 | `DIRECT_URL` | Sólo existía por el pooler de Supabase. Pasa a **opcional**: si falta, `prisma.config.ts` usa `DATABASE_URL` |
 | `NEXT_PUBLIC_SUPABASE_URL` | Sustituida por el driver de almacenamiento |
 | `SUPABASE_SERVICE_ROLE_KEY` | Ídem |
-| `BUSINESS_SLUG` | Desaparece en la fase 7: el negocio se resuelve por sesión o por dominio |
+| `BUSINESS_SLUG` | Desapareció en el módulo 17: el negocio se resuelve por sesión (panel) o por subdominio (público) |
 
 ## Quedan igual
 
@@ -2028,7 +2037,8 @@ la numeración de los seis existentes:
 | `14-inventario-y-promociones.md` | 5.1–5.2 | `feature/catalog-completion` |
 | `15-landing-desde-la-base.md` | 5.3–5.5 | `feature/dynamic-landing` |
 | `16-tiempo-real-y-rendimiento.md` | 6 | `feature/perf-fase-N` |
-| `17-multi-sucursal.md` | 7 | `feature/multi-tenant` |
+| `17-multi-sucursal.md` | 7 | `feature/tenancy-fase-N` |
+| `17b-stripe-connect.md` | 7 (pagos) | por escribir |
 | `18-producto.md` | 8 | varias |
 
 El `08` no corresponde a ninguna fase del plan: es mantenimiento del generador de
