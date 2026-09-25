@@ -54,6 +54,13 @@ instead of duplicating it here.
   means no rows. Queries still carry `where: { businessId }`; the policy is
   what saves you when one does not. `runInTenant` awaits `fn` inside the
   scope on purpose: a Prisma query is lazy.
+- **"May this user act on this business?" has one answer:**
+  `authorizeBusiness` (`lib/auth/business-access.ts`). Sign-in, the `jwt`
+  callback's revalidation and the business switcher all ask it, and nothing
+  else decides what business a token may name: the token's `businessId` becomes
+  `x-marea-tenant`, which becomes `app.business_id`, which row level security
+  obeys without question. An `ORG_ADMIN` session carries `BUSINESS_ADMIN`, the
+  role held at the active business, so permission checks did not change.
 - **Work that has no business uses `systemPrisma`** (`lib/db/system.ts`,
   role `marea_worker`): the notification queue, the realtime sweep and
   `lib/tenancy/discover.ts`, which finds a business from a device token,
