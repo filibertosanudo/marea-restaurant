@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { updateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/lib/generated/prisma/client";
-import { getCurrentBusiness } from "@/lib/business";
+import { getPublicBusiness } from "@/lib/business";
 import { getPublicMenuByLang } from "@/lib/menu/queries";
 import { listFeaturedPromotionsForLanding } from "@/lib/promotions/queries";
 import { listFeaturedTestimonialsForLanding } from "@/lib/testimonials/queries";
@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 
 describe("cached reads keep their types", () => {
-  it("getCurrentBusiness returns Decimal and Date columns as Decimal and Date, equal to the row", async () => {
+  it("getPublicBusiness returns Decimal and Date columns as Decimal and Date, equal to the row", async () => {
     const row = await makeBusiness({
       slug: "marea",
       taxRate: "0.1600",
@@ -43,7 +43,7 @@ describe("cached reads keep their types", () => {
       addressLine1: "Calle 1",
     });
 
-    const business = await getCurrentBusiness();
+    const business = await getPublicBusiness();
 
     expect(business.taxRate).toBeInstanceOf(Prisma.Decimal);
     expect(business.latitude).toBeInstanceOf(Prisma.Decimal);
@@ -159,7 +159,8 @@ describe("panel mutations expire the public cache", () => {
     const result = await updateBusinessSettingsAction(undefined, form);
 
     expect(result).toEqual({ success: true });
-    expect(updateTagMock).toHaveBeenCalledWith("business:marea");
+    expect(updateTagMock).toHaveBeenCalledWith("business:slug:marea");
+    expect(updateTagMock).toHaveBeenCalledWith("business:default");
     expect(updateTagMock).toHaveBeenCalledWith(`business:${business.id}`);
   });
 

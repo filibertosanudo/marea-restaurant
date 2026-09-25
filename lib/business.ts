@@ -153,19 +153,6 @@ export const getBusinessForRequest = cache(async (): Promise<Business> => {
   return business;
 });
 
-/**
- * @deprecated Single-tenant, reads BUSINESS_SLUG. Use getPublicBusiness()
- * (public pages and actions) or getBusinessForRequest() (panel). Removed
- * once no caller is left, at the end of module 17's phase 2.
- */
-export const getCurrentBusiness = cache(async (): Promise<Business> => {
-  const business = await bySlug(env.BUSINESS_SLUG);
-  if (!business) {
-    throw new Error(`Business "${env.BUSINESS_SLUG}" not found — did you run the seed?`);
-  }
-  return business;
-});
-
 const translationSelect = {
   locale: true,
   tagline: true,

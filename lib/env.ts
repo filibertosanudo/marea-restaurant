@@ -44,9 +44,6 @@ const schema = z
     // every generated query with whatever schema it's given (defaulting to
     // "public"), and doesn't infer it from the connection's search_path.
     DATABASE_SCHEMA: optional(z.string().min(1)),
-    // Which Business row this deployment serves. Single-tenant only: goes
-    // away when the business is resolved per request (module 17, Fase 2).
-    BUSINESS_SLUG: withDefault(z.string().min(1).default("marea")),
     // The domain business subdomains hang off (`<slug>.<this>`). Missing:
     // the host of APP_ORIGIN, which is right whenever the app is served from
     // the bare root domain.

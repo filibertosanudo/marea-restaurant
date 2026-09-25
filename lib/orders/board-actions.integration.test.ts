@@ -9,7 +9,7 @@ import { makeBusiness, makeMenuCategory, makeMenuItem, makeStaff } from "@/test/
 import { setTestSession, sessionUserFromRow } from "@/test/stubs/auth-session";
 import { runConcurrently, partitionSettled } from "@/test/concurrency";
 
-/** board-actions.ts calls getCurrentBusiness(), which looks a Business up by a fixed slug — not by id, unlike create-order.ts. */
+/** board-actions.ts resolves the business per request (here: the only one), not by id, unlike create-order.ts. */
 function makeCurrentBusiness() {
   return makeBusiness({ slug: "marea" });
 }
