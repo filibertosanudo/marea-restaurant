@@ -31,6 +31,7 @@ export function PaymentSection({
   currency,
   lang,
   acceptsOnlinePayment,
+  publishableKey,
   publicToken,
   dict,
 }: {
@@ -39,6 +40,8 @@ export function PaymentSection({
   currency: string;
   lang: Lang;
   acceptsOnlinePayment: boolean;
+  /** Stripe's publishable key, read on the server; the card form loads Stripe.js with it. */
+  publishableKey: string;
   publicToken: string;
   dict: OrderDictionary;
 }) {
@@ -172,6 +175,7 @@ export function PaymentSection({
 
           {clientSecret && !loadingIntent && (
             <CardPaymentPanel
+              publishableKey={publishableKey}
               clientSecret={clientSecret}
               amountLabel={formatMoney(total, currency, lang)}
               onSwitchToCash={() => handleMethodChange("CASH_REGISTER")}

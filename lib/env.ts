@@ -91,6 +91,11 @@ const schema = z
     // may turn these into per-business values (Stripe Connect).
     STRIPE_SECRET_KEY: optional(z.string().min(1)),
     STRIPE_WEBHOOK_SECRET: optional(z.string().min(1)),
+    // The publishable key is public by design and inlined into the browser
+    // bundle by Next, which is why it carries the NEXT_PUBLIC_ prefix; it is read
+    // here, on the server, and handed to the card form as a prop. With Stripe
+    // Connect (module 17b) it becomes a per-business value taken from the row.
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: optional(z.string().min(1)),
     // Guards app/api/cron/notifications — the serverless-friendly way to
     // drive the same queue a long-running worker polls, per Fase 3.
     CRON_SECRET: optional(z.string().min(16)),
