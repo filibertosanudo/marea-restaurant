@@ -5,9 +5,9 @@ import { requireRole } from "@/lib/auth/permissions";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { getBusinessForRequest, invalidateBusinessCache } from "@/lib/business";
 import { businessOrigin } from "@/lib/business-origin";
-import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import type { Business, StripeCapabilityStatus } from "@/lib/generated/prisma/client";
+import { platformKeyIsLive } from "@/lib/stripe/mode";
 import { createConnectedAccount, createOnboardingLink, readCardPaymentsStatus } from "@/lib/stripe/connect";
 import { isUniqueConstraintError } from "@/lib/payments/prisma-errors";
 
@@ -41,11 +41,6 @@ export type StartOnboardingResult =
   | { ok: false; error: ConnectError };
 
 export type RefreshStatusResult = { ok: true; status: StripeCapabilityStatus } | { ok: false; error: ConnectError };
-
-/** The mode (live or test) of the key this deployment talks to Stripe with. An account of the other mode does not exist for that key. */
-function keyIsLive(): boolean {
-  return (env.STRIPE_SECRET_KEY ?? "").startsWith("sk_live_");
-}
 
 /** Records what Stripe says, for the account THIS row holds: if the row changed in between, nothing is written. */
 async function saveStatus(business: Pick<Business, "id" | "slug">, accountId: string, status: StripeCapabilityStatus): Promise<void> {
@@ -104,7 +99,7 @@ export async function startStripeOnboardingAction(): Promise<StartOnboardingResu
     }
 
     const reading = await readCardPaymentsStatus(accountId);
-    if (reading.livemode !== keyIsLive()) return { ok: false, error: "livemode_mismatch" };
+    if (reading.livemode !== platformKeyIsLive()) return { ok: false, error: "livemode_mismatch" };
     await saveStatus(business, accountId, reading.status);
     if (reading.status === "ACTIVE") return { ok: true, done: true, status: reading.status };
 
@@ -132,7 +127,7 @@ export async function refreshStripeAccountAction(): Promise<RefreshStatusResult>
 
   try {
     const reading = await readCardPaymentsStatus(business.stripeAccountId);
-    if (reading.livemode !== keyIsLive()) return { ok: false, error: "livemode_mismatch" };
+    if (reading.livemode !== platformKeyIsLive()) return { ok: false, error: "livemode_mismatch" };
     await saveStatus(business, business.stripeAccountId, reading.status);
     return { ok: true, status: reading.status };
   } catch (err) {

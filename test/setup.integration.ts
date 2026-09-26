@@ -34,6 +34,7 @@ vi.mock("next-auth", async () => {
 vi.mock("next/cache", () => ({
   revalidatePath: () => {},
   updateTag: vi.fn(),
+  revalidateTag: vi.fn(),
   unstable_cache:
     <A extends unknown[], R>(fn: (...args: A) => Promise<R>) =>
     async (...args: A): Promise<R> =>

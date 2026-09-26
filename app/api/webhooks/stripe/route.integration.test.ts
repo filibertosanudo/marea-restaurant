@@ -7,6 +7,7 @@ import { POST } from "./route";
 import { makeBusiness, makeOrder } from "@/test/factories";
 
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_test_secret";
+process.env.STRIPE_CONNECT_WEBHOOK_SECRET = "whsec_connect_secret";
 
 function signedRequest(event: object) {
   const payload = JSON.stringify(event);
@@ -594,45 +595,49 @@ describe("POST /api/webhooks/stripe", () => {
   });
 });
 
-describe("Stripe API calls made while handling an event", () => {
-  it("read the charge on the account the event came from", async () => {
+describe("POST /api/webhooks/stripe: what is not a platform event", () => {
+  it("ignores, with a 2xx and no change, an event that carries a connected account", async () => {
     const business = await makeBusiness();
-    await makePendingCardPayment(business.id, "pi_on_account");
-    const retrieveSpy = vi.spyOn(stripe.charges, "retrieve").mockResolvedValue({ id: "ch_a", payment_method_details: {}, receipt_url: null } as never);
+    const payment = await makePendingCardPayment(business.id, "pi_scope");
+    const event = { ...paymentIntentEvent("payment_intent.succeeded", "pi_scope"), account: "acct_mine" };
 
-    const event = { ...paymentIntentEvent("payment_intent.succeeded", "pi_on_account", { latest_charge: "ch_a" }), account: "acct_mine" };
-    expect((await POST(signedRequest(event))).status).toBe(200);
+    const response = await POST(signedRequest(event));
 
-    expect(retrieveSpy).toHaveBeenCalledWith("ch_a", {}, { stripeAccount: "acct_mine" });
+    expect(response.status).toBe(200);
+    expect((await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } })).status).toBe("PENDING");
+    expect(await prisma.stripeWebhookEvent.count()).toBe(0);
   });
 
-  it("read the charge on the platform's account when the event names none", async () => {
-    const business = await makeBusiness();
-    await makePendingCardPayment(business.id, "pi_on_platform");
-    const retrieveSpy = vi.spyOn(stripe.charges, "retrieve").mockResolvedValue({ id: "ch_p", payment_method_details: {}, receipt_url: null } as never);
+  it("rejects an event signed with the Connect secret", async () => {
+    const payload = JSON.stringify(paymentIntentEvent("payment_intent.succeeded", "pi_wrong_secret"));
+    const signature = stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_connect_secret" });
 
-    await POST(signedRequest(paymentIntentEvent("payment_intent.succeeded", "pi_on_platform", { latest_charge: "ch_p" })));
+    const response = await POST(new Request("http://localhost/api/webhooks/stripe", { method: "POST", headers: { "stripe-signature": signature }, body: payload }));
 
-    expect(retrieveSpy).toHaveBeenCalledWith("ch_p", {}, {});
+    expect(response.status).toBe(400);
   });
 
-  it("list a charge's refunds on the account the event came from", async () => {
+  it("ignores an event of the other mode than the key's", async () => {
     const business = await makeBusiness();
-    const payment = await makePendingCardPayment(business.id, "pi_refund_acct");
-    await prisma.payment.update({ where: { id: payment.id }, data: { status: "SUCCEEDED" } });
-    const listSpy = vi.spyOn(stripe.refunds, "list").mockReturnValue({
-      autoPagingToArray: async () => [{ id: "re_acct", amount: 500, status: "succeeded" }],
-    } as unknown as ReturnType<typeof stripe.refunds.list>);
+    const payment = await makePendingCardPayment(business.id, "pi_live_event");
+    const event = { ...paymentIntentEvent("payment_intent.succeeded", "pi_live_event"), livemode: true };
 
-    const event = {
-      id: "evt_refund_acct",
-      object: "event",
-      type: "charge.refunded",
-      account: "acct_mine",
-      data: { object: { id: "ch_r", object: "charge", payment_intent: "pi_refund_acct", amount: 2319, amount_refunded: 500, currency: "mxn" } },
-    };
     expect((await POST(signedRequest(event))).status).toBe(200);
 
-    expect(listSpy).toHaveBeenCalledWith({ charge: "ch_r" }, { stripeAccount: "acct_mine" });
+    expect((await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } })).status).toBe("PENDING");
+    expect(await prisma.stripeWebhookEvent.count()).toBe(0);
+  });
+
+  it("ignores an event for a payment that was charged on a connected account", async () => {
+    const business = await makeBusiness();
+    const order = await makeOrder(business.id);
+    const payment = await prisma.payment.create({
+      data: { businessId: business.id, orderId: order.id, provider: "STRIPE", status: "PENDING", amount: "23.19", stripePaymentIntentId: "pi_on_acct", stripeAccountId: "acct_mine" },
+    });
+
+    expect((await POST(signedRequest(paymentIntentEvent("payment_intent.succeeded", "pi_on_acct")))).status).toBe(200);
+
+    expect((await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } })).status).toBe("PENDING");
+    expect(await prisma.stripeWebhookEvent.count()).toBe(0);
   });
 });

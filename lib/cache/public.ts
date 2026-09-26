@@ -1,5 +1,5 @@
 import "server-only";
-import { unstable_cache, updateTag } from "next/cache";
+import { revalidateTag, unstable_cache, updateTag } from "next/cache";
 import { runInTenant, runWithoutTenant } from "@/lib/tenancy/context";
 
 /**
@@ -64,4 +64,15 @@ export function cachedPublicRead<T extends JsonSafe>(
  */
 export function invalidatePublicCache(kind: PublicCacheKind, scope: string): void {
   updateTag(publicCacheTag(kind, scope));
+}
+
+/**
+ * The same, for a Route Handler such as a webhook, where `updateTag` does not
+ * exist: `expire: 0` makes the next read a blocking miss instead of serving the
+ * stale entry while it refreshes (Next's documented form for webhooks). Like the
+ * one above it only reaches the instance that ran it; the TTL covers the rest,
+ * and anything that decides to move money reads the row instead of this cache.
+ */
+export function expirePublicCache(kind: PublicCacheKind, scope: string): void {
+  revalidateTag(publicCacheTag(kind, scope), { expire: 0 });
 }
