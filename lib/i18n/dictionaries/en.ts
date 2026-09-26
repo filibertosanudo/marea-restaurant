@@ -584,6 +584,42 @@ export const en = {
       paymentsTitle: "Payments",
       onlinePaymentLabel: "Accept online payment",
       onlinePaymentHint: "Card at the time of ordering, via Stripe.",
+      onlinePaymentAccountNotActive:
+        "Card payments are off until your Stripe account is active. Until then, guests pay at the register.",
+      countryLabel: "Country (two letters, e.g. MX)",
+      countryInvalid: "Use the two-letter country code, e.g. MX.",
+      stripeTitle: "Card payments with your own Stripe account",
+      stripeLead:
+        "Card payments go straight to your Stripe account, not to ours. You keep your own Stripe dashboard, refunds and disputes.",
+      stripeNeedsCountry: "Set the country of your business (in Contact & address, then save) before connecting.",
+      stripeConnect: "Connect Stripe",
+      stripeContinue: "Continue setup on Stripe",
+      stripeCheck: "Check status",
+      stripeWorking: "One moment...",
+      stripeStatusLabel: "Status",
+      stripeCheckedAt: "Checked",
+      stripeStatuses: {
+        active: { title: "Active", body: "Your account can take card payments. Turn them on above." },
+        pending: {
+          title: "Pending",
+          body: "Stripe is still verifying your account, or needs more information. Continue setup on Stripe. Until it is active, guests pay at the register.",
+        },
+        restricted: {
+          title: "Restricted",
+          body: "Stripe has limited your account. Card payments are off until you resolve it in your Stripe dashboard. Guests pay at the register meanwhile.",
+        },
+        unsupported: {
+          title: "Not available",
+          body: "Stripe cannot offer card payments for this account. Guests pay at the register.",
+        },
+      },
+      stripeErrors: {
+        country_required: "Set the country of your business first.",
+        account_in_use: "That Stripe account is already connected to another business.",
+        no_account: "There is no Stripe account to check yet.",
+        livemode_mismatch: "This Stripe account belongs to a different mode (live or test) than this deployment. Contact support.",
+        stripe_unavailable: "Stripe did not answer. Try again in a moment.",
+      },
       onlinePaymentNeedsAccount:
         "Card payments are off because this business has no Stripe account of its own yet. Until it does, guests pay at the register.",
 

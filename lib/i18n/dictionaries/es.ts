@@ -589,6 +589,42 @@ export const es = {
       paymentsTitle: "Pagos",
       onlinePaymentLabel: "Aceptar pago en línea",
       onlinePaymentHint: "Tarjeta al momento de ordenar, vía Stripe.",
+      onlinePaymentAccountNotActive:
+        "El pago con tarjeta está desactivado hasta que tu cuenta de Stripe esté activa. Mientras tanto, los clientes pagan en caja.",
+      countryLabel: "País (dos letras, p. ej. MX)",
+      countryInvalid: "Usa el código de país de dos letras, p. ej. MX.",
+      stripeTitle: "Pagos con tarjeta en tu propia cuenta de Stripe",
+      stripeLead:
+        "Los pagos con tarjeta llegan directo a tu cuenta de Stripe, no a la nuestra. Conservas tu propio panel de Stripe, tus reembolsos y tus disputas.",
+      stripeNeedsCountry: "Indica el país de tu negocio (en Contacto y dirección, y guarda) antes de conectar.",
+      stripeConnect: "Conectar Stripe",
+      stripeContinue: "Continuar en Stripe",
+      stripeCheck: "Revisar estado",
+      stripeWorking: "Un momento...",
+      stripeStatusLabel: "Estado",
+      stripeCheckedAt: "Revisado",
+      stripeStatuses: {
+        active: { title: "Activa", body: "Tu cuenta puede cobrar con tarjeta. Actívalo arriba." },
+        pending: {
+          title: "Pendiente",
+          body: "Stripe aún verifica tu cuenta o necesita más información. Continúa en Stripe. Mientras no esté activa, los clientes pagan en caja.",
+        },
+        restricted: {
+          title: "Restringida",
+          body: "Stripe limitó tu cuenta. El pago con tarjeta queda desactivado hasta que lo resuelvas en tu panel de Stripe. Mientras tanto los clientes pagan en caja.",
+        },
+        unsupported: {
+          title: "No disponible",
+          body: "Stripe no puede ofrecer pagos con tarjeta para esta cuenta. Los clientes pagan en caja.",
+        },
+      },
+      stripeErrors: {
+        country_required: "Indica primero el país de tu negocio.",
+        account_in_use: "Esa cuenta de Stripe ya está conectada a otro negocio.",
+        no_account: "Todavía no hay una cuenta de Stripe que revisar.",
+        livemode_mismatch: "Esta cuenta de Stripe es de otro modo (real o de prueba) que este despliegue. Contacta a soporte.",
+        stripe_unavailable: "Stripe no respondió. Intenta de nuevo en un momento.",
+      },
       onlinePaymentNeedsAccount:
         "El pago con tarjeta está desactivado porque este negocio aún no tiene una cuenta de Stripe propia. Mientras tanto, los clientes pagan en caja.",
 

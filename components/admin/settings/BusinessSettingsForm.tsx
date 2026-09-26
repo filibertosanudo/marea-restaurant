@@ -18,6 +18,9 @@ export type BusinessSettings = {
   acceptsOnlinePayment: boolean;
   /** False when the business has no Stripe account of its own and shares a deployment with others. */
   onlinePaymentAllowed: boolean;
+  /** Why cards are off, when they are: no account of its own, or an account that cannot charge yet. */
+  onlinePaymentReason: "no_account" | "account_not_active" | null;
+  country: string | null;
   minBookingLeadMinutes: number;
   minCancelLeadMinutes: number;
   addressLine1: string | null;
@@ -174,7 +177,7 @@ export function BusinessSettingsForm({ dict, business }: { dict: SettingsDict; b
             <div className="text-[11.5px] text-on-surface-muted">{dict.onlinePaymentHint}</div>
             {!business.onlinePaymentAllowed && (
               <div role="note" className="mt-[4px] text-[11.5px] text-warning">
-                {dict.onlinePaymentNeedsAccount}
+                {business.onlinePaymentReason === "account_not_active" ? dict.onlinePaymentAccountNotActive : dict.onlinePaymentNeedsAccount}
               </div>
             )}
           </div>
@@ -214,6 +217,17 @@ export function BusinessSettingsForm({ dict, business }: { dict: SettingsDict; b
           <div className={fieldClass}>
             <label className={labelClass}>{dict.cityLabel}</label>
             <input type="text" name="city" defaultValue={business.city ?? ""} className={inputClass} />
+          </div>
+          <div className={fieldClass}>
+            <label className={labelClass}>{dict.countryLabel}</label>
+            <input
+              type="text"
+              name="country"
+              maxLength={2}
+              defaultValue={business.country ?? ""}
+              className={`${inputClass} uppercase`}
+            />
+            {fieldError("country") && <p className="mt-[4px] text-[12px] text-error">{dict.countryInvalid}</p>}
           </div>
           <div className={fieldClass}>
             <label className={labelClass}>{dict.phoneLabel}</label>
