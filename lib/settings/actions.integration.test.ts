@@ -144,8 +144,16 @@ describe("updateBusinessSettingsAction", () => {
     expect(refused).toEqual({ error: "invalid", fieldErrors: { acceptsOnlinePayment: "no_connected_account" } });
     expect((await prisma.business.findUniqueOrThrow({ where: { id: business.id } })).acceptsOnlinePayment).toBe(false);
 
-    // With an account of its own it may.
-    await prisma.business.update({ where: { id: business.id }, data: { stripeAccountId: "acct_test" } });
+    // An account that cannot charge yet is not enough, however it got there.
+    await prisma.business.update({
+      where: { id: business.id },
+      data: { stripeAccountId: "acct_test", stripeCardPaymentsStatus: "PENDING" },
+    });
+    const pending = await updateBusinessSettingsAction(undefined, closureForm({ ...fields, acceptsOnlinePayment: "on" }));
+    expect(pending).toEqual({ error: "invalid", fieldErrors: { acceptsOnlinePayment: "account_not_active" } });
+
+    // With an account that can charge it may.
+    await prisma.business.update({ where: { id: business.id }, data: { stripeCardPaymentsStatus: "ACTIVE" } });
     const allowed = await updateBusinessSettingsAction(undefined, closureForm({ ...fields, acceptsOnlinePayment: "on" }));
     expect(allowed).toEqual({ success: true });
   });
