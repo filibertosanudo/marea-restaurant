@@ -7,6 +7,7 @@ import { canTakeOnlinePayments } from "@/lib/payments/availability";
 import { getOrderForPaymentIntentByPublicToken } from "@/lib/orders/queries";
 import { stripeFor } from "@/lib/stripe/payments";
 import { toStripeAmount } from "./amount";
+import { applicationFeeParams, platformFeeAmount } from "./platform-fee";
 import { computePaymentSummary } from "./summary";
 import { isUniqueConstraintError } from "./prisma-errors";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
@@ -138,6 +139,7 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
         amount: currentAmount,
         currency: order.currency.toLowerCase(),
         automatic_payment_methods: { enabled: true },
+        ...applicationFeeParams(platformFeeAmount(currentAmount)),
         metadata: { orderId: order.id, orderNumber: order.orderNumber, businessId: business.id },
       },
       // The amount is part of the key, not just the order id — otherwise a

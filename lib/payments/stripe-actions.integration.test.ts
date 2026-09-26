@@ -217,6 +217,10 @@ describe("createPaymentIntentAction on a connected account", () => {
     const [params, options] = createSpy.mock.calls[0];
     expect(params).toMatchObject({ amount: 2319, metadata: { businessId: business.id } });
     expect(options).toEqual({ stripeAccount: "acct_mine", idempotencyKey: `pi_create_${order.id}_acct_mine_2319` });
+    // No platform fee: neither a fee nor a transfer of any kind is asked of Stripe.
+    expect(params).not.toHaveProperty("application_fee_amount");
+    expect(params).not.toHaveProperty("transfer_data");
+    expect(params).not.toHaveProperty("on_behalf_of");
     expect((await prisma.payment.findUniqueOrThrow({ where: { stripePaymentIntentId: "pi_c" } })).stripeAccountId).toBe("acct_mine");
   });
 

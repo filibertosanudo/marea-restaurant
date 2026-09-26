@@ -358,6 +358,10 @@ describe("createRefundAction on a connected account", () => {
     expect((await createRefundAction(order.id, { mode: "FULL", amount: "0", reason: "guest request" })).ok).toBe(true);
 
     expect(createSpy.mock.calls[0][1]).toMatchObject({ stripeAccount: "acct_mine" });
+    // Direct charge, no platform fee: nothing about a fee or a transfer to reverse.
+    const params = createSpy.mock.calls[0][0] as Record<string, unknown>;
+    expect(params).not.toHaveProperty("refund_application_fee");
+    expect(params).not.toHaveProperty("reverse_transfer");
   });
 
   it("uses the payment's account, not the business's current one, after the business reconnected elsewhere", async () => {
@@ -390,5 +394,28 @@ describe("createRefundAction on a connected account", () => {
     expect(createSpy).toHaveBeenCalledTimes(1);
     expect(createSpy.mock.calls[0][1]).toMatchObject({ stripeAccount: "acct_gone" });
     expect(await prisma.refund.count()).toBe(0);
+  });
+
+  it("leaves a cash refund alone: no Stripe call of any kind, even for a business with a connected account", async () => {
+    const business = await makeBusiness({ slug: "marea", stripeAccountId: "acct_mine", stripeCardPaymentsStatus: "ACTIVE" });
+    await loginAsAdmin();
+    const order = await makeOrder(business.id, { total: "23.19" });
+    await openCashSession(business.id);
+    await prisma.payment.create({
+      data: { businessId: business.id, orderId: order.id, provider: "CASH_REGISTER", status: "SUCCEEDED", amount: "23.19" },
+    });
+    const spies = [
+      vi.spyOn(stripe.refunds, "create"),
+      vi.spyOn(stripe.refunds, "list"),
+      vi.spyOn(stripe.charges, "retrieve"),
+      vi.spyOn(stripe.paymentIntents, "retrieve"),
+      vi.spyOn(stripe.paymentIntents, "cancel"),
+    ];
+
+    const result = await createRefundAction(order.id, { mode: "FULL", amount: "0", reason: "spilled the order" });
+
+    expect(result.ok).toBe(true);
+    for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+    expect(await prisma.refund.count()).toBe(1);
   });
 });
