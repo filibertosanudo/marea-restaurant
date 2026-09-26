@@ -57,8 +57,8 @@ al proyecto después de un tiempo fuera.
 | 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | **Terminada.** Inventario y promociones (módulo 14, fusionado en `main`) y testimonios + landing desde la base (módulo 15, fusionado en `main`, PRs #65, #67, #68, #71) |
 | 6 · Rendimiento y tiempo real | 16 | **Terminada** (PRs #73–#79 y la del cierre). Cinco pantallas quietas de 605 a 2 sentencias por minuto, cambios en ~130 ms, prueba de carga de 200 pedidos sin errores. Dos criterios se cumplen distinto a como se escribieron: ver el módulo 16 |
 | 7 · Multi-sucursal | 17 | **Terminada** (PRs #81, #82–#87, fusionados en `main`). Un negocio por petición, RLS con `marea_app`, organización y `ORG_ADMIN`, alta de negocios sin tocar la base. Los pagos multi-negocio salieron a la 7b: ver abajo |
-| 7b · Stripe Connect | 17b | **Terminada** (PRs #88–#92 y la del cierre, sin fusionar). Cada negocio cobra en su propia cuenta de Stripe (cargos directos): la plataforma no retiene fondos ajenos, así que ya puede entrar un restaurante que no sea tuyo. Se conecta desde la configuración, sin tocar la base ni el entorno; una cuenta que Stripe restringe o que el negocio desconecta deja de ofrecer tarjeta sola. Sin comisión de plataforma por ahora (decidido; la política de devolución está escrita en `lib/payments/platform-fee.ts`). **Antes del primer restaurante ajeno, a mano:** registrar los dos webhooks (`docs/DEPLOY.md`) y probar su entrega real, que en las pruebas sólo se ejerció con eventos firmados; y probar el alta completa con una cuenta de Stripe activada de verdad, no sólo hasta el enlace de Stripe |
-| 8 · Producto vendible | 18 | Sin empezar |
+| 7b · Stripe Connect | 17b | **Terminada** (PRs #88–#93, fusionados en `main`). Cada negocio cobra en su propia cuenta de Stripe (cargos directos): la plataforma no retiene fondos ajenos, así que ya puede entrar un restaurante que no sea tuyo. Se conecta desde la configuración, sin tocar la base ni el entorno; una cuenta que Stripe restringe o que el negocio desconecta deja de ofrecer tarjeta sola. Sin comisión de plataforma por ahora (decidido; la política de devolución está escrita en `lib/payments/platform-fee.ts`). **Antes del primer restaurante ajeno, a mano:** registrar los dos webhooks (`docs/DEPLOY.md`) y probar su entrega real, que en las pruebas sólo se ejerció con eventos firmados; y probar el alta completa con una cuenta de Stripe activada de verdad, no sólo hasta el enlace de Stripe |
+| 8 · Producto vendible | 18, 19, 20 | Dividida en tres módulos. **18, operación como servicio** (8.5: respaldos, restauración probada, tareas programadas, monitoreo, modo de sólo lectura, manual): prompt escrito, sin empezar, y va primero porque guardar datos de un restaurante ajeno sin un respaldo restaurado es la siguiente condición. **19, alta autoservicio y suscripción** (8.1 y 8.3) y **20, CFDI 4.0** (8.2): sin escribir. La PWA offline (8.4) se pospone, ver abajo |
 
 ### Pospuesto a propósito
 
@@ -71,6 +71,9 @@ al proyecto después de un tiempo fuera.
 - **WhatsApp y SMS.** El enum los contempla desde el primer día. Salen del
   módulo 11 porque son otro proveedor, otro formato y otras reglas de
   consentimiento. Alto valor comercial en México: candidatos a plan superior.
+- **PWA sin conexión para el mesero** (8.4). El propio plan dice construirla
+  cuando un cliente real la pida; es lo más caro de la fase 8 y lo único que no
+  bloquea vender.
 - **Inventario de insumos** (recetas, escandallos, mermas). Nunca entra en este
   plan: es otro producto. Ver el Apéndice E.
 
@@ -2039,7 +2042,9 @@ la numeración de los seis existentes:
 | `16-tiempo-real-y-rendimiento.md` | 6 | `feature/perf-fase-N` |
 | `17-multi-sucursal.md` | 7 | `feature/tenancy-fase-N` |
 | `17b-stripe-connect.md` | 7b (pagos) | `feature/connect-fase-N` |
-| `18-producto.md` | 8 | varias |
+| `18-operacion-como-servicio.md` | 8.5 | `feature/ops-fase-N` |
+| `19-alta-y-suscripcion.md` | 8.1, 8.3 | por escribir |
+| `20-cfdi.md` | 8.2 | por escribir |
 
 El `08` no corresponde a ninguna fase del plan: es mantenimiento del generador de
 documentación, y está numerado ahí porque conviene hacerlo pronto — el cierre de
