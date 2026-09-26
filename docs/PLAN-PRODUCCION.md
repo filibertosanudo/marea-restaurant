@@ -56,8 +56,8 @@ al proyecto después de un tiempo fuera.
 | 4 · Operación diaria: reportes, corte de caja, comanda | 12, 13 | **Terminada.** Reportes y corte de caja (módulo 12, fusionado en `main`) y comanda impresa + KDS (módulo 13, fusionado en `main`, PRs #54, #56–#58). No probado contra una impresora térmica física — verificado contra un emulador ESC/POS, ver el módulo 13 |
 | 5 · Completar catálogo: inventario, promociones, testimonios | 14, 15 | **Terminada.** Inventario y promociones (módulo 14, fusionado en `main`) y testimonios + landing desde la base (módulo 15, fusionado en `main`, PRs #65, #67, #68, #71) |
 | 6 · Rendimiento y tiempo real | 16 | **Terminada** (PRs #73–#79 y la del cierre). Cinco pantallas quietas de 605 a 2 sentencias por minuto, cambios en ~130 ms, prueba de carga de 200 pedidos sin errores. Dos criterios se cumplen distinto a como se escribieron: ver el módulo 16 |
-| 7 · Multi-sucursal | 17 | **Terminada** (PRs #81, #82–#86, sin fusionar). Un negocio por petición, RLS con `marea_app`, organización y `ORG_ADMIN`, alta de negocios sin tocar la base. Los pagos multi-negocio salieron a la 7b: ver abajo |
-| 7b · Stripe Connect | 17b | Sin empezar. **Condición, no pendiente:** tiene que estar hecho antes de que entre cualquier restaurante que no sea tuyo. Con una sola llave global y dos negocios sin relación, el dinero del segundo cae en tu cuenta y estás reteniendo fondos ajenos. Mientras tanto un negocio sin `stripeAccountId` no puede activar tarjeta (lo impide el servidor, con prueba) |
+| 7 · Multi-sucursal | 17 | **Terminada** (PRs #81, #82–#87, fusionados en `main`). Un negocio por petición, RLS con `marea_app`, organización y `ORG_ADMIN`, alta de negocios sin tocar la base. Los pagos multi-negocio salieron a la 7b: ver abajo |
+| 7b · Stripe Connect | 17b | **Terminada** (PRs #88–#92 y la del cierre, sin fusionar). Cada negocio cobra en su propia cuenta de Stripe (cargos directos): la plataforma no retiene fondos ajenos, así que ya puede entrar un restaurante que no sea tuyo. Se conecta desde la configuración, sin tocar la base ni el entorno; una cuenta que Stripe restringe o que el negocio desconecta deja de ofrecer tarjeta sola. Sin comisión de plataforma por ahora (decidido; la política de devolución está escrita en `lib/payments/platform-fee.ts`). **Antes del primer restaurante ajeno, a mano:** registrar los dos webhooks (`docs/DEPLOY.md`) y probar su entrega real, que en las pruebas sólo se ejerció con eventos firmados; y probar el alta completa con una cuenta de Stripe activada de verdad, no sólo hasta el enlace de Stripe |
 | 8 · Producto vendible | 18 | Sin empezar |
 
 ### Pospuesto a propósito
@@ -1776,7 +1776,7 @@ de veinte, en menos de dos. Criterio numérico, no intuición: cuando
       producción se rechaza (`DATABASE_ROLE_CHECK`).
 - [x] La prueba de carga del módulo 16 pasa con dos negocios y el rol
       restringido (7 de 7; p95 83 ms).
-- [ ] Stripe Connect (módulo 17b), antes del primer restaurante ajeno.
+- [x] Stripe Connect (módulo 17b), antes del primer restaurante ajeno. Falta, a mano: registrar los dos webhooks y probar su entrega real.
 
 ---
 
@@ -2038,7 +2038,7 @@ la numeración de los seis existentes:
 | `15-landing-desde-la-base.md` | 5.3–5.5 | `feature/dynamic-landing` |
 | `16-tiempo-real-y-rendimiento.md` | 6 | `feature/perf-fase-N` |
 | `17-multi-sucursal.md` | 7 | `feature/tenancy-fase-N` |
-| `17b-stripe-connect.md` | 7 (pagos) | por escribir |
+| `17b-stripe-connect.md` | 7b (pagos) | `feature/connect-fase-N` |
 | `18-producto.md` | 8 | varias |
 
 El `08` no corresponde a ninguna fase del plan: es mantenimiento del generador de
