@@ -2,19 +2,43 @@ import "server-only";
 import { businessCount } from "@/lib/tenancy/discover";
 import type { Business } from "@/lib/generated/prisma/client";
 
+export type OnlinePaymentAvailability =
+  | { allowed: true }
+  | { allowed: false; reason: "no_account" | "account_not_active" };
+
 /**
  * Whether card payments for this business may be taken at all, decided on
  * the server and never by the UI.
  *
- * Every card payment goes through the platform's one Stripe key, so the
- * money lands in the platform's account. That is the owner's own account
- * while they are the only business on the deployment. The moment a second,
- * unrelated business exists, the platform would be holding somebody else's
- * funds: a business may then take cards only through a Stripe account of
- * its own (`stripeAccountId`, wired up in module 17b). Until then it has
- * to say "pay at the register", not quietly route its money to the platform.
+ * Two cases, and the second is the reason the first is a rule and not a habit.
+ *
+ * A business with a connected Stripe account (module 17b) may take cards only
+ * while Stripe says that account can: `stripeCardPaymentsStatus` is ACTIVE. An
+ * id alone is not permission: a new account has one and can charge nothing until
+ * it is verified, and a verified account can be restricted later. The state
+ * is refreshed on return from onboarding, by Stripe's account events and when
+ * the settings screen is opened. And once an account has started to be
+ * connected, the business never goes back to the platform's key: a pending or
+ * restricted account means "pay at the register", even for the only business on
+ * the deployment.
+ *
+ * A business with no account charges to the platform's one Stripe key, so the
+ * money lands in the platform's account. That is the owner's own account while
+ * they are the only business on the deployment. The moment a second, unrelated
+ * business exists, the platform would be holding somebody else's funds: it
+ * then has to say "pay at the register" until it connects an account of its own.
  */
-export async function canTakeOnlinePayments(business: Pick<Business, "stripeAccountId">): Promise<boolean> {
-  if (business.stripeAccountId) return true;
-  return (await businessCount()) <= 1;
+export async function onlinePaymentAvailability(
+  business: Pick<Business, "stripeAccountId" | "stripeCardPaymentsStatus">
+): Promise<OnlinePaymentAvailability> {
+  if (business.stripeAccountId) {
+    return business.stripeCardPaymentsStatus === "ACTIVE" ? { allowed: true } : { allowed: false, reason: "account_not_active" };
+  }
+  return (await businessCount()) <= 1 ? { allowed: true } : { allowed: false, reason: "no_account" };
+}
+
+export async function canTakeOnlinePayments(
+  business: Pick<Business, "stripeAccountId" | "stripeCardPaymentsStatus">
+): Promise<boolean> {
+  return (await onlinePaymentAvailability(business)).allowed;
 }

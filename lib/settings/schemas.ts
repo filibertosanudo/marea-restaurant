@@ -80,6 +80,15 @@ export const businessSettingsSchema = z
     addressLine2: optionalContactField(200),
     city: optionalContactField(100),
     phone: optionalContactField(30),
+    // ISO 3166-1 alpha-2, capitals, as the column and its CHECK expect. Blank is
+    // "not set"; onboarding a Stripe account is what needs it.
+    country: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .optional()
+      .transform((v) => (v ? v : null))
+      .pipe(z.string().regex(/^[A-Z]{2}$/, "invalid_country").nullable()),
     email: z
       .string()
       .trim()

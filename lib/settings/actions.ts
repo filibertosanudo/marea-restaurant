@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { getBusinessForRequest, invalidateBusinessCache } from "@/lib/business";
-import { canTakeOnlinePayments } from "@/lib/payments/availability";
+import { onlinePaymentAvailability } from "@/lib/payments/availability";
 import { invalidatePublicCache } from "@/lib/cache/public";
 import { localWallClockToUtc } from "@/lib/reservations/availability";
 import { parseDateParam } from "@/lib/reservations/schemas";
@@ -150,6 +150,7 @@ export async function updateBusinessSettingsAction(
     addressLine2: String(formData.get("addressLine2") ?? ""),
     city: String(formData.get("city") ?? ""),
     phone: String(formData.get("phone") ?? ""),
+    country: String(formData.get("country") ?? ""),
     email: String(formData.get("email") ?? ""),
   });
   if (!parsed.success) return { error: "invalid", fieldErrors: flattenZodError(parsed.error) };
@@ -157,9 +158,11 @@ export async function updateBusinessSettingsAction(
   // Enforced here and again when a payment is started (stripe-actions.ts),
   // not only in the form: see lib/payments/availability.ts for why. A
   // business that cannot take cards is saved with the flag off.
-  const canTakeCards = await canTakeOnlinePayments(business);
-  if (parsed.data.acceptsOnlinePayment && !canTakeCards) {
-    return { error: "invalid", fieldErrors: { acceptsOnlinePayment: "no_connected_account" } };
+  const availability = await onlinePaymentAvailability(business);
+  const canTakeCards = availability.allowed;
+  if (parsed.data.acceptsOnlinePayment && !availability.allowed) {
+    const reason = availability.reason === "no_account" ? "no_connected_account" : "account_not_active";
+    return { error: "invalid", fieldErrors: { acceptsOnlinePayment: reason } };
   }
 
   await prisma.business.update({
