@@ -277,6 +277,12 @@ describe("onlinePaymentAvailability", () => {
     expect(await onlinePaymentAvailability({ stripeAccountId: "acct_x", stripeCardPaymentsStatus: "PENDING" })).toEqual({ allowed: false, reason: "account_not_active" });
   });
 
+  it("does not send a business whose account was disconnected back to the platform's key either", async () => {
+    await makeBusiness({ slug: "only" });
+    // The id is cleared on disconnection; the status it leaves behind is what remembers.
+    expect(await onlinePaymentAvailability({ stripeAccountId: null, stripeCardPaymentsStatus: "RESTRICTED" })).toEqual({ allowed: false, reason: "account_not_active" });
+  });
+
   it("keeps the earlier rule for a business with no account", async () => {
     await makeBusiness({ slug: "only" });
     expect(await onlinePaymentAvailability({ stripeAccountId: null, stripeCardPaymentsStatus: null })).toEqual({ allowed: true });

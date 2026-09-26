@@ -52,7 +52,16 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
   // against is incurred on every attempt, not just a successful one.
   await recordScopeAttempt(INTENT_SCOPE, ip);
 
-  const business = await getPublicBusiness();
+  // Whether and where to take a payment is read from the row, not from the public
+  // cache: that cache can be up to a minute stale on any replica, and a business
+  // that just disconnected its Stripe account must not be charged to in that time.
+  const cached = await getPublicBusiness();
+  const fresh = await prisma.business.findUnique({
+    where: { id: cached.id },
+    select: { acceptsOnlinePayment: true, stripeAccountId: true, stripeCardPaymentsStatus: true },
+  });
+  if (!fresh) return { ok: false, error: "not_found" };
+  const business = { ...cached, ...fresh };
   if (!business.acceptsOnlinePayment || !(await canTakeOnlinePayments(business))) return { ok: false, error: "online_payment_disabled" };
 
   const order = await getOrderForPaymentIntentByPublicToken(business.id, publicToken);
