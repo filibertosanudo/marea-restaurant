@@ -67,17 +67,20 @@ describe("createPaymentIntentAction", () => {
   it("creates a fresh PaymentIntent and records a PENDING payment for it", async () => {
     const business = await makeBusiness({ slug: "marea" });
     const order = await makeOrder(business.id, { total: "23.19" });
-    vi.spyOn(stripe.paymentIntents, "create").mockResolvedValue({
+    const createSpy = vi.spyOn(stripe.paymentIntents, "create").mockResolvedValue({
       id: "pi_new",
       client_secret: "secret_new",
     } as never);
 
     const result = await createPaymentIntentAction(order.publicToken);
 
-    expect(result).toEqual({ ok: true, clientSecret: "secret_new" });
+    expect(result).toEqual({ ok: true, clientSecret: "secret_new", stripeAccountId: null });
     const payment = await prisma.payment.findUniqueOrThrow({ where: { stripePaymentIntentId: "pi_new" } });
     expect(payment.status).toBe("PENDING");
     expect(payment.amount.toString()).toBe("23.19");
+    // No account of its own on a single-business deployment: the platform's, named as such.
+    expect(payment.stripeAccountId).toBeNull();
+    expect(createSpy.mock.calls[0][1]).toEqual({ idempotencyKey: `pi_create_${order.id}_platform_2319` });
   });
 
   it("reuses an existing open intent instead of creating a second one", async () => {
@@ -102,7 +105,7 @@ describe("createPaymentIntentAction", () => {
 
     const result = await createPaymentIntentAction(order.publicToken);
 
-    expect(result).toEqual({ ok: true, clientSecret: "secret_existing" });
+    expect(result).toEqual({ ok: true, clientSecret: "secret_existing", stripeAccountId: null });
     expect(createSpy).not.toHaveBeenCalled();
   });
 
@@ -128,7 +131,7 @@ describe("createPaymentIntentAction", () => {
 
     const result = await createPaymentIntentAction(order.publicToken);
 
-    expect(result).toEqual({ ok: true, clientSecret: "secret_updated" });
+    expect(result).toEqual({ ok: true, clientSecret: "secret_updated", stripeAccountId: null });
     const updated = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
     expect(updated.amount.toString()).toBe("30");
   });
@@ -190,5 +193,90 @@ describe("createPaymentIntentAction", () => {
     const result = await createPaymentIntentAction(order.publicToken);
 
     expect(result).toEqual({ ok: false, error: "rate_limited" });
+  });
+});
+
+describe("createPaymentIntentAction on a connected account", () => {
+  const connected = { stripeAccountId: "acct_mine", stripeCardPaymentsStatus: "ACTIVE" as const, acceptsOnlinePayment: true };
+
+  async function connectedBusiness() {
+    const business = await makeBusiness({ slug: "marea", ...connected });
+    await makeBusiness({ slug: "cala", stripeAccountId: "acct_other", stripeCardPaymentsStatus: "ACTIVE" as const });
+    setTestHost("marea.localhost:3000");
+    return business;
+  }
+
+  it("charges on the business's account, records it on the payment, and hands it back for Stripe.js", async () => {
+    const business = await connectedBusiness();
+    const order = await makeOrder(business.id, { total: "23.19" });
+    const createSpy = vi.spyOn(stripe.paymentIntents, "create").mockResolvedValue({ id: "pi_c", client_secret: "secret_c" } as never);
+
+    const result = await createPaymentIntentAction(order.publicToken);
+
+    expect(result).toEqual({ ok: true, clientSecret: "secret_c", stripeAccountId: "acct_mine" });
+    const [params, options] = createSpy.mock.calls[0];
+    expect(params).toMatchObject({ amount: 2319, metadata: { businessId: business.id } });
+    expect(options).toEqual({ stripeAccount: "acct_mine", idempotencyKey: `pi_create_${order.id}_acct_mine_2319` });
+    expect((await prisma.payment.findUniqueOrThrow({ where: { stripePaymentIntentId: "pi_c" } })).stripeAccountId).toBe("acct_mine");
+  });
+
+  it("charges nothing while the account is not active, even to the platform", async () => {
+    const business = await makeBusiness({ slug: "marea", ...connected, stripeCardPaymentsStatus: "PENDING" });
+    const order = await makeOrder(business.id, { total: "23.19" });
+    const createSpy = vi.spyOn(stripe.paymentIntents, "create");
+
+    expect(await createPaymentIntentAction(order.publicToken)).toEqual({ ok: false, error: "online_payment_disabled" });
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it("reads, updates and reuses an open intent on the account stored on its payment", async () => {
+    const business = await connectedBusiness();
+    const order = await makeOrder(business.id, { total: "30.00" });
+    await prisma.payment.create({
+      data: { businessId: business.id, orderId: order.id, provider: "STRIPE", status: "PENDING", amount: "23.19", stripePaymentIntentId: "pi_open", stripeAccountId: "acct_mine" },
+    });
+    const retrieveSpy = vi.spyOn(stripe.paymentIntents, "retrieve").mockResolvedValue({ id: "pi_open", status: "requires_payment_method", amount: 2319, client_secret: "s" } as never);
+    const updateSpy = vi.spyOn(stripe.paymentIntents, "update").mockResolvedValue({ client_secret: "s2" } as never);
+    const createSpy = vi.spyOn(stripe.paymentIntents, "create");
+
+    const result = await createPaymentIntentAction(order.publicToken);
+
+    expect(result).toEqual({ ok: true, clientSecret: "s2", stripeAccountId: "acct_mine" });
+    expect(retrieveSpy).toHaveBeenCalledWith("pi_open", {}, { stripeAccount: "acct_mine" });
+    expect(updateSpy).toHaveBeenCalledWith("pi_open", { amount: 3000 }, { stripeAccount: "acct_mine" });
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not reuse an intent left on the platform's account: it makes a new one on the business's and cancels the old", async () => {
+    const business = await connectedBusiness();
+    const order = await makeOrder(business.id, { total: "23.19" });
+    await prisma.payment.create({
+      data: { businessId: business.id, orderId: order.id, provider: "STRIPE", status: "PENDING", amount: "23.19", stripePaymentIntentId: "pi_platform" },
+    });
+    const retrieveSpy = vi.spyOn(stripe.paymentIntents, "retrieve");
+    const cancelSpy = vi.spyOn(stripe.paymentIntents, "cancel").mockResolvedValue({} as never);
+    const createSpy = vi.spyOn(stripe.paymentIntents, "create").mockResolvedValue({ id: "pi_new_c", client_secret: "sc" } as never);
+
+    const result = await createPaymentIntentAction(order.publicToken);
+
+    expect(result).toEqual({ ok: true, clientSecret: "sc", stripeAccountId: "acct_mine" });
+    expect(retrieveSpy).not.toHaveBeenCalled();
+    // The old intent is cancelled where it lives: no account header, the platform's.
+    expect(cancelSpy).toHaveBeenCalledWith("pi_platform", {}, {});
+    expect(createSpy.mock.calls[0][1]).toMatchObject({ stripeAccount: "acct_mine" });
+    expect((await prisma.payment.findUniqueOrThrow({ where: { stripePaymentIntentId: "pi_platform" } })).stripeAccountId).toBeNull();
+  });
+
+  it("cancels the just-created intent on its own account when the order was cancelled meanwhile", async () => {
+    const business = await connectedBusiness();
+    const order = await makeOrder(business.id, { total: "23.19" });
+    vi.spyOn(stripe.paymentIntents, "create").mockImplementation((async () => {
+      await prisma.order.update({ where: { id: order.id }, data: { status: "CANCELLED" } });
+      return { id: "pi_late", client_secret: "sl" };
+    }) as never);
+    const cancelSpy = vi.spyOn(stripe.paymentIntents, "cancel").mockResolvedValue({} as never);
+
+    expect(await createPaymentIntentAction(order.publicToken)).toEqual({ ok: false, error: "order_cancelled" });
+    expect(cancelSpy).toHaveBeenCalledWith("pi_late", {}, { stripeAccount: "acct_mine" });
   });
 });

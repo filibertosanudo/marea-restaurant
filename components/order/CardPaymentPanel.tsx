@@ -62,12 +62,15 @@ function readColorToken(name: string, fallback: string): string {
  */
 export function CardPaymentPanel({
   publishableKey,
+  stripeAccountId,
   clientSecret,
   amountLabel,
   onSwitchToCash,
   dict,
 }: {
   publishableKey: string;
+  /** The account the intent lives on; null is the platform's own. Stripe.js must be loaded for the same one. */
+  stripeAccountId: string | null;
   clientSecret: string;
   amountLabel: string;
   onSwitchToCash?: () => void;
@@ -126,7 +129,7 @@ export function CardPaymentPanel({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setElementReady(false);
 
-    getStripe(publishableKey).then((stripeInstance) => {
+    getStripe(publishableKey, stripeAccountId).then((stripeInstance) => {
       if (cancelled || !stripeInstance || !mountNodeRef.current) return;
       stripeRef.current = stripeInstance;
 
@@ -164,7 +167,7 @@ export function CardPaymentPanel({
       elementsRef.current = null;
       stripeRef.current = null;
     };
-  }, [clientSecret]);
+  }, [clientSecret, stripeAccountId]);
 
   async function handleSubmit() {
     // Guards against a double-click firing this twice while status is

@@ -277,6 +277,8 @@ export const es = {
       refundSubmitting: "Reembolsando…",
       refundDisabledCaption: "Los reembolsos llegan en una actualización posterior.",
       refundErrorGeneric: "No se pudo procesar el reembolso. Intenta de nuevo.",
+      refundErrorAccountUnavailable:
+        "Stripe ya no puede acceder a la cuenta de este negocio, así que el reembolso no se puede hacer desde aquí. Reembolsa este pago desde tu propio panel de Stripe.",
       refundErrorNothingRefundable: "Ya no queda nada por reembolsar en este pedido.",
       refundErrorAmountExceeds: "Ese monto es mayor a lo reembolsable.",
       refundErrorNoOpenCashSession: "No hay un turno de caja abierto para reembolsar el efectivo. Abre uno primero.",
