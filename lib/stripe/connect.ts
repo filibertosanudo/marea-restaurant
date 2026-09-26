@@ -30,12 +30,12 @@ import { stripe as platformStripe } from "@/lib/stripe/client";
  */
 
 /** The four states Stripe reports for a capability, and nothing else. */
-const KNOWN_STATUSES: Record<string, StripeCapabilityStatus> = {
-  active: "ACTIVE",
-  pending: "PENDING",
-  restricted: "RESTRICTED",
-  unsupported: "UNSUPPORTED",
-};
+const KNOWN_STATUSES = new Map<string, StripeCapabilityStatus>([
+  ["active", "ACTIVE"],
+  ["pending", "PENDING"],
+  ["restricted", "RESTRICTED"],
+  ["unsupported", "UNSUPPORTED"],
+]);
 
 /**
  * A status this code does not know is stored as RESTRICTED, never as ACTIVE: an
@@ -44,7 +44,7 @@ const KNOWN_STATUSES: Record<string, StripeCapabilityStatus> = {
  * costs a failed checkout or worse.
  */
 export function mapCardPaymentsStatus(status: string | null | undefined): StripeCapabilityStatus {
-  return (status && KNOWN_STATUSES[status]) || "RESTRICTED";
+  return (status ? KNOWN_STATUSES.get(status) : undefined) ?? "RESTRICTED";
 }
 
 export type ConnectedAccountInput = {

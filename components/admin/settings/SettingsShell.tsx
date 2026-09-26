@@ -5,6 +5,7 @@ import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import type { Lang } from "@/lib/i18n/lang";
 import { ScheduleEditor, type OpeningHourRow, type ClosureRow } from "./ScheduleEditor";
 import { BusinessSettingsForm, type BusinessSettings } from "./BusinessSettingsForm";
+import { StripeConnectCard, type StripeCardState } from "./StripeConnectCard";
 import { BusinessContentForm, type BusinessContent } from "./BusinessContentForm";
 import { NotificationQueuePanel } from "./NotificationQueuePanel";
 import { DevicesPanel } from "./DevicesPanel";
@@ -24,6 +25,7 @@ export function SettingsShell({
   notificationsDueCount,
   notificationJobs,
   devices,
+  stripe,
 }: {
   dict: SettingsDict;
   lang: Lang;
@@ -35,8 +37,9 @@ export function SettingsShell({
   notificationsDueCount: number;
   notificationJobs: NotificationJobDTO[];
   devices: DeviceDTO[];
+  stripe: StripeCardState;
 }) {
-  const [tab, setTab] = useState<"hours" | "business" | "content" | "notifications" | "devices">("hours");
+  const [tab, setTab] = useState<"hours" | "business" | "content" | "notifications" | "devices">(stripe.arrival ? "business" : "hours");
 
   return (
     <div className="p-lg">
@@ -95,7 +98,12 @@ export function SettingsShell({
       {tab === "hours" && (
         <ScheduleEditor dict={dict} lang={lang} timezone={timezone} openingHours={openingHours} closures={closures} />
       )}
-      {tab === "business" && <BusinessSettingsForm dict={dict} business={business} />}
+      {tab === "business" && (
+        <>
+          <BusinessSettingsForm dict={dict} business={business} />
+          <StripeConnectCard dict={dict} state={stripe} lang={lang} />
+        </>
+      )}
       {tab === "content" && <BusinessContentForm dict={dict} defaultLocale={lang} content={content} />}
       {tab === "notifications" && (
         <NotificationQueuePanel

@@ -18,12 +18,14 @@ import { createConnectedAccount, createOnboardingLink, readCardPaymentsStatus } 
 const key = process.env.STRIPE_SMOKE_SECRET_KEY;
 
 describe.skipIf(!key)("Stripe Connect against the sandbox", () => {
-  const client = new Stripe(key ?? "", { apiVersion: "2026-07-29.dahlia", typescript: true });
+  // Built on first use: this body also runs, and must not throw, when the suite is skipped.
+  let cached: Stripe | undefined;
+  const stripeClient = () => (cached ??= new Stripe(key ?? "", { apiVersion: "2026-07-29.dahlia", typescript: true }));
   const created: string[] = [];
 
   afterAll(async () => {
     // Close what this run opened; a closed account cannot be operated on.
-    await Promise.all(created.map((id) => client.v2.core.accounts.close(id).catch(() => {})));
+    await Promise.all(created.map((id) => stripeClient().v2.core.accounts.close(id).catch(() => {})));
   });
 
   it("refuses to run with anything but a test key", () => {
@@ -31,6 +33,7 @@ describe.skipIf(!key)("Stripe Connect against the sandbox", () => {
   });
 
   it("creates the account with the chosen responsibilities, reads its status and offers an onboarding link", async () => {
+    const client = stripeClient();
     const businessId = `smoke_${randomUUID()}`;
     const input = {
       businessId,
