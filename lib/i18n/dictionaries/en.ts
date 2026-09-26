@@ -606,7 +606,7 @@ export const en = {
         },
         restricted: {
           title: "Restricted",
-          body: "Stripe has limited your account. Card payments are off until you resolve it in your Stripe dashboard. Guests pay at the register meanwhile.",
+          body: "Stripe needs more from you before this account can take cards: setup is unfinished, or the account has a limit. Continue setup on Stripe or check your Stripe dashboard. Guests pay at the register meanwhile.",
         },
         unsupported: {
           title: "Not available",

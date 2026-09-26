@@ -68,7 +68,6 @@ export function StripeConnectCard({ dict, state, lang }: { dict: SettingsDict; s
     // Runs once on arrival; the state it sets is the result of a server call, not derived state.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (state.arrival === "return") check();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     else connect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

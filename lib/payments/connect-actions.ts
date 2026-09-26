@@ -79,7 +79,6 @@ export async function startStripeOnboardingAction(): Promise<StartOnboardingResu
         businessId: business.id,
         businessName: business.name,
         country: business.country,
-        currency: business.currency,
         locale: business.defaultLocale === "en" ? "en" : "es",
         contactEmail: session.user.email,
       });

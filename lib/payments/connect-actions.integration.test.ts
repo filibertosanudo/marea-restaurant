@@ -51,7 +51,7 @@ beforeEach(() => {
 });
 
 async function adminOf(slug: string, overrides: Record<string, unknown> = {}) {
-  const business = await makeBusiness({ slug, name: `Shop ${slug}`, country: "MX", currency: "MXN", ...overrides });
+  const business = await makeBusiness({ slug, name: `Shop ${slug}`, country: "MX", currency: "USD", ...overrides });
   const admin = await makeStaff("BUSINESS_ADMIN");
   setTestSession(sessionUserFromRow(admin, { role: "BUSINESS_ADMIN", businessId: business.id }));
   setTestHost(`${slug}.localhost`);
@@ -96,10 +96,11 @@ describe("startStripeOnboardingAction", () => {
         dashboard: "full",
         identity: { country: "mx" },
         configuration: { merchant: { capabilities: { card_payments: { requested: true } } } },
-        defaults: expect.objectContaining({ currency: "mxn", responsibilities: { fees_collector: "stripe", losses_collector: "stripe" } }),
+        // No currency: Stripe derives the payout currency from the country and rejects e.g. usd in MX.
+        defaults: { locales: ["es-419"], responsibilities: { fees_collector: "stripe", losses_collector: "stripe" } },
         metadata: { businessId: business.id },
       }),
-      { idempotencyKey: `connect_account_${business.id}` }
+      { idempotencyKey: expect.stringMatching(new RegExp(`^connect_account_${business.id}_[0-9a-f]{16}$`)) }
     );
     const saved = await row(business.id);
     expect(saved).toMatchObject({ stripeAccountId: "acct_1", stripeCardPaymentsStatus: "PENDING" });

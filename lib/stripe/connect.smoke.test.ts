@@ -25,7 +25,7 @@ describe.skipIf(!key)("Stripe Connect against the sandbox", () => {
 
   afterAll(async () => {
     // Close what this run opened; a closed account cannot be operated on.
-    await Promise.all(created.map((id) => stripeClient().v2.core.accounts.close(id).catch(() => {})));
+    await Promise.all(created.map((id) => stripeClient().v2.core.accounts.close(id, { applied_configurations: ["merchant"] }).catch(() => {})));
   });
 
   it("refuses to run with anything but a test key", () => {
@@ -39,7 +39,6 @@ describe.skipIf(!key)("Stripe Connect against the sandbox", () => {
       businessId,
       businessName: "Marea smoke test",
       country: "MX",
-      currency: "MXN",
       locale: "es" as const,
       contactEmail: "smoke-test@example.com",
     };

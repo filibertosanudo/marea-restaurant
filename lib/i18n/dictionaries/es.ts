@@ -611,7 +611,7 @@ export const es = {
         },
         restricted: {
           title: "Restringida",
-          body: "Stripe limitó tu cuenta. El pago con tarjeta queda desactivado hasta que lo resuelvas en tu panel de Stripe. Mientras tanto los clientes pagan en caja.",
+          body: "Stripe necesita más de ti para que esta cuenta cobre con tarjeta: falta terminar la configuración o la cuenta tiene un límite. Continúa la configuración en Stripe o revisa tu panel de Stripe. Mientras tanto los clientes pagan en caja.",
         },
         unsupported: {
           title: "No disponible",

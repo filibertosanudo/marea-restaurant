@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import type Stripe from "stripe";
 import type { StripeCapabilityStatus } from "@/lib/generated/prisma/client";
 import { stripe as platformStripe } from "@/lib/stripe/client";
@@ -52,14 +53,30 @@ export type ConnectedAccountInput = {
   businessName: string;
   /** ISO 3166-1 alpha-2, capitals, as Business.country stores it; Stripe's own examples send it in lowercase. */
   country: string;
-  currency: string;
   locale: "en" | "es";
   contactEmail: string;
 };
 
 /**
- * Creates the connected account for a business. The idempotency key is the
- * business's id: two clicks, or two replicas, that both get past "no account
+ * The key covers the parameters as well as the business: Stripe remembers a key
+ * for 24 hours together with what it was first used for, and answers 409 to the
+ * same key with different parameters. Without this, a failed attempt (or a
+ * changed country) would block the retry for a day. The same input, sent twice,
+ * still gets the same account.
+ */
+export function connectAccountKey(input: ConnectedAccountInput): string {
+  const digest = createHash("sha256")
+    .update(JSON.stringify([input.country, input.businessName, input.locale, input.contactEmail]))
+    .digest("hex")
+    .slice(0, 16);
+  return `connect_account_${input.businessId}_${digest}`;
+}
+
+/**
+ * Creates the connected account for a business. No currency is sent: the
+ * account default follows its country and Stripe rejects unsupported pairs (usd
+ * in MX); charges take their currency from the PaymentIntent. The idempotency key
+ * (see above): two clicks, or two replicas, that both get past "no account
  * yet" receive the same account back from Stripe for 24 hours instead of
  * creating two, only one of which the database could hold. After that window
  * the caller's own "no account yet" check (a conditional update on the row) is
@@ -77,14 +94,13 @@ export async function createConnectedAccount(
       identity: { country: input.country.toLowerCase() },
       configuration: { merchant: { capabilities: { card_payments: { requested: true } } } },
       defaults: {
-        currency: input.currency.toLowerCase(),
         locales: [input.locale === "es" ? "es-419" : "en-US"],
         responsibilities: { fees_collector: "stripe", losses_collector: "stripe" },
       },
       include: ["configuration.merchant", "requirements"],
       metadata: { businessId: input.businessId },
     },
-    { idempotencyKey: `connect_account_${input.businessId}` }
+    { idempotencyKey: connectAccountKey(input) }
   );
   return { id: account.id };
 }
