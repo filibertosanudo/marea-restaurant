@@ -83,6 +83,15 @@ enum UserRole {
   SUPER_ADMIN // administrador de la plataforma (todos los negocios)
 }
 
+/// Estado de la capacidad de cobro con tarjeta de una cuenta conectada de
+/// Stripe (módulo 17b). Los cuatro estados de Accounts v2, no un booleano.
+enum StripeCapabilityStatus {
+  ACTIVE
+  PENDING
+  RESTRICTED
+  UNSUPPORTED
+}
+
 /// Giro del negocio. Permite que la misma base sirva a varios verticales
 /// y que la UI decida qué módulos mostrar (un food truck no tiene mesas).
 enum BusinessType {
@@ -251,9 +260,21 @@ model Business {
   latitude     Decimal? @db.Decimal(9, 6)
   longitude    Decimal? @db.Decimal(9, 6)
 
-  // Stripe: cada negocio cobra a su propia cuenta (Stripe Connect en v2).
-  stripeAccountId      String?
-  stripePublishableKey String?
+  // Stripe Connect (módulo 17b): cada negocio cobra a su propia cuenta
+  // conectada, con cargos directos. El id lo escribe SÓLO el código que acaba
+  // de crear la cuenta en Stripe, nunca un formulario; es único porque dos
+  // negocios en una misma cuenta serían dos restaurantes cobrando al mismo
+  // saldo. Nulo: sin cuenta propia (el único negocio de un despliegue cobra
+  // a la cuenta de la plataforma). Stripe.js usa la llave publicable de la
+  // plataforma más este id, así que no hay llave por negocio.
+  stripeAccountId          String?                 @unique
+  /// Estado de `card_payments` de la cuenta, tal como lo reporta Stripe
+  /// (v2: active, pending, restricted, unsupported). Un id no es permiso para
+  /// cobrar: sólo ACTIVE lo es. Un valor que Stripe añada y aquí no se
+  /// reconozca se guarda como no activo (el código que lo escribe lo mapea).
+  stripeCardPaymentsStatus StripeCapabilityStatus?
+  /// Cuándo se leyó ese estado de Stripe por última vez.
+  stripeStatusCheckedAt    DateTime?
 
   // Ajustes de operación usados por reservaciones y pedidos
   defaultReservationMinutes Int     @default(90)
@@ -1130,6 +1151,14 @@ model Payment {
   // Identificadores de Stripe. Únicos porque son la llave de idempotencia
   // natural cuando llega el webhook.
   stripePaymentIntentId String? @unique
+  /// La cuenta de Stripe en la que VIVE el intent (y su cargo): nulo es la
+  /// cuenta de la plataforma, que es donde nacieron todos los pagos previos a
+  /// Stripe Connect. Se fija al crear la fila y no cambia nunca (un trigger de
+  /// la migración lo impide, también de nulo a un valor): un reembolso o una
+  /// consulta se dirigen a la cuenta que dice ESTA fila, no a la que el negocio
+  /// tenga hoy, y reetiquetar un pago viejo mandaría su reembolso a una cuenta
+  /// donde el intent no existe.
+  stripeAccountId       String?
   stripeChargeId        String? @unique
   stripeCustomerId      String?
   paymentMethodBrand    String? // "visa"

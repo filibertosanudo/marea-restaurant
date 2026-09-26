@@ -41,6 +41,9 @@ describe("cached reads keep their types", () => {
       latitude: "29.075000",
       longitude: "-110.955000",
       addressLine1: "Calle 1",
+      stripeAccountId: "acct_cached",
+      stripeCardPaymentsStatus: "ACTIVE",
+      stripeStatusCheckedAt: new Date("2026-09-27T10:00:00Z"),
     });
 
     const business = await getPublicBusiness();
@@ -49,6 +52,7 @@ describe("cached reads keep their types", () => {
     expect(business.latitude).toBeInstanceOf(Prisma.Decimal);
     expect(business.createdAt).toBeInstanceOf(Date);
     expect(business.deletedAt).toBeNull();
+    expect(business.stripeStatusCheckedAt).toBeInstanceOf(Date);
     // A new Date or Decimal column on Business fails this equality until
     // toCacheable/fromCacheable in lib/business.ts learn about it.
     expect(business).toEqual(row);

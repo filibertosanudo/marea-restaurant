@@ -27,6 +27,21 @@ export async function businessIdForPaymentIntent(stripePaymentIntentId: string):
   return row?.businessId ?? null;
 }
 
+/**
+ * The business a Stripe connected account belongs to, from the `account` an
+ * event carries. Safe for the system role to answer for the same reason as the
+ * others here: it reads only Business."id" and Business."stripeAccountId" (the
+ * column grants of the row level security and Stripe Connect migrations), the
+ * account id is issued by Stripe and unique per business, and the event it came
+ * from has already had its signature verified. Null when no business holds that
+ * account, which includes one that was disconnected: its old payments keep
+ * their own account id on the Payment row and are matched through that instead.
+ */
+export async function businessIdForStripeAccount(stripeAccountId: string): Promise<string | null> {
+  const row = await systemPrisma.business.findUnique({ where: { stripeAccountId }, select: { id: true } });
+  return row?.id ?? null;
+}
+
 export type TokenKind = "table" | "order" | "reservation";
 
 export async function businessIdForToken(kind: TokenKind, token: string): Promise<string | null> {

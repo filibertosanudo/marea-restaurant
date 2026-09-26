@@ -6,7 +6,7 @@ import { prisma as owner } from "@/lib/prisma";
 import { TenantPool } from "@/lib/db/tenant-pool";
 import { findRoleProblem } from "@/lib/db/role-check";
 import { runInTenant, explicitTenant } from "@/lib/tenancy/context";
-import { businessIdForPaymentIntent, businessIdForToken, businessIdForDeviceTokenHash } from "@/lib/tenancy/discover";
+import { businessIdForPaymentIntent, businessIdForStripeAccount, businessIdForToken, businessIdForDeviceTokenHash } from "@/lib/tenancy/discover";
 import { currentTenant } from "@/lib/tenancy/request-tenant";
 import { setTestTenantHeader } from "@/test/stubs/next-headers";
 import { testSchema } from "@/test/db";
@@ -314,6 +314,28 @@ describe("finding the business of a capability, from the web process", () => {
     expect(await businessIdForPaymentIntent("pi_unknown")).toBeNull();
     expect(await businessIdForToken("order", mareaOrder.publicToken)).toBe(marea.id);
     expect(await businessIdForDeviceTokenHash("hash-marea")).toBe(marea.id);
+  });
+});
+
+describe("finding the business of a Stripe connected account", () => {
+  it("resolves the account an event names to its business, and knows nothing of a business without one", async () => {
+    const { marea, cala, calaOrder } = await twoBusinessesWithOrders();
+    await owner.business.update({ where: { id: cala.id }, data: { stripeAccountId: "acct_cala", stripeCardPaymentsStatus: "ACTIVE" } });
+    await owner.payment.create({
+      data: { businessId: cala.id, orderId: calaOrder.id, provider: "STRIPE", status: "PENDING", amount: "10.00", stripePaymentIntentId: "pi_c", stripeAccountId: "acct_cala" },
+    });
+    const worker = workerClient();
+
+    expect(await businessIdForStripeAccount("acct_cala")).toBe(cala.id);
+    expect(await businessIdForStripeAccount("acct_unknown")).toBeNull();
+    expect(marea.id).not.toBe(cala.id);
+
+    // The grants stop at the two columns a Stripe event is matched by.
+    expect((await worker.business.findUnique({ where: { id: cala.id }, select: { stripeAccountId: true } }))?.stripeAccountId).toBe("acct_cala");
+    expect((await worker.payment.findUnique({ where: { stripePaymentIntentId: "pi_c" }, select: { stripeAccountId: true } }))?.stripeAccountId).toBe("acct_cala");
+    await expect(worker.business.findUnique({ where: { id: cala.id }, select: { stripeCardPaymentsStatus: true } })).rejects.toThrow(/permission denied/);
+    await expect(worker.business.findUnique({ where: { id: cala.id }, select: { email: true } })).rejects.toThrow(/permission denied/);
+    await expect(worker.payment.findUnique({ where: { stripePaymentIntentId: "pi_c" }, select: { amount: true } })).rejects.toThrow(/permission denied/);
   });
 });
 
