@@ -5,14 +5,14 @@ import { prisma } from "@/lib/prisma";
 import { getPublicBusiness } from "@/lib/business";
 import { canTakeOnlinePayments } from "@/lib/payments/availability";
 import { getOrderForPaymentIntentByPublicToken } from "@/lib/orders/queries";
-import { stripe } from "@/lib/stripe/client";
+import { stripeFor } from "@/lib/stripe/payments";
 import { toStripeAmount } from "./amount";
 import { computePaymentSummary } from "./summary";
 import { isUniqueConstraintError } from "./prisma-errors";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 
 export type CreatePaymentIntentResult =
-  | { ok: true; clientSecret: string }
+  | { ok: true; clientSecret: string; stripeAccountId: string | null }
   | {
       ok: false;
       error:
@@ -76,8 +76,27 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
   );
   const currentAmount = toStripeAmount(order.total);
 
-  if (openPayment?.stripePaymentIntentId) {
-    const existing = await stripe.paymentIntents.retrieve(openPayment.stripePaymentIntentId).catch(() => null);
+  // A new payment goes to the business's own Stripe account (direct charges);
+  // availability above has already required it to be active. The platform's
+  // account (null) is only ever the answer for a deployment that never
+  // connected one. Everything after creation uses the account stored on the
+  // Payment row, never this value.
+  const account = business.stripeAccountId;
+
+  // An open payment on another account than the one this business charges to
+  // now (it connected after the guest opened the page) is not reused: the
+  // money would land where the business no longer collects. A new one is made
+  // below and the old intent is cancelled, on its own account.
+  const reusable = openPayment && (openPayment.stripeAccountId ?? null) === account ? openPayment : null;
+  if (openPayment && !reusable && openPayment.stripePaymentIntentId) {
+    await stripeFor(openPayment.stripeAccountId ?? null)
+      .cancelPaymentIntent(openPayment.stripePaymentIntentId)
+      .catch(() => {});
+  }
+
+  if (reusable?.stripePaymentIntentId) {
+    const client = stripeFor(reusable.stripeAccountId ?? null);
+    const existing = await client.retrievePaymentIntent(reusable.stripePaymentIntentId).catch(() => null);
     if (existing?.status === "succeeded") return { ok: false, error: "already_paid" };
     if (existing && CONFIRMABLE_INTENT_STATUSES.includes(existing.status) && existing.client_secret) {
       // The order's total can move between the guest opening this page and
@@ -91,8 +110,8 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
       if (existing.amount !== currentAmount) {
         let updated;
         try {
-          updated = await stripe.paymentIntents.update(existing.id, { amount: currentAmount });
-          await prisma.payment.update({ where: { id: openPayment.id }, data: { amount: order.total } });
+          updated = await client.updatePaymentIntent(existing.id, { amount: currentAmount });
+          await prisma.payment.update({ where: { id: reusable.id }, data: { amount: order.total } });
         } catch {
           // Whether Stripe's update or the DB write failed, surface the
           // same typed try_again the rest of this function uses rather
@@ -102,9 +121,9 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
           return { ok: false, error: "try_again" };
         }
         if (!updated.client_secret) return { ok: false, error: "try_again" };
-        return { ok: true, clientSecret: updated.client_secret };
+        return { ok: true, clientSecret: updated.client_secret, stripeAccountId: account };
       }
-      return { ok: true, clientSecret: existing.client_secret };
+      return { ok: true, clientSecret: existing.client_secret, stripeAccountId: account };
     }
     // Anything else (canceled, retrieve failed) falls through to create —
     // Stripe's idempotency window means a truly dead intent under the
@@ -114,7 +133,7 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
 
   let intent;
   try {
-    intent = await stripe.paymentIntents.create(
+    intent = await stripeFor(account).createPaymentIntent(
       {
         amount: currentAmount,
         currency: order.currency.toLowerCase(),
@@ -125,8 +144,10 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
       // total that changes between two calls (see above) would collide
       // with the first call's cached Stripe response under the same key
       // and stay stuck on the stale amount for the rest of Stripe's 24h
-      // idempotency window, surfacing as a persistent try_again.
-      { idempotencyKey: `pi_create_${order.id}_${currentAmount}` }
+      // idempotency window, surfacing as a persistent try_again. The account
+      // is part of it too, so one key never stands for a payment on two
+      // accounts, whatever way Stripe scopes its keys (not verified here).
+      `pi_create_${order.id}_${account ?? "platform"}_${currentAmount}`
     );
   } catch {
     return { ok: false, error: "try_again" };
@@ -139,7 +160,7 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
   // holding a DB transaction open across an external API call.
   const freshOrder = await prisma.order.findUnique({ where: { id: order.id }, select: { status: true } });
   if (freshOrder?.status === "CANCELLED") {
-    await stripe.paymentIntents.cancel(intent.id).catch(() => {});
+    await stripeFor(account).cancelPaymentIntent(intent.id).catch(() => {});
     return { ok: false, error: "order_cancelled" };
   }
 
@@ -153,6 +174,7 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
         amount: order.total,
         currency: order.currency,
         stripePaymentIntentId: intent.id,
+        stripeAccountId: account,
       },
     });
   } catch (err) {
@@ -162,5 +184,5 @@ export async function createPaymentIntentAction(publicToken: string): Promise<Cr
     if (!isUniqueConstraintError(err)) throw err;
   }
 
-  return { ok: true, clientSecret: intent.client_secret };
+  return { ok: true, clientSecret: intent.client_secret, stripeAccountId: account };
 }
