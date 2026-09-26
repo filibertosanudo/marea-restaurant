@@ -5,6 +5,7 @@ import { PrismaClient } from "@/lib/generated/prisma/client";
 import { stripe } from "@/lib/stripe/client";
 import { testSchema } from "@/test/db";
 import { POST } from "./route";
+import { POST as connectPOST } from "./connect/route";
 
 // The webhook runs in the web process with no host and no session: all it has
 // is the PaymentIntent a signed event names. Under row level security the
@@ -20,6 +21,7 @@ function urlAs(role: string): string {
 }
 
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_test_secret";
+process.env.STRIPE_CONNECT_WEBHOOK_SECRET = "whsec_connect_secret";
 process.env.WORKER_DATABASE_URL = urlAs("marea_worker");
 
 vi.mock("@/lib/prisma", async () => {
@@ -88,5 +90,55 @@ describe("POST /api/webhooks/stripe under row level security", () => {
     expect(response.status).toBe(200);
     expect((await owner.payment.findUniqueOrThrow({ where: { id: marea.id } })).status).toBe("PENDING");
     expect(await owner.stripeWebhookEvent.count({ where: { eventId: "evt_pi_someone_elses" } })).toBe(1);
+  });
+});
+
+describe("POST /api/webhooks/stripe/connect under row level security", () => {
+  function connectRequest(event: object) {
+    const payload = JSON.stringify(event);
+    const signature = stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_connect_secret" });
+    return new Request("http://localhost/api/webhooks/stripe/connect", { method: "POST", headers: { "stripe-signature": signature }, body: payload });
+  }
+  const connectEvent = (id: string, type: string, account: string, object: object) => ({ id, object: "event", type, livemode: false, account, data: { object } });
+
+  it("settles a payment made on the business's account, and only that business's", async () => {
+    const marea = await pendingCardPayment("marea", "pi_marea_c");
+    const cala = await owner.business.create({ data: { slug: "cala", name: "cala" } });
+    const order = await owner.order.create({ data: { businessId: cala.id, orderNumber: "T-cala" } });
+    const calaPayment = await owner.payment.create({
+      data: { businessId: cala.id, orderId: order.id, provider: "STRIPE", status: "PENDING", amount: "23.19", stripePaymentIntentId: "pi_cala_c", stripeAccountId: "acct_cala" },
+    });
+
+    const response = await connectPOST(connectRequest(connectEvent("evt_c1", "payment_intent.succeeded", "acct_cala", { id: "pi_cala_c", object: "payment_intent" })));
+
+    expect(response.status).toBe(200);
+    expect((await owner.payment.findUniqueOrThrow({ where: { id: calaPayment.id } })).status).toBe("SUCCEEDED");
+    expect((await owner.payment.findUniqueOrThrow({ where: { id: marea.id } })).status).toBe("PENDING");
+  });
+
+  it("disconnects the business whose account was deauthorized, and no other", async () => {
+    const marea = await owner.business.create({ data: { slug: "marea", name: "marea", stripeAccountId: "acct_marea", stripeCardPaymentsStatus: "ACTIVE", acceptsOnlinePayment: true } });
+    const cala = await owner.business.create({ data: { slug: "cala", name: "cala", stripeAccountId: "acct_cala", stripeCardPaymentsStatus: "ACTIVE", acceptsOnlinePayment: true } });
+
+    const response = await connectPOST(connectRequest(connectEvent("evt_c2", "account.application.deauthorized", "acct_cala", { id: "acct_cala", object: "application" })));
+
+    expect(response.status).toBe(200);
+    expect(await owner.business.findUniqueOrThrow({ where: { id: cala.id } })).toMatchObject({ stripeAccountId: null, stripeCardPaymentsStatus: "RESTRICTED", acceptsOnlinePayment: false });
+    expect(await owner.business.findUniqueOrThrow({ where: { id: marea.id } })).toMatchObject({ stripeAccountId: "acct_marea", stripeCardPaymentsStatus: "ACTIVE", acceptsOnlinePayment: true });
+  });
+
+  it("records the state of an account that was updated", async () => {
+    const business = await owner.business.create({ data: { slug: "marea", name: "marea", stripeAccountId: "acct_marea", stripeCardPaymentsStatus: "ACTIVE" } });
+    vi.spyOn(stripe.v2.core.accounts, "retrieve").mockResolvedValue({
+      id: "acct_marea",
+      livemode: false,
+      closed: false,
+      configuration: { merchant: { capabilities: { card_payments: { status: "restricted" } } } },
+    } as never);
+
+    const response = await connectPOST(connectRequest(connectEvent("evt_c3", "account.updated", "acct_marea", { id: "acct_marea", object: "account" })));
+
+    expect(response.status).toBe(200);
+    expect((await owner.business.findUniqueOrThrow({ where: { id: business.id } })).stripeCardPaymentsStatus).toBe("RESTRICTED");
   });
 });
