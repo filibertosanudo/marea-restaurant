@@ -10,7 +10,7 @@ import { businessOrigin } from "@/lib/business-origin";
 import { runInTenant } from "@/lib/tenancy/context";
 import { businessIdForSlug, businessIdForToken, onlyBusinessId } from "@/lib/tenancy/discover";
 import { slugFromHost } from "@/lib/business-host";
-import { cachedPublicRead, invalidatePublicCache } from "@/lib/cache/public";
+import { cachedPublicRead, expirePublicCache, invalidatePublicCache } from "@/lib/cache/public";
 
 // The data cache stores JSON, which turns Date and Decimal columns into
 // strings. Converting them explicitly, both ways, keeps `Business` honest
@@ -55,6 +55,13 @@ export function invalidateBusinessCache(business: Pick<Business, "id" | "slug">)
   invalidatePublicCache("business", idScope(business.id));
   invalidatePublicCache("business", slugScope(business.slug));
   invalidatePublicCache("business", DEFAULT_SCOPE);
+}
+
+/** The same, for a Route Handler (a webhook), where Server Actions' `updateTag` is not available. */
+export function expireBusinessCache(business: Pick<Business, "id" | "slug">): void {
+  expirePublicCache("business", idScope(business.id));
+  expirePublicCache("business", slugScope(business.slug));
+  expirePublicCache("business", DEFAULT_SCOPE);
 }
 
 /** The domain subdomains hang off: BUSINESS_ROOT_DOMAIN, or the host of this deployment's own origin. */

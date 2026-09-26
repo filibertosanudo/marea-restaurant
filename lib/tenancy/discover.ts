@@ -20,11 +20,21 @@ export async function businessIdForDeviceTokenHash(tokenHash: string): Promise<s
 }
 
 export async function businessIdForPaymentIntent(stripePaymentIntentId: string): Promise<string | null> {
-  const row = await systemPrisma.payment.findUnique({
+  return (await paymentOwnerForIntent(stripePaymentIntentId))?.businessId ?? null;
+}
+
+/**
+ * The business of a payment and the Stripe account it was charged on (null: the
+ * platform's own), for a webhook to check against the account its event carries.
+ * Reads only the two columns the worker role may.
+ */
+export async function paymentOwnerForIntent(
+  stripePaymentIntentId: string
+): Promise<{ businessId: string; stripeAccountId: string | null } | null> {
+  return systemPrisma.payment.findUnique({
     where: { stripePaymentIntentId },
-    select: { businessId: true },
+    select: { businessId: true, stripeAccountId: true },
   });
-  return row?.businessId ?? null;
 }
 
 /**
