@@ -111,6 +111,17 @@ describe("startStripeOnboardingAction", () => {
     expect(urls.use_case.account_onboarding.refresh_url).toBe("http://localhost:3000/admin/configuracion?stripe=refresh");
   });
 
+  it("asks Stripe for English defaults when the business's language is English", async () => {
+    await adminOf("a", { defaultLocale: "en" });
+
+    await startStripeOnboardingAction();
+
+    expect(stripeFake.create).toHaveBeenCalledWith(
+      expect.objectContaining({ defaults: expect.objectContaining({ locales: ["en-US"] }) }),
+      expect.anything()
+    );
+  });
+
   it("resumes an existing account with a fresh link instead of creating a second one", async () => {
     const { business } = await adminOf("a");
     await startStripeOnboardingAction();
@@ -141,6 +152,28 @@ describe("startStripeOnboardingAction", () => {
     expect(first.ok && second.ok).toBe(true);
     expect((await row(business.id)).stripeAccountId).toBe("acct_1");
     expect(await prisma.business.count({ where: { stripeAccountId: { not: null } } })).toBe(1);
+  });
+
+  it("uses the account another request connected first, when it wins between our Stripe call and our write", async () => {
+    const { business } = await adminOf("a");
+    stripeFake.create.mockImplementationOnce(async () => {
+      await prisma.business.update({ where: { id: business.id }, data: { stripeAccountId: "acct_first", stripeCardPaymentsStatus: "PENDING" } });
+      return { id: "acct_second" };
+    });
+
+    const result = await startStripeOnboardingAction();
+
+    expect(result).toEqual({ ok: true, url: "https://connect.stripe.com/setup/acct_first" });
+    expect((await row(business.id)).stripeAccountId).toBe("acct_first");
+  });
+
+  it("answers stripe_unavailable, not a crash, when the database fails while recording the account", async () => {
+    const { business } = await adminOf("a");
+    const spy = vi.spyOn(prisma.business, "updateMany").mockRejectedValueOnce(new Error("connection reset"));
+
+    expect(await startStripeOnboardingAction()).toEqual({ ok: false, error: "stripe_unavailable" });
+    spy.mockRestore();
+    expect((await row(business.id)).stripeAccountId).toBeNull();
   });
 
   it("says so, in plain terms, when the account already belongs to another business", async () => {
@@ -212,6 +245,14 @@ describe("refreshStripeAccountAction", () => {
     expect(stripeFake.retrieve).toHaveBeenCalledWith("acct_mine", expect.anything());
     expect((await row(business.id)).stripeCardPaymentsStatus).toBe("ACTIVE");
     expect((await row(other.id)).stripeCardPaymentsStatus).toBe("PENDING");
+  });
+
+  it("refuses to record an account of the other mode on refresh too", async () => {
+    const { business } = await adminOf("a", { stripeAccountId: "acct_live", stripeCardPaymentsStatus: "PENDING" });
+    stripeFake.state.livemode = true;
+
+    expect(await refreshStripeAccountAction()).toEqual({ ok: false, error: "livemode_mismatch" });
+    expect((await row(business.id)).stripeStatusCheckedAt).toBeNull();
   });
 
   it("answers stripe_unavailable when Stripe cannot be read, and changes nothing", async () => {
