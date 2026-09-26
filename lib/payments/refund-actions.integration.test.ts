@@ -339,3 +339,56 @@ describe("createRefundAction", () => {
     expect(refundCount).toBe(1);
   });
 });
+
+describe("createRefundAction on a connected account", () => {
+  async function paymentOn(stripeAccountId: string | null, businessOverrides: Record<string, unknown> = {}) {
+    const business = await makeBusiness({ slug: "marea", ...businessOverrides });
+    await loginAsAdmin();
+    const order = await makeOrder(business.id, { total: "23.19" });
+    await prisma.payment.create({
+      data: { businessId: business.id, orderId: order.id, provider: "STRIPE", status: "SUCCEEDED", amount: "23.19", stripePaymentIntentId: "pi_acct", stripeAccountId },
+    });
+    return order;
+  }
+
+  it("refunds on the account stored on the payment, with that account named on the call", async () => {
+    const order = await paymentOn("acct_mine", { stripeAccountId: "acct_mine", stripeCardPaymentsStatus: "ACTIVE" });
+    const createSpy = vi.spyOn(stripe.refunds, "create").mockResolvedValue({ id: "re_acct" } as never);
+
+    expect((await createRefundAction(order.id, { mode: "FULL", amount: "0", reason: "guest request" })).ok).toBe(true);
+
+    expect(createSpy.mock.calls[0][1]).toMatchObject({ stripeAccount: "acct_mine" });
+  });
+
+  it("uses the payment's account, not the business's current one, after the business reconnected elsewhere", async () => {
+    const order = await paymentOn("acct_old", { stripeAccountId: "acct_new", stripeCardPaymentsStatus: "ACTIVE" });
+    const createSpy = vi.spyOn(stripe.refunds, "create").mockResolvedValue({ id: "re_old" } as never);
+
+    await createRefundAction(order.id, { mode: "FULL", amount: "0", reason: "guest request" });
+
+    expect(createSpy.mock.calls[0][1]).toMatchObject({ stripeAccount: "acct_old" });
+  });
+
+  it("a payment taken on the platform's account is refunded there, without an account header", async () => {
+    const order = await paymentOn(null);
+    const createSpy = vi.spyOn(stripe.refunds, "create").mockResolvedValue({ id: "re_platform" } as never);
+
+    await createRefundAction(order.id, { mode: "FULL", amount: "0", reason: "guest request" });
+
+    expect(createSpy.mock.calls[0][1]).not.toHaveProperty("stripeAccount");
+  });
+
+  it("says the account is unreachable when the business disconnected, records nothing, and does not retry on the platform", async () => {
+    const order = await paymentOn("acct_gone");
+    const createSpy = vi
+      .spyOn(stripe.refunds, "create")
+      .mockRejectedValue(Object.assign(new Error("does not have access to account"), { type: "StripePermissionError", code: "account_invalid" }));
+
+    const result = await createRefundAction(order.id, { mode: "FULL", amount: "0", reason: "guest request" });
+
+    expect(result).toEqual({ ok: false, error: "account_unavailable" });
+    expect(createSpy).toHaveBeenCalledTimes(1);
+    expect(createSpy.mock.calls[0][1]).toMatchObject({ stripeAccount: "acct_gone" });
+    expect(await prisma.refund.count()).toBe(0);
+  });
+});

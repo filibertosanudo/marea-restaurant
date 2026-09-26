@@ -593,3 +593,46 @@ describe("POST /api/webhooks/stripe", () => {
     expect(await prisma.stripeWebhookEvent.count({ where: { eventId: event.id } })).toBe(1);
   });
 });
+
+describe("Stripe API calls made while handling an event", () => {
+  it("read the charge on the account the event came from", async () => {
+    const business = await makeBusiness();
+    await makePendingCardPayment(business.id, "pi_on_account");
+    const retrieveSpy = vi.spyOn(stripe.charges, "retrieve").mockResolvedValue({ id: "ch_a", payment_method_details: {}, receipt_url: null } as never);
+
+    const event = { ...paymentIntentEvent("payment_intent.succeeded", "pi_on_account", { latest_charge: "ch_a" }), account: "acct_mine" };
+    expect((await POST(signedRequest(event))).status).toBe(200);
+
+    expect(retrieveSpy).toHaveBeenCalledWith("ch_a", {}, { stripeAccount: "acct_mine" });
+  });
+
+  it("read the charge on the platform's account when the event names none", async () => {
+    const business = await makeBusiness();
+    await makePendingCardPayment(business.id, "pi_on_platform");
+    const retrieveSpy = vi.spyOn(stripe.charges, "retrieve").mockResolvedValue({ id: "ch_p", payment_method_details: {}, receipt_url: null } as never);
+
+    await POST(signedRequest(paymentIntentEvent("payment_intent.succeeded", "pi_on_platform", { latest_charge: "ch_p" })));
+
+    expect(retrieveSpy).toHaveBeenCalledWith("ch_p", {}, {});
+  });
+
+  it("list a charge's refunds on the account the event came from", async () => {
+    const business = await makeBusiness();
+    const payment = await makePendingCardPayment(business.id, "pi_refund_acct");
+    await prisma.payment.update({ where: { id: payment.id }, data: { status: "SUCCEEDED" } });
+    const listSpy = vi.spyOn(stripe.refunds, "list").mockReturnValue({
+      autoPagingToArray: async () => [{ id: "re_acct", amount: 500, status: "succeeded" }],
+    } as unknown as ReturnType<typeof stripe.refunds.list>);
+
+    const event = {
+      id: "evt_refund_acct",
+      object: "event",
+      type: "charge.refunded",
+      account: "acct_mine",
+      data: { object: { id: "ch_r", object: "charge", payment_intent: "pi_refund_acct", amount: 2319, amount_refunded: 500, currency: "mxn" } },
+    };
+    expect((await POST(signedRequest(event))).status).toBe(200);
+
+    expect(listSpy).toHaveBeenCalledWith({ charge: "ch_r" }, { stripeAccount: "acct_mine" });
+  });
+});

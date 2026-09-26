@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
 import { runInTenant } from "@/lib/tenancy/context";
 import { businessIdForPaymentIntent } from "@/lib/tenancy/discover";
-import { stripe } from "@/lib/stripe/client";
+import { constructWebhookEvent } from "@/lib/stripe/payments";
 import { applyStripeEvent, resolveChargeDetailsForEvent, resolveRefundsForEvent } from "@/lib/payments/webhook-handlers";
 import { isUniqueConstraintError } from "@/lib/payments/prisma-errors";
 import { Prisma } from "@/lib/generated/prisma/client";
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(rawBody, signature, env.STRIPE_WEBHOOK_SECRET ?? "");
+    event = constructWebhookEvent(rawBody, signature, env.STRIPE_WEBHOOK_SECRET ?? "");
   } catch {
     return new Response("Invalid signature", { status: 400 });
   }

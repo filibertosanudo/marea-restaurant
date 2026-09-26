@@ -47,6 +47,7 @@ export function PaymentSection({
 }) {
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
   const [intentError, setIntentError] = useState<string | null>(null);
   const [loadingIntent, setLoadingIntent] = useState(false);
 
@@ -72,6 +73,7 @@ export function PaymentSection({
         if (cancelled) return;
         setLoadingIntent(false);
         if (result.ok) {
+          setStripeAccountId(result.stripeAccountId);
           setClientSecret(result.clientSecret);
         } else {
           setIntentError(dict.cardIntentError);
@@ -176,6 +178,7 @@ export function PaymentSection({
           {clientSecret && !loadingIntent && (
             <CardPaymentPanel
               publishableKey={publishableKey}
+              stripeAccountId={stripeAccountId}
               clientSecret={clientSecret}
               amountLabel={formatMoney(total, currency, lang)}
               onSwitchToCash={() => handleMethodChange("CASH_REGISTER")}
