@@ -86,6 +86,22 @@ instead of duplicating it here.
   and local day, so two businesses both start at `-001`. A new script that
   reads or writes business data walks the businesses or takes one on the
   command line.
+- **Card payments go to the business's own Stripe account, and every payment
+  call names it.** `stripeFor(account)` (`lib/stripe/payments.ts`) is the only
+  way to make them: the account is a required argument (`null` = the platform's
+  own, written out), and the raw client (`lib/stripe/client`) is not importable
+  outside `lib/stripe/` (ESLint). A new payment takes the business's account;
+  everything after it (retrieve, update, cancel, refund, charge details) takes
+  the account stored on the `Payment` row, which a trigger keeps immutable. An
+  account id never comes from a form: only from the code that just created the
+  account, or from Stripe. Whether to take a payment is read from the row, not
+  from the public cache (up to 60 s stale, per replica).
+- **Two Stripe webhooks, two secrets.** `/api/webhooks/stripe` (platform,
+  `STRIPE_WEBHOOK_SECRET`) and `/api/webhooks/stripe/connect`
+  (`STRIPE_CONNECT_WEBHOOK_SECRET`). The event's `account` must equal the
+  account on the `Payment` it names, or nothing is applied (logged, 2xx). A
+  disconnected business keeps a non-null `stripeCardPaymentsStatus` with no
+  account id, which is what stops it falling back to the platform's key.
 - **Nothing depends on a single cloud provider.** Storage (`lib/storage/`)
   and, going forward, any other external integration go behind an
   interface with at least two implementations — see `lib/storage/driver.ts`
@@ -128,3 +144,13 @@ see [`docs/DEPLOY.md`](docs/DEPLOY.md).
 `docs/design.html` — design tokens. `docs/product/roles-y-alcance.md` —
 the permission matrix. `docs/PLAN-PRODUCCION.md` — the production roadmap;
 `docs/prompts/` is its module-by-module history, not edited after the fact.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

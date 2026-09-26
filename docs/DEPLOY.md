@@ -267,13 +267,53 @@ that terminal, and the person must change it at first sign-in. Then:
    fills an empty menu from a sister branch in one click (dishes, categories,
    modifiers, photos and translations; stock counts start at zero and prices are
    copied as they are).
-3. Card payments start **off**. From the second business on, one without a
-   Stripe account of its own cannot take cards, and the panel says why.
+3. Card payments start **off**, and stay off until the business has connected
+   its own Stripe account and Stripe says it can take cards (next section).
+   Until then guests pay at the register, and the panel says why.
 
 `npm run tenants` does the same from a checkout with `DIRECT_URL` (or
 `DATABASE_URL`) pointing at the owner. The seed (`npm run db:seed`, local only)
 creates the two-business example the tests use: `marea` and `cala`, one chain,
 and `owner@marea.test` to move between them.
+
+### Giving a business its own Stripe account
+
+The business's administrator does this from the panel; nobody touches the
+database or the environment. The two webhook endpoints have to be registered
+first ("Stripe: two webhook endpoints" above), or the app will not hear when the
+account changes.
+
+1. **Settings, "Business settings" tab: set the country** of the business (two
+   letters, `MX`). Stripe cannot create the account without it, and the country
+   fixes the account's payout currency, which the app does not choose.
+2. **"Connect Stripe".** The app creates the account and sends the administrator
+   to Stripe's own page to fill in the business details, bank account and
+   identity. Stripe holds all of that; the app never sees it.
+3. On return the card shows the account's state, read from Stripe: *Active*
+   (cards can be turned on), *Pending* or *Restricted* (Stripe needs more, or has
+   limited the account: **Continue setup on Stripe** goes back there; **Check status** re-reads it), *Not available*.
+   A brand-new account reads *Restricted* until the setup is finished; that is
+   Stripe's word for "requirements outstanding".
+4. **Turn on "Accept online payment"** in the same tab. The server allows it only
+   while the state is *Active*, and turns it away otherwise.
+
+If the administrator leaves Stripe before finishing, "Continue setup on Stripe" resumes the
+same account. An account id is never typed anywhere: it is written only by the
+code that has just created the account, and one account belongs to one business
+(the database enforces it).
+
+**Test mode and live mode are different worlds.** An account made with a test
+key does not exist for a live key. No schema change is needed: each deployment
+has its own database, so a sandbox database holds sandbox account ids and a live
+one holds live ids, and the app refuses (and logs) an account or an event whose
+mode differs from the key's. Do not point a live deployment at a database that
+holds sandbox accounts, or the reverse.
+
+If a business disconnects the platform from its Stripe account (from its own
+Stripe dashboard), the app hears it, turns card payments off for that business
+and stops charging. Payments already taken can still be refunded from the app
+while Stripe allows it; afterwards the restaurateur refunds from their own Stripe
+dashboard, and the app says so.
 
 ## Alternatives
 
