@@ -91,6 +91,9 @@ const schema = z
     // may turn these into per-business values (Stripe Connect).
     STRIPE_SECRET_KEY: optional(z.string().min(1)),
     STRIPE_WEBHOOK_SECRET: optional(z.string().min(1)),
+    // Signs the events of connected accounts (module 17b). A second endpoint with its own
+    // secret: an event of one kind is never accepted with the other's secret.
+    STRIPE_CONNECT_WEBHOOK_SECRET: optional(z.string().min(1)),
     // The publishable key is public by design and inlined into the browser
     // bundle by Next, which is why it carries the NEXT_PUBLIC_ prefix; it is read
     // here, on the server, and handed to the card form as a prop. With Stripe
@@ -112,6 +115,25 @@ const schema = z
         path: ["APP_ORIGIN"],
         message: "required in production (AUTH_URL also accepted as a fallback)",
       });
+    }
+
+    // The two Stripe endpoints are registered together. A deployment that set only one
+    // would boot, take payments, and silently never hear about the other kind of event
+    // (a connected account restricted or disconnected, a payment made on one), so in
+    // production the missing one stops the boot and names the variable.
+    if (process.env.NODE_ENV === "production" && value.STRIPE_SECRET_KEY) {
+      for (const [set, missing] of [
+        [value.STRIPE_WEBHOOK_SECRET, "STRIPE_WEBHOOK_SECRET"],
+        [value.STRIPE_CONNECT_WEBHOOK_SECRET, "STRIPE_CONNECT_WEBHOOK_SECRET"],
+      ] as const) {
+        if (!set) {
+          ctx.addIssue({
+            code: "custom",
+            path: [missing],
+            message: "required in production when STRIPE_SECRET_KEY is set: register both Stripe webhook endpoints (see docs/DEPLOY.md)",
+          });
+        }
+      }
     }
 
     // Same shape of conditional requirement as APP_ORIGIN above, but keyed

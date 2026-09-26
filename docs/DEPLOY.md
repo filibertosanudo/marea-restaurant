@@ -119,6 +119,45 @@ Set `TRUSTED_PROXY_COUNT=0` — the app then trusts nothing from
 for that dimension. The per-email limit is unaffected either way and stays
 the primary defense.
 
+## Stripe: two webhook endpoints
+
+Card payments go to each business's own Stripe account (Stripe Connect, direct
+charges), so Stripe reports on two kinds of thing and the app has an endpoint for
+each, with its own signing secret. Register **both** in the Stripe Dashboard
+(Developers, Webhooks), in the same mode as `STRIPE_SECRET_KEY` (test or live: a
+test account does not exist in live mode, and an event of the other mode is
+ignored and logged).
+
+| Endpoint | Listen to | Signing secret variable | Events |
+|---|---|---|---|
+| `https://<host>/api/webhooks/stripe` | **Events from: Your account** | `STRIPE_WEBHOOK_SECRET` | `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled`, `payment_intent.processing`, `charge.refunded` (payments taken on the platform's own account, before a business connected its own) |
+| `https://<host>/api/webhooks/stripe/connect` | **Events from: Connected accounts** | `STRIPE_CONNECT_WEBHOOK_SECRET` | the same five, plus `account.updated` and `account.application.deauthorized` |
+
+`<host>` is the bare `APP_ORIGIN` host, not a business subdomain: the endpoints
+are not per business, the payment names its business.
+
+- Each endpoint checks the signature against its own secret only. An event of
+  one kind signed with the other's secret is rejected (400), and an event that
+  reaches the wrong endpoint (a platform event with an `account`, a Connect event
+  without one) is logged and answered 2xx without changing anything.
+- The account an event carries must be the account the payment was charged on.
+  If not, nothing is applied and a line is logged: `[stripe webhook] ... ignored
+  ...`. Search the logs for that when a payment does not update.
+- **Both secrets are required in production** whenever `STRIPE_SECRET_KEY` is
+  set: with only one, the app refuses to start and names the missing variable,
+  rather than run and silently never hear about the other kind of event.
+- What the Connect events do: `account.updated` re-reads the account from Stripe
+  and stores whether it can take cards, so an account that becomes restricted
+  stops offering cards on its own. `account.application.deauthorized` (the
+  business disconnected the platform from its Stripe account) clears the
+  business's account, turns online payment off and keeps it from falling back to
+  the platform's key; its earlier payments keep their account and can still be
+  refunded from the app until Stripe refuses, after which the refund has to be
+  made from the restaurateur's own Stripe dashboard.
+- Locally, `stripe listen --forward-to localhost:3000/api/webhooks/stripe` and
+  `stripe listen --forward-connect-to localhost:3000/api/webhooks/stripe/connect`
+  each print their own `whsec_...`; put them in the two variables.
+
 ## Database roles and row level security
 
 Every business table has a Postgres row level security policy tying its rows
@@ -186,8 +225,9 @@ public comes from the host.
    business. From the second one on, a business without its own
    `stripeAccountId` cannot enable card payments (the panel says why) and
    guests of a business that had them enabled are sent to "pay at the
-   register". Connecting accounts is module 17b; it must ship before any
-   restaurant that is not yours goes live.
+   register". Each business connects its own Stripe account from its settings
+   (Stripe Connect, module 17b); register the two webhook endpoints first (see
+   "Stripe: two webhook endpoints" above).
 
 ### Adding a business to a running deployment
 
