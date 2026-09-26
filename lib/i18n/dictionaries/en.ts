@@ -272,6 +272,8 @@ export const en = {
       refundSubmitting: "Refunding…",
       refundDisabledCaption: "Refunds are arriving in a later update.",
       refundErrorGeneric: "Couldn't process this refund. Try again.",
+      refundErrorAccountUnavailable:
+        "Stripe can no longer reach this business's account, so the refund cannot be made from here. Refund this payment from your own Stripe dashboard.",
       refundErrorNothingRefundable: "There's nothing left to refund on this order.",
       refundErrorAmountExceeds: "That amount is more than what's refundable.",
       refundErrorNoOpenCashSession: "There's no open cash shift to refund the cash from. Open one first.",

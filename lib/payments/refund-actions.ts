@@ -7,7 +7,7 @@ import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { getBusinessForRequest } from "@/lib/business";
 import { getOrderPaymentDetailRaw } from "@/lib/orders/queries";
 import { toOrderPaymentDetailDTO, type OrderPaymentDetailDTO } from "@/lib/orders/dto";
-import { stripe } from "@/lib/stripe/client";
+import { isAccountUnavailableError, stripeFor } from "@/lib/stripe/payments";
 import { toStripeAmount } from "./amount";
 import { refundableForPayment } from "./summary";
 import { isUniqueConstraintError } from "./prisma-errors";
@@ -26,6 +26,7 @@ export type CreateRefundResult =
         | "nothing_refundable"
         | "amount_exceeds_refundable"
         | "no_open_cash_session"
+        | "account_unavailable"
         | "try_again";
     };
 
@@ -54,14 +55,16 @@ async function refundOnePayment(
 ): Promise<void> {
   const idempotencyKey = `refund_${candidate.payment.id}_${candidate.payment.refunds.length}_${toStripeAmount(amount)}`;
 
-  const stripeRefund = await stripe.refunds.create(
+  // The account the payment was charged on (immutable on the row), never the
+  // business's current one: a refund has to reach the charge where it lives.
+  const stripeRefund = await stripeFor(candidate.payment.stripeAccountId ?? null).createRefund(
     {
       payment_intent: candidate.payment.stripePaymentIntentId ?? undefined,
       amount: toStripeAmount(amount),
       reason: "requested_by_customer",
       metadata: { orderId, staffId, staffReason: reason },
     },
-    { idempotencyKey }
+    idempotencyKey
   );
 
   try {
@@ -246,6 +249,10 @@ export async function createRefundAction(
     }
   } catch (err) {
     if (err instanceof NoOpenCashSessionError) return { ok: false, error: "no_open_cash_session" };
+    // The business disconnected the platform, or closed the account: the charge
+    // is still there but this key can no longer reach it. Say so, and never
+    // retry on the platform's own account, which never held this money.
+    if (isAccountUnavailableError(err)) return { ok: false, error: "account_unavailable" };
     // Whatever refunds in a FULL-mode loop already succeeded at Stripe are
     // still recorded (each has its own Refund row by this point) — the
     // idempotency key makes retrying this same call safe, so surfacing

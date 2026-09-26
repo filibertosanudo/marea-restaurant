@@ -2,7 +2,7 @@ import "server-only";
 import type Stripe from "stripe";
 import { Prisma } from "@/lib/generated/prisma/client";
 import type { PaymentStatus } from "@/lib/generated/prisma/client";
-import { stripe } from "@/lib/stripe/client";
+import { stripeFor } from "@/lib/stripe/payments";
 import { canTransitionPayment } from "./state-machine";
 import { cancelOtherOpenPaymentsIfSettled } from "./actions";
 
@@ -21,11 +21,11 @@ export type ChargeDetails = {
  * external network round-trip. Webhook event payloads carry `latest_charge`
  * as a bare id, not the expanded charge, so this is a real extra request.
  */
-async function resolveChargeDetails(intent: Stripe.PaymentIntent): Promise<ChargeDetails | null> {
+async function resolveChargeDetails(intent: Stripe.PaymentIntent, account: string | null): Promise<ChargeDetails | null> {
   const chargeId = typeof intent.latest_charge === "string" ? intent.latest_charge : intent.latest_charge?.id;
   if (!chargeId) return null;
 
-  const charge = await stripe.charges.retrieve(chargeId);
+  const charge = await stripeFor(account).retrieveCharge(chargeId);
   return {
     chargeId: charge.id,
     brand: charge.payment_method_details?.card?.brand ?? null,
@@ -41,7 +41,7 @@ async function resolveChargeDetails(intent: Stripe.PaymentIntent): Promise<Charg
  */
 export async function resolveChargeDetailsForEvent(event: Stripe.Event): Promise<ChargeDetails | null> {
   if (event.type === "payment_intent.succeeded") {
-    return resolveChargeDetails(event.data.object as Stripe.PaymentIntent);
+    return resolveChargeDetails(event.data.object as Stripe.PaymentIntent, event.account ?? null);
   }
   return null;
 }
@@ -63,7 +63,7 @@ export async function resolveRefundsForEvent(event: Stripe.Event): Promise<Strip
   const charge = event.data.object as Stripe.Charge;
   // .list() on its own still defaults to a page of 10 — the exact ceiling
   // this function exists to get past. autoPagingToArray walks every page.
-  return stripe.refunds.list({ charge: charge.id }).autoPagingToArray({ limit: 10_000 });
+  return stripeFor(event.account ?? null).listRefunds(charge.id);
 }
 
 /** A transition the graph rejects is worth a trace even though the handler still no-ops and responds 2xx — otherwise a real state mismatch (Stripe says paid, the DB disagrees) leaves zero record anywhere. */
