@@ -118,7 +118,8 @@ services:
       target: worker
     environment:
       DATABASE_URL: postgresql://marea_worker:${WORKER_DB_PASSWORD}@db:5432/marea
-      AUTH_SECRET: ${AUTH_SECRET}
+      # No AUTH_SECRET: the worker never authenticates anyone, and lib/env.ts
+      # only requires it inside the actual Next process (module 18 phase 5).
       MAIL_DRIVER: smtp
       MAIL_FROM_EMAIL: ${MAIL_FROM_EMAIL:-notifications@marea.local}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Marea}
@@ -191,7 +192,7 @@ services:
       # The purges, the sweep and the anonymize-guests report connect the
       # same way `app` does: as marea_app, bound by row level security.
       DATABASE_URL: postgresql://marea_app:${APP_DB_PASSWORD}@db:5432/marea
-      AUTH_SECRET: ${AUTH_SECRET}
+      # No AUTH_SECRET here either, same reason as `worker`.
       STORAGE_DRIVER: local
       STORAGE_LOCAL_DIR: /data/media
       MAIL_DRIVER: smtp

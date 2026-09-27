@@ -61,7 +61,14 @@ const schema = z
     // the host of APP_ORIGIN, which is right whenever the app is served from
     // the bare root domain.
     BUSINESS_ROOT_DOMAIN: optional(z.string().min(1)),
-    AUTH_SECRET: z.string().min(1),
+    // Required for the running app (superRefine below), not for every
+    // process that happens to import this schema: Auth.js is the only thing
+    // that reads it (@auth/core picks it up from process.env directly, not
+    // through this module — confirmed by grep, module 18 phase 0), and the
+    // worker, the migrator and the maintenance scripts never authenticate
+    // anyone. A process that doesn't need it shouldn't hold the key that
+    // decrypts every session cookie.
+    AUTH_SECRET: optional(z.string().min(1)),
     AUTH_URL: optional(z.string().url()),
     APP_ORIGIN: optional(z.string().url()),
     // Proxies between the client and this app that rewrite (not just append
@@ -102,6 +109,11 @@ const schema = z
     // Guards app/api/cron/notifications — the serverless-friendly way to
     // drive the same queue a long-running worker polls, per Fase 3.
     CRON_SECRET: optional(z.string().min(16)),
+    // Guards the detail app/api/status returns (lib/ops/health.ts): the
+    // status code alone is public (what the monitor's uptime check needs),
+    // the per-check breakdown is not, since it names how the deployment is
+    // failing to whoever asks.
+    STATUS_CHECK_TOKEN: optional(z.string().min(16)),
     // Module 18: scheduled maintenance tasks (lib/ops/scheduled-task.ts),
     // pinged once each finishes successfully — the monitor alerts on the
     // silence, not on a bad exit code it has to be told about.
@@ -116,6 +128,14 @@ const schema = z
     OPS_ALERT_EMAIL: optional(z.string().email()),
   })
   .superRefine((value, ctx) => {
+    // NEXT_RUNTIME is Next's own marker for its server process — set before
+    // any route module runs, unset for a plain script (tsx, `prisma migrate
+    // deploy`, the worker). AUTH_SECRET is required exactly there: the one
+    // process that actually calls Auth.js.
+    if (process.env.NEXT_RUNTIME && !value.AUTH_SECRET) {
+      ctx.addIssue({ code: "custom", path: ["AUTH_SECRET"], message: "required to run the application" });
+    }
+
     // APP_ORIGIN (or its AUTH_URL fallback) only matters once a URL gets
     // printed and handed to a stranger — a printed table QR chief among
     // them. In development it's fine to fall back to localhost; in
