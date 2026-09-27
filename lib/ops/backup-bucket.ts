@@ -61,3 +61,27 @@ export function writeOnlyPolicy(bucket: string): object {
     ],
   };
 }
+
+/**
+ * What the restore needs and nothing more: list, and read (including older
+ * versions: an overwritten object is recovered by reading the one before).
+ * No write, no delete. Kept apart from the server's key on purpose: the
+ * machine that writes backups must not be able to read them.
+ */
+export function readOnlyPolicy(bucket: string): object {
+  return {
+    Version: "2012-10-17",
+    Statement: [
+      {
+        Effect: "Allow",
+        Action: ["s3:ListBucket", "s3:ListBucketVersions"],
+        Resource: [`arn:aws:s3:::${bucket}`],
+      },
+      {
+        Effect: "Allow",
+        Action: ["s3:GetObject", "s3:GetObjectVersion"],
+        Resource: [`arn:aws:s3:::${bucket}/*`],
+      },
+    ],
+  };
+}

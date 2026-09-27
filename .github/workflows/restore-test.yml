@@ -1,0 +1,68 @@
+name: Restore test
+
+# Restores the newest backup into a disposable Postgres and checks that the
+# application could run on it. Monthly, and by hand from the Actions tab.
+#
+# It runs here, not on the production server, because "a machine that is not
+# production" is the point. That means these repository secrets hold the two
+# things that can read every restaurant's data, and whoever can edit this
+# workflow or the secrets can read the backups: keep write access to the repo
+# small, and protect this file with CODEOWNERS or branch rules.
+#
+#   RESTORE_S3_ENDPOINT, RESTORE_S3_BUCKET, RESTORE_S3_REGION
+#   RESTORE_S3_ACCESS_KEY_ID, RESTORE_S3_SECRET_ACCESS_KEY   read-only key (readOnlyPolicy)
+#   RESTORE_AGE_IDENTITY                                     the age private key
+#   RESTORE_MONITOR_URL                                      dead man's switch, pinged on success only
+#
+# A failed run turns this workflow red and sends GitHub's failure email to the
+# person who last edited the schedule; the monitor alerts on the missing ping
+# as well, which also covers the run that never started.
+
+on:
+  schedule:
+    - cron: "17 6 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  restore-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the ops image (cached)
+        run: |
+          docker buildx build --target ops --tag marea-ops:local \
+            --cache-from type=gha,scope=ops --cache-to type=gha,mode=max,scope=ops --load .
+      - name: Restore the newest backup and check it
+        env:
+          RESTORE_S3_ENDPOINT: ${{ secrets.RESTORE_S3_ENDPOINT }}
+          RESTORE_S3_BUCKET: ${{ secrets.RESTORE_S3_BUCKET }}
+          RESTORE_S3_REGION: ${{ secrets.RESTORE_S3_REGION }}
+          RESTORE_S3_ACCESS_KEY_ID: ${{ secrets.RESTORE_S3_ACCESS_KEY_ID }}
+          RESTORE_S3_SECRET_ACCESS_KEY: ${{ secrets.RESTORE_S3_SECRET_ACCESS_KEY }}
+          RESTORE_AGE_IDENTITY: ${{ secrets.RESTORE_AGE_IDENTITY }}
+          RESTORE_MONITOR_URL: ${{ secrets.RESTORE_MONITOR_URL }}
+          RESTORE_REPORT_FILE: /report/restore-report.json
+        run: |
+          mkdir -p "$RUNNER_TEMP/report"
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$RUNNER_TEMP/report:/report" \
+            -v "$GITHUB_STEP_SUMMARY:/summary" \
+            -e GITHUB_STEP_SUMMARY=/summary \
+            -e RESTORE_S3_ENDPOINT -e RESTORE_S3_BUCKET -e RESTORE_S3_REGION \
+            -e RESTORE_S3_ACCESS_KEY_ID -e RESTORE_S3_SECRET_ACCESS_KEY \
+            -e RESTORE_AGE_IDENTITY -e RESTORE_MONITOR_URL -e RESTORE_REPORT_FILE \
+            marea-ops:local npm run ops:restore-test
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: restore-report
+          path: ${{ runner.temp }}/report/restore-report.json
+          retention-days: 90
+          if-no-files-found: ignore

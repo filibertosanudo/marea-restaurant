@@ -46,9 +46,10 @@ CMD ["npm", "run", "notifications:worker"]
 # the client of the same major version as the server (compose pins
 # postgres:17-alpine): pg_dump older than its server refuses to run, and
 # lib/ops/backup.ts checks it before it trusts a dump. age encrypts; tar
-# archives the local media volume.
+# archives the local media volume; docker-cli is for the restore test, which
+# starts and removes its own disposable Postgres.
 FROM build AS ops
-RUN apk add --no-cache postgresql17-client age tar
+RUN apk add --no-cache postgresql17-client age tar docker-cli
 CMD ["npm", "run", "ops:backup"]
 
 # --- runner: the actual deployed image ---

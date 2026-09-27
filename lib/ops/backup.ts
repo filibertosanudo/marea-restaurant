@@ -32,6 +32,8 @@ export type BackupManifest = {
   lastMigration: string | null;
   pgServerVersion: string;
   pgDumpVersion: string;
+  /** The role that owns the objects: the restore target must have the same name (default privileges name it). */
+  owner: string;
   encryption: { tool: "age"; recipient: string };
   files: BackupFile[];
 };
@@ -124,6 +126,7 @@ export async function createBackup(
       lastMigration: migration.rows[0]?.migration_name ?? null,
       pgServerVersion: serverVersion,
       pgDumpVersion: dumpVersion,
+      owner: pgEnv.PGUSER,
       encryption: { tool: "age", recipient: config.BACKUP_AGE_RECIPIENT },
       files,
     };
