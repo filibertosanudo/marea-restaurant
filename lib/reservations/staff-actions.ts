@@ -8,7 +8,7 @@ import { getBusinessForRequest } from "@/lib/business";
 import { canTransitionReservation } from "./state-machine";
 import { isTableFreeForRange, BLOCKING_STATUSES } from "./availability";
 import { getReservationsOverlapping } from "./queries";
-import { isExclusionConstraintError } from "./prisma-errors";
+import { isSlotConflictError } from "./prisma-errors";
 import type { Prisma, Reservation, ReservationStatus, UserRole } from "@/lib/generated/prisma/client";
 
 export type ReservationActionState = { error?: string } | undefined;
@@ -135,7 +135,7 @@ export async function confirmReservationAction(
 
     if (result?.error) return result;
   } catch (err) {
-    if (isExclusionConstraintError(err)) return { error: "table_taken" };
+    if (isSlotConflictError(err)) return { error: "table_taken" };
     throw err;
   }
 
@@ -174,7 +174,7 @@ export async function reassignReservationTableAction(
 
     if (result?.error) return result;
   } catch (err) {
-    if (isExclusionConstraintError(err)) return { error: "table_taken" };
+    if (isSlotConflictError(err)) return { error: "table_taken" };
     throw err;
   }
 

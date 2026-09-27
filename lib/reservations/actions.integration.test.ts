@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { createReservationAction, getReservationSlotsAction, cancelReservationByCodeAction } from "./actions";
 import { makeBusiness } from "@/test/factories";
-import { runConcurrently, partitionSettled } from "@/test/concurrency";
+import { runConcurrently, partitionSettled, settleNow, waitForLockWaitOn } from "@/test/concurrency";
+import { testSchema } from "@/test/db";
 
 const guest = { guestName: "Ana Ruiz", guestEmail: "ana@example.com", lang: "es" as const };
 
@@ -46,8 +47,11 @@ describe("createReservationAction", () => {
       () => createReservationAction({ ...guest, partySize: 2, date, time }),
       () => createReservationAction({ ...guest, partySize: 2, date, time }),
     ]);
-    const { fulfilled } = partitionSettled(results);
+    const { fulfilled, rejected } = partitionSettled(results);
 
+    // First, so a call that threw shows its own error in the failure message
+    // instead of only a length mismatch.
+    expect(rejected).toEqual([]);
     // Both calls resolve (createReservationAction never throws for a taken
     // slot, it returns { ok: false }), so this is really two disjoint
     // groups of one result each.
@@ -65,6 +69,55 @@ describe("createReservationAction", () => {
     const reservationCount = await prisma.reservation.count({ where: { businessId: business.id } });
     expect(reservationCount).toBe(1);
   });
+
+  // Two inserts into an EXCLUDE-constrained table can deadlock instead of one
+  // getting exclusion_violation: the constraint is checked after the row is
+  // inserted, so each waits on the other. This builds that deadlock for real,
+  // with no timing to get right: a blocker holds a conflicting row, the guest
+  // insert waits on it, and the blocker then inserts a row that conflicts with
+  // the guest's own uncommitted one. The guest's insert has waited longer, so
+  // Postgres aborts it (40P01). It is the same "somebody took the table" as the
+  // constraint violation, and must not reach the guest as a server error.
+  it("a booking aborted by a deadlock with a conflicting one answers slot_taken, not an error", async () => {
+    const business = await makeAlwaysOpenBusiness();
+    const table = await prisma.restaurantTable.findFirstOrThrow({ where: { businessId: business.id } });
+    const date = tomorrowDateString();
+    const slots = await getReservationSlotsAction(date, 2);
+    if (!slots.ok) throw new Error("test setup: no slots came back");
+    const time = slots.slots[10];
+    const startsAt = new Date(`${date}T00:00:00Z`);
+    startsAt.setUTCMinutes(time);
+    const at = (offsetMinutes: number) => new Date(startsAt.getTime() + offsetMinutes * 60_000);
+    const held = (from: Date) => ({
+      businessId: business.id,
+      tableId: table.id,
+      guestName: "Blocker",
+      partySize: 2,
+      reservedFor: from,
+      durationMinutes: 60,
+      endsAt: new Date(from.getTime() + 60 * 60_000),
+      locale: "es",
+    });
+
+    let firstInserted!: () => void;
+    const holding = new Promise<void>((resolve) => (firstInserted = resolve));
+    const blocker = settleNow(
+      prisma.$transaction(async (tx) => {
+        // Overlaps the guest's slot but not the second row below.
+        await tx.reservation.create({ data: held(at(-30)) });
+        firstInserted();
+        await waitForLockWaitOn(prisma, testSchema, "Reservation");
+        // Overlaps the guest's own row, which is still uncommitted: now each waits on the other.
+        await tx.reservation.create({ data: held(at(45)) });
+      })
+    );
+
+    await holding;
+    const result = await settleNow(createReservationAction({ ...guest, partySize: 2, date, time }));
+    await blocker;
+
+    expect(result).toMatchObject({ status: "fulfilled", value: { ok: false, error: "slot_taken" } });
+  }, 30_000);
 
   it("persists the guest's browsing language on the reservation and its confirmation email", async () => {
     await makeAlwaysOpenBusiness();
