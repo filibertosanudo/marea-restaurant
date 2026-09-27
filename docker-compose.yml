@@ -132,6 +132,35 @@ services:
       mailhog:
         condition: service_started
 
+  # The scheduled operations image (see the Dockerfile's `ops` stage). Not part
+  # of a plain `up`: it is a one-shot command, run by hand or by the scheduler.
+  #   docker compose --profile ops run --rm ops
+  # Its connection is the OWNER's (pg_dump must see every row past row level
+  # security), and nothing else in the stack gets it besides `migrate`. The
+  # BACKUP_* names are its own: the script reads no .env and infers nothing
+  # from DATABASE_URL. The media volume is read-only here.
+  ops:
+    image: marea-ops:local
+    profiles: ["ops"]
+    build:
+      context: .
+      target: ops
+    environment:
+      BACKUP_DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-}
+      BACKUP_S3_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
+      BACKUP_S3_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:-}
+      BACKUP_MEDIA_DIR: /data/media
+      BACKUP_MONITOR_URL: ${BACKUP_MONITOR_URL:-}
+    volumes:
+      - media:/data/media:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:
   media:

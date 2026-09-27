@@ -1807,3 +1807,33 @@ model NewsletterSubscriber {
 //   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 //   @@index([businessId, sourceType, locale])
 // }
+
+// ============================================================================
+//  OPERACIÓN (módulo 18)
+// ============================================================================
+
+enum OpsTaskStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+/// Rastro de las tareas programadas (respaldo, purgas, ...). Tabla de la
+/// plataforma, sin políticas de RLS: como StripeWebhookEvent, no pertenece a un
+/// negocio. `slot` identifica la ventana de la tarea (p. ej. "2026-09-26T18"
+/// para un respaldo de las 18:00 UTC): (task, slot) único es lo que hace a la
+/// tarea idempotente, y la fila del último SUCCEEDED es lo que lee la salud.
+model OpsTaskRun {
+  id         String        @id @default(cuid(2))
+  task       String
+  slot       String
+  status     OpsTaskStatus @default(RUNNING)
+  startedAt  DateTime      @default(now())
+  finishedAt DateTime?
+  /// Filas o bytes tratados; el significado lo fija cada tarea.
+  processed  BigInt?
+  detail     String?
+
+  @@unique([task, slot])
+  @@index([task, status, finishedAt])
+}
