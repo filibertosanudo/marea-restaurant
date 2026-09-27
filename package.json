@@ -33,6 +33,8 @@
     "privacy:anonymize-guests": "tsx --conditions=react-server scripts/anonymize-old-guests.ts",
     "ops:backup": "tsx scripts/ops/backup.ts",
     "ops:backup-bucket": "tsx scripts/ops/backup-bucket.ts",
+    "ops:restore": "tsx scripts/ops/restore.ts",
+    "ops:restore-test": "tsx scripts/ops/restore-test.ts",
     "notifications:worker": "tsx --require ./scripts/loaders/server-only-noop.cjs scripts/worker.ts"
   },
   "dependencies": {
