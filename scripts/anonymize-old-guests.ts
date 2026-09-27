@@ -15,12 +15,11 @@ import "dotenv/config";
 import { prisma } from "../lib/prisma";
 import { systemPrisma } from "../lib/db/system";
 import { runInTenant } from "../lib/tenancy/context";
-
-const RETENTION_MS = 24 * 30 * 24 * 60 * 60 * 1000; // 24 months, treated as 30-day months
+import { GUEST_RETENTION_MS } from "../lib/privacy/guest-retention";
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
-  const cutoff = new Date(Date.now() - RETENTION_MS);
+  const cutoff = new Date(Date.now() - GUEST_RETENTION_MS);
 
   const scrubbed = { guestName: "", guestEmail: null, guestPhone: null };
 

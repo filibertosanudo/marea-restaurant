@@ -1,0 +1,17 @@
+# Read by the `scheduler` image (Dockerfile) via busybox crond, which
+# forwards the container's own environment to each job — verified against
+# plain alpine/crond directly, since that's the one thing that would make
+# this silently break (a job that can't see DATABASE_URL fails loudly at
+# lib/env's own validation, not silently). Times are UTC.
+#
+# Every command here is a plain `npm run ...`: single-shot, idempotent per
+# its own window (see lib/ops/task-run.ts and lib/ops/scheduled-task.ts), so
+# a missed or repeated tick never duplicates work or double-deletes. A
+# restart of this container catches up on the next tick, nothing more.
+#
+# min hour day month weekday  command
+0    */6  *   *     *         cd /app && npm run ops:backup
+10   3    *   *     *         cd /app && npm run privacy:purge-ip-data
+20   *    *   *     *         cd /app && npm run rate-limits:purge
+30   3    *   *     *         cd /app && npm run storage:sweep
+0    4    2   *     *         cd /app && npm run ops:anonymize-alert

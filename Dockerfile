@@ -40,17 +40,30 @@ CMD ["npx", "tsx", "prisma/seed.ts"]
 FROM build AS worker
 CMD ["npm", "run", "notifications:worker"]
 
-# --- ops: scheduled operations (backup now; purges and the restore test in
-# later phases). Needs what the runner leaves out: tsx and the full
-# node_modules, plus the tools a backup shells out to. postgresql17-client is
-# the client of the same major version as the server (compose pins
-# postgres:17-alpine): pg_dump older than its server refuses to run, and
-# lib/ops/backup.ts checks it before it trusts a dump. age encrypts; tar
-# archives the local media volume; docker-cli is for the restore test, which
-# starts and removes its own disposable Postgres.
+# --- ops: one-shot maintenance commands (backup, restore test, the purges,
+# the media sweep, the anonymize-guests report). Needs what the runner
+# leaves out: tsx and the full node_modules, plus the tools these shell out
+# to. postgresql17-client is the client of the same major version as the
+# server (compose pins postgres:17-alpine): pg_dump older than its server
+# refuses to run, and lib/ops/backup.ts checks it before it trusts a dump.
+# age encrypts and decrypts; tar archives the local media volume;
+# docker-cli is for the restore test, which starts and removes its own
+# disposable Postgres. No CMD: docker-compose.yml's `ops` service and
+# `scheduler`'s crontab each pick a command explicitly.
 FROM build AS ops
 RUN apk add --no-cache postgresql17-client age tar docker-cli
 CMD ["npm", "run", "ops:backup"]
+
+# --- scheduler: runs the `ops` image's commands on a schedule
+# (docker/ops-crontab) via busybox crond, already in this base image — no
+# extra package to fetch, and it forwards the container's own environment to
+# each job (verified directly against alpine's own crond), which every
+# command here already needs (lib/env.ts validates the same schema `app`
+# does). Long-running on purpose, unlike every other stage above: a job's
+# own single run is still one-shot and idempotent per its window.
+FROM ops AS scheduler
+COPY docker/ops-crontab /etc/crontabs/root
+CMD ["crond", "-f", "-l", "2"]
 
 # --- runner: the actual deployed image ---
 FROM node:22-alpine AS runner

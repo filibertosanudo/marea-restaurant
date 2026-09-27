@@ -102,6 +102,18 @@ const schema = z
     // Guards app/api/cron/notifications — the serverless-friendly way to
     // drive the same queue a long-running worker polls, per Fase 3.
     CRON_SECRET: optional(z.string().min(16)),
+    // Module 18: scheduled maintenance tasks (lib/ops/scheduled-task.ts),
+    // pinged once each finishes successfully — the monitor alerts on the
+    // silence, not on a bad exit code it has to be told about.
+    OPS_MONITOR_PURGE_IP_URL: optional(z.string().url()),
+    OPS_MONITOR_RATE_LIMITS_URL: optional(z.string().url()),
+    OPS_MONITOR_MEDIA_SWEEP_URL: optional(z.string().url()),
+    OPS_MONITOR_ANONYMIZE_ALERT_URL: optional(z.string().url()),
+    // Where the monthly "guests are overdue for anonymization" report goes
+    // (scripts/ops/anonymize-alert.ts) — the platform owner, not a business:
+    // the decision itself stays manual (privacy:anonymize-guests), this only
+    // makes sure someone is told it's due.
+    OPS_ALERT_EMAIL: optional(z.string().email()),
   })
   .superRefine((value, ctx) => {
     // APP_ORIGIN (or its AUTH_URL fallback) only matters once a URL gets

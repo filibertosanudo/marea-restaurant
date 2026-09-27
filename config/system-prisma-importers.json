@@ -1,8 +1,9 @@
 [
   "lib/db/system.ts",
   "lib/notifications/queue.ts",
+  "lib/ops/media-sweep.ts",
+  "lib/privacy/guest-retention.ts",
   "lib/realtime/sweep.ts",
   "lib/tenancy/discover.ts",
-  "scripts/anonymize-old-guests.ts",
-  "scripts/sweep-orphaned-media.ts"
+  "scripts/anonymize-old-guests.ts"
 ]
