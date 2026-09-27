@@ -99,3 +99,38 @@ describe("lib/env Stripe webhook secrets", () => {
     expect((await boot({ NODE_ENV: "development", STRIPE_SECRET_KEY: "sk_test_x" }))()).toBe("sk_test_x");
   });
 });
+
+describe("lib/env AUTH_SECRET per process", () => {
+  const keys = ["AUTH_SECRET", "NEXT_RUNTIME", "DATABASE_URL"] as const;
+  const vars = process.env as Record<string, string | undefined>;
+  const saved = Object.fromEntries(keys.map((k) => [k, vars[k]]));
+
+  afterEach(() => {
+    vi.resetModules();
+    for (const k of keys) {
+      if (saved[k] === undefined) delete vars[k];
+      else vars[k] = saved[k];
+    }
+  });
+
+  async function boot(set: Partial<Record<(typeof keys)[number], string>>) {
+    vi.resetModules();
+    for (const k of keys) delete vars[k];
+    Object.assign(vars, { DATABASE_URL: "postgresql://u:p@h:5432/d", ...set });
+    const { env } = await import("@/lib/env");
+    return () => env.AUTH_SECRET;
+  }
+
+  it("is optional for a plain script: no NEXT_RUNTIME, no AUTH_SECRET, still boots", async () => {
+    expect((await boot({}))()).toBeUndefined();
+  });
+
+  it("is required once NEXT_RUNTIME says this is the Next process", async () => {
+    const read = await boot({ NEXT_RUNTIME: "nodejs" });
+    expect(read).toThrow(/AUTH_SECRET/);
+  });
+
+  it("boots under NEXT_RUNTIME once AUTH_SECRET is set", async () => {
+    expect((await boot({ NEXT_RUNTIME: "nodejs", AUTH_SECRET: "s3cret" }))()).toBe("s3cret");
+  });
+});
