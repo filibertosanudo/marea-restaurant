@@ -13,6 +13,20 @@ export function runConcurrently<T>(thunks: Array<() => Promise<T>>): Promise<Pro
   return Promise.allSettled(promises);
 }
 
+/**
+ * Watches `promise` from the moment it is created. A promise held in a
+ * variable while the test awaits something else (a lock wait, another
+ * transaction) has no handler until the test finally awaits it; if it
+ * rejects in that gap Node reports an unhandled rejection even though the
+ * rejection is the expected outcome. Wrap at creation, assert on the result.
+ */
+export function settleNow<T>(promise: Promise<T>): Promise<PromiseSettledResult<T>> {
+  return promise.then(
+    (value): PromiseSettledResult<T> => ({ status: "fulfilled", value }),
+    (reason: unknown): PromiseSettledResult<T> => ({ status: "rejected", reason })
+  );
+}
+
 /** Splits settled results into their fulfilled values and rejection reasons, in the order they were given. */
 export function partitionSettled<T>(results: PromiseSettledResult<T>[]): { fulfilled: T[]; rejected: unknown[] } {
   const fulfilled: T[] = [];

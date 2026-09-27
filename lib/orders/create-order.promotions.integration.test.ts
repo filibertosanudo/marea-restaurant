@@ -8,7 +8,7 @@ import {
   makeCart,
   makePromotion,
 } from "@/test/factories";
-import { runConcurrently, partitionSettled, waitForLockWaitOn } from "@/test/concurrency";
+import { runConcurrently, partitionSettled, settleNow, waitForLockWaitOn } from "@/test/concurrency";
 import { checkout, defaultGuest as guest } from "@/test/checkout";
 import { testSchema } from "@/test/db";
 import { businessLocalDateParts, businessLocalMinutesOfDay, dayOfWeekFor } from "@/lib/reservations/availability";
@@ -367,10 +367,9 @@ describe("createOrderFromCart — promotion usage limits", () => {
   // realistic, but which of the two defenses (the eligibility check's own
   // stale-read rejection, or the atomic usageCount guard) actually catches
   // the loser depends on how far each transaction happened to get before
-  // the other committed. In practice `business.update`'s row lock earlier
-  // in checkout fully serializes the two before either reaches the
-  // promotion step, so the eligibility check reliably wins that race and
-  // the atomic guard's own branch below never fires. These two tests force
+  // the other committed. The folio counter's row lock is taken only after
+  // the promotion step (see nextFolio), so nothing serializes the two before
+  // it and either defense may be the one that fires. These two tests force
   // the atomic guard specifically: a real, uncommitted transaction holds
   // the promotion's row lock after already claiming its only slot, which
   // is invisible to the checkout's own eligibility read (MVCC) but blocks
@@ -393,17 +392,23 @@ describe("createOrderFromCart — promotion usage limits", () => {
     const blockerCanCommit = new Promise<void>((resolve) => {
       releaseBlocker = resolve;
     });
-    const blockerTx = prisma.$transaction(async (tx) => {
-      await tx.promotion.update({ where: { id: promo.id }, data: { usageCount: { increment: 1 } } });
-      await blockerCanCommit;
-    });
+    // Both promises are watched from creation (settleNow): the checkout can
+    // reject while the test is still awaiting the lock wait or the blocker.
+    const blockerTx = settleNow(
+      prisma.$transaction(async (tx) => {
+        await tx.promotion.update({ where: { id: promo.id }, data: { usageCount: { increment: 1 } } });
+        await blockerCanCommit;
+      })
+    );
 
-    const checkoutPromise = checkout(cart, business);
+    const checkoutOutcome = settleNow(checkout(cart, business));
     await waitForLockWaitOn(prisma, testSchema, "Promotion");
     releaseBlocker();
-    await blockerTx;
+    expect((await blockerTx).status).toBe("fulfilled");
 
-    const order = await checkoutPromise;
+    const outcome = await checkoutOutcome;
+    if (outcome.status === "rejected") throw outcome.reason;
+    const order = outcome.value;
     expect(order.discountTotal.toString()).toBe("0");
     const final = await prisma.promotion.findUniqueOrThrow({ where: { id: promo.id } });
     expect(final.usageCount).toBe(1);
@@ -423,17 +428,23 @@ describe("createOrderFromCart — promotion usage limits", () => {
     const blockerCanCommit = new Promise<void>((resolve) => {
       releaseBlocker = resolve;
     });
-    const blockerTx = prisma.$transaction(async (tx) => {
-      await tx.promotion.update({ where: { id: promo.id }, data: { usageCount: { increment: 1 } } });
-      await blockerCanCommit;
-    });
+    // The checkout rejects as soon as the blocker commits, possibly before
+    // the test gets past `await blockerTx`: watch it from creation.
+    const blockerTx = settleNow(
+      prisma.$transaction(async (tx) => {
+        await tx.promotion.update({ where: { id: promo.id }, data: { usageCount: { increment: 1 } } });
+        await blockerCanCommit;
+      })
+    );
 
-    const checkoutPromise = checkout(cart, business, { ...guest, promoCode: "RACE" });
+    const checkoutOutcome = settleNow(checkout(cart, business, { ...guest, promoCode: "RACE" }));
     await waitForLockWaitOn(prisma, testSchema, "Promotion");
     releaseBlocker();
-    await blockerTx;
+    expect((await blockerTx).status).toBe("fulfilled");
 
-    await expect(checkoutPromise).rejects.toMatchObject({ code: "promotion_exhausted" });
+    const outcome = await checkoutOutcome;
+    expect(outcome.status).toBe("rejected");
+    expect(outcome.status === "rejected" ? outcome.reason : null).toMatchObject({ code: "promotion_exhausted" });
     const final = await prisma.promotion.findUniqueOrThrow({ where: { id: promo.id } });
     expect(final.usageCount).toBe(1);
   });
