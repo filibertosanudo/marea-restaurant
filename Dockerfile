@@ -40,6 +40,17 @@ CMD ["npx", "tsx", "prisma/seed.ts"]
 FROM build AS worker
 CMD ["npm", "run", "notifications:worker"]
 
+# --- ops: scheduled operations (backup now; purges and the restore test in
+# later phases). Needs what the runner leaves out: tsx and the full
+# node_modules, plus the tools a backup shells out to. postgresql17-client is
+# the client of the same major version as the server (compose pins
+# postgres:17-alpine): pg_dump older than its server refuses to run, and
+# lib/ops/backup.ts checks it before it trusts a dump. age encrypts; tar
+# archives the local media volume.
+FROM build AS ops
+RUN apk add --no-cache postgresql17-client age tar
+CMD ["npm", "run", "ops:backup"]
+
 # --- runner: the actual deployed image ---
 FROM node:22-alpine AS runner
 WORKDIR /app

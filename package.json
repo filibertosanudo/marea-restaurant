@@ -31,6 +31,8 @@
     "rate-limits:purge": "tsx --conditions=react-server scripts/purge-rate-limits.ts",
     "privacy:purge-ip-data": "tsx --conditions=react-server scripts/purge-old-ip-data.ts",
     "privacy:anonymize-guests": "tsx --conditions=react-server scripts/anonymize-old-guests.ts",
+    "ops:backup": "tsx scripts/ops/backup.ts",
+    "ops:backup-bucket": "tsx scripts/ops/backup-bucket.ts",
     "notifications:worker": "tsx --require ./scripts/loaders/server-only-noop.cjs scripts/worker.ts"
   },
   "dependencies": {
@@ -61,6 +63,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@aws-sdk/client-sts": "^3.1141.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "^22.10.0",
     "@types/nodemailer": "^8.0.1",

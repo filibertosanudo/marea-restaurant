@@ -188,6 +188,42 @@ jobs:
         if: always()
         run: docker compose down -v
 
+  # The backup against the real tools: pg_dump 17, age, tar and an
+  # object-locked bucket (MinIO). Runs inside the same `ops` image production
+  # uses, so what is tested is what ships. The integration job above skips
+  # this file, since a runner has none of those tools at the right version.
+  ops:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the ops image (cached)
+        run: |
+          docker buildx build --target ops --tag marea-ops:local \
+            --cache-from type=gha,scope=ops --cache-to type=gha,mode=max,scope=ops --load .
+      - name: Start Postgres 17 and MinIO
+        run: |
+          docker network create ops-ci
+          docker run -d --name pg --network ops-ci -e POSTGRES_USER=marea -e POSTGRES_PASSWORD=marea -e POSTGRES_DB=marea postgres:17-alpine
+          docker run -d --name minio --network ops-ci --network-alias minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin-secret minio/minio server /data
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:9000/minio/health/live > /dev/null && docker exec pg pg_isready -U marea > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::services did not start"; exit 1
+      - name: Run the backup test
+        run: |
+          docker run --rm --network ops-ci \
+            -e AUTH_SECRET=ci-test-secret \
+            -e DATABASE_URL=postgresql://marea:marea@pg:5432/marea \
+            -e OPS_TEST_ADMIN_DATABASE_URL=postgresql://marea:marea@pg:5432/postgres \
+            -e OPS_TEST_S3_ENDPOINT=http://minio:9000 \
+            -e OPS_TEST_S3_ADMIN_KEY=minioadmin \
+            -e OPS_TEST_S3_ADMIN_SECRET=minioadmin-secret \
+            --entrypoint npx marea-ops:local vitest run --project integration lib/ops/backup.integration
+
   commits:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
