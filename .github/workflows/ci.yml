@@ -202,21 +202,22 @@ jobs:
         run: |
           docker buildx build --target ops --tag marea-ops:local \
             --cache-from type=gha,scope=ops --cache-to type=gha,mode=max,scope=ops --load .
-      # MinIO no longer publishes its image on Docker Hub, so the server
-      # binary runs on the runner itself; the ops container reaches it, and
-      # Postgres, over the host network.
+      # MinIO publishes neither an image nor a binary any more, so the last
+      # tagged release is built from source (.github/minio/Dockerfile).
+      - name: Build MinIO (cached)
+        run: |
+          docker buildx build --tag ops-minio:ci --cache-from type=gha,scope=minio             --cache-to type=gha,mode=max,scope=minio --load .github/minio
+      # Both servers publish on the host, and the ops container joins the host
+      # network to reach them.
       - name: Start Postgres 17 and MinIO
         run: |
           docker run -d --name pg --network host -e POSTGRES_USER=marea -e POSTGRES_PASSWORD=marea -e POSTGRES_DB=marea postgres:17-alpine
-          curl -sSfL https://dl.min.io/server/minio/release/linux-amd64/minio -o "$RUNNER_TEMP/minio"
-          chmod +x "$RUNNER_TEMP/minio"
-          export MINIO_ROOT_USER=minioadmin MINIO_ROOT_PASSWORD=minioadmin-secret
-          nohup "$RUNNER_TEMP/minio" server "$RUNNER_TEMP/minio-data" > "$RUNNER_TEMP/minio.log" 2>&1 &
+          docker run -d --name minio --network host -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin-secret ops-minio:ci server /data
           for i in $(seq 1 30); do
             if curl -sf http://localhost:9000/minio/health/live > /dev/null && docker exec pg pg_isready -U marea > /dev/null; then exit 0; fi
             sleep 2
           done
-          echo "::error::services did not start"; cat "$RUNNER_TEMP/minio.log"; exit 1
+          echo "::error::services did not start"; docker logs minio; exit 1
       - name: Run the backup test
         run: |
           docker run --rm --network host \
