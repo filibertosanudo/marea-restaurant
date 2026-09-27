@@ -1,8 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import { requireRole, ForbiddenError } from "@/lib/auth/permissions";
 import { ADMIN_ROLES, STAFF_ROLES } from "@/lib/auth/roles";
 import { UserRole } from "@/lib/generated/prisma/client";
 import { setTestSession } from "@/test/stubs/auth-session";
+import { prisma } from "@/lib/prisma";
+import { ReadOnlyModeError, clearReadOnlyCache } from "@/lib/ops/read-only";
 
 const ALL_ROLES: UserRole[] = ["CUSTOMER", "STAFF", "BUSINESS_ADMIN", "SUPER_ADMIN"];
 
@@ -70,5 +72,33 @@ describe("permission matrix", () => {
 
   it("rejects when there's no session at all", async () => {
     await expect(requireRole(...STAFF_ROLES)).rejects.toThrow(ForbiddenError);
+  });
+});
+
+describe("requireRole and read-only mode", () => {
+  afterEach(async () => {
+    await prisma.readOnlyMode.deleteMany({ where: { scope: "PLATFORM" } });
+    clearReadOnlyCache();
+  });
+
+  it("refuses even a SUPER_ADMIN with a valid session, before checking the session at all", async () => {
+    // No session set up on purpose: if requireRole reached the session check
+    // first, this would fail with "not authenticated", not read-only.
+    await prisma.readOnlyMode.create({ data: { scope: "PLATFORM", reason: "migrating" } });
+    clearReadOnlyCache();
+
+    await expect(requireRole(...ADMIN_ROLES)).rejects.toThrow(ReadOnlyModeError);
+    await expect(requireRole(...ADMIN_ROLES)).rejects.toThrow(/migrating/);
+  });
+
+  it("stops refusing once the row is gone", async () => {
+    await prisma.readOnlyMode.create({ data: { scope: "PLATFORM" } });
+    clearReadOnlyCache();
+    await expect(requireRole(...ADMIN_ROLES)).rejects.toThrow(ReadOnlyModeError);
+
+    await prisma.readOnlyMode.deleteMany({ where: { scope: "PLATFORM" } });
+    clearReadOnlyCache();
+    setTestSession(sessionUser("SUPER_ADMIN"));
+    await expect(requireRole(...ADMIN_ROLES)).resolves.toBeDefined();
   });
 });

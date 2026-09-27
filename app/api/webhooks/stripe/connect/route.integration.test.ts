@@ -6,6 +6,7 @@ import { onlinePaymentAvailability } from "@/lib/payments/availability";
 import { createPaymentIntentAction } from "@/lib/payments/stripe-actions";
 import * as businessModule from "@/lib/business";
 import { setTestHost } from "@/test/stubs/next-headers";
+import { clearReadOnlyCache } from "@/lib/ops/read-only";
 import { makeBusiness, makeOrder } from "@/test/factories";
 import { POST } from "./route";
 import { POST as platformPOST } from "../route";
@@ -337,6 +338,28 @@ describe("account.application.deauthorized", () => {
 
     await POST(signed(body));
 
+    expect((await prisma.business.findUniqueOrThrow({ where: { id: business.id } })).stripeAccountId).toBe(ACCOUNT);
+  });
+});
+
+describe("read-only mode", () => {
+  const deauthorized = (extra: object = {}) => event("account.application.deauthorized", { id: ACCOUNT, object: "application" }, extra);
+  const connected = () =>
+    makeBusiness({ slug: "marea", stripeAccountId: ACCOUNT, stripeCardPaymentsStatus: "ACTIVE", acceptsOnlinePayment: true });
+
+  afterEach(async () => {
+    await prisma.readOnlyMode.deleteMany({ where: { scope: "PLATFORM" } });
+    clearReadOnlyCache();
+  });
+
+  it("answers 503 too — the connect endpoint shares the same guard", async () => {
+    const business = await connected();
+    await prisma.readOnlyMode.create({ data: { scope: "PLATFORM" } });
+    clearReadOnlyCache();
+
+    const response = await POST(signed(deauthorized()));
+
+    expect(response.status).toBe(503);
     expect((await prisma.business.findUniqueOrThrow({ where: { id: business.id } })).stripeAccountId).toBe(ACCOUNT);
   });
 });

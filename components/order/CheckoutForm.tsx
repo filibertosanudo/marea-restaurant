@@ -39,6 +39,8 @@ function errorMessage(state: CheckoutState, dict: OrderDictionary): string | nul
       return dict[PROMO_REASON_KEY[state.promoReason ?? "not_found"]];
     case "rate_limited":
       return dict.errorRateLimited;
+    case "read_only":
+      return dict.errorReadOnly;
     case "invalid_input":
       return dict.requiredField;
   }

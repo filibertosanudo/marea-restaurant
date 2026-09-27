@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { processQueue } from "@/lib/notifications/queue";
+import { isPlatformReadOnly } from "@/lib/ops/read-only";
 
 const BATCH_LIMIT = 20;
 
@@ -24,6 +25,12 @@ function isAuthorized(request: Request): boolean {
 export async function POST(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // The worker's own loop pauses the same way (scripts/worker.ts); this is
+  // its serverless equivalent (module 18, phase 6).
+  if ((await isPlatformReadOnly()).enabled) {
+    return NextResponse.json({ error: "read_only" }, { status: 503 });
   }
 
   const result = await processQueue(BATCH_LIMIT);

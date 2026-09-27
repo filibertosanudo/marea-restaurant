@@ -8,6 +8,7 @@ import { getOrderForReviewByPublicToken } from "@/lib/orders/queries";
 import { resolveOrderAuthorName } from "@/lib/orders/dto";
 import { getOrderLang } from "@/lib/i18n/cookie";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
+import { isPlatformReadOnly } from "@/lib/ops/read-only";
 import { submitTestimonialSchema } from "@/lib/testimonials/schemas";
 
 // A public, unauthenticated form that writes text later published on the
@@ -20,7 +21,7 @@ const CREATE_WINDOW_MS = 60 * 60 * 1000;
 
 export type SubmitTestimonialResult =
   | { ok: true }
-  | { ok: false; error: "invalid_input" | "rate_limited" | "not_found" | "not_reviewable" | "already_reviewed" };
+  | { ok: false; error: "invalid_input" | "rate_limited" | "not_found" | "not_reviewable" | "already_reviewed" | "read_only" };
 
 /**
  * `authorName` is read from the order and frozen onto the row here — never
@@ -34,6 +35,8 @@ export async function submitTestimonialAction(
   publicToken: string,
   input: { rating: number; quote?: string }
 ): Promise<SubmitTestimonialResult> {
+  if ((await isPlatformReadOnly()).enabled) return { ok: false, error: "read_only" };
+
   const parsed = submitTestimonialSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "invalid_input" };
 

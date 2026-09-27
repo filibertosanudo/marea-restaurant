@@ -1846,3 +1846,25 @@ model WorkerHeartbeat {
   id        String   @id
   updatedAt DateTime @updatedAt
 }
+
+enum ReadOnlyScope {
+  PLATFORM
+  ORGANIZATION
+}
+
+/// Interruptor de sólo lectura (módulo 18, fase 6). Presencia de fila = activo;
+/// lo borra el mismo comando que lo prende. Tabla de la plataforma, sin RLS,
+/// como OpsTaskRun. `organizationId` es la costura para el módulo 19 (una
+/// organización en periodo de gracia de suscripción): nula para el alcance de
+/// todo el despliegue, y entonces única por el índice parcial de la migración
+/// (Prisma no puede expresar "único sólo cuando NULL").
+model ReadOnlyMode {
+  id             String        @id @default(cuid(2))
+  scope          ReadOnlyScope
+  organizationId String?
+  reason         String?
+  enabledAt      DateTime      @default(now())
+  enabledBy      String?
+
+  @@unique([scope, organizationId])
+}

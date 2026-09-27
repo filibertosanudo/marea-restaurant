@@ -11,6 +11,7 @@ import { applicationFeeParams, platformFeeAmount } from "./platform-fee";
 import { computePaymentSummary } from "./summary";
 import { isUniqueConstraintError } from "./prisma-errors";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
+import { isPlatformReadOnly } from "@/lib/ops/read-only";
 
 export type CreatePaymentIntentResult =
   | { ok: true; clientSecret: string; stripeAccountId: string | null }
@@ -22,7 +23,8 @@ export type CreatePaymentIntentResult =
         | "already_paid"
         | "online_payment_disabled"
         | "try_again"
-        | "rate_limited";
+        | "rate_limited"
+        | "read_only";
     };
 
 const OPEN_STRIPE_STATUSES = ["PENDING", "PROCESSING", "REQUIRES_ACTION"] as const;
@@ -42,6 +44,8 @@ const INTENT_WINDOW_MS = 15 * 60 * 1000;
  * resolve to the same PaymentIntent at Stripe instead of two charges.
  */
 export async function createPaymentIntentAction(publicToken: string): Promise<CreatePaymentIntentResult> {
+  if ((await isPlatformReadOnly()).enabled) return { ok: false, error: "read_only" };
+
   const ip = getClientIp(await headers());
   if (await isScopeRateLimited(INTENT_SCOPE, ip, INTENT_MAX_ATTEMPTS, INTENT_WINDOW_MS)) {
     return { ok: false, error: "rate_limited" };

@@ -2,6 +2,7 @@ import "server-only";
 import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
+import { isPlatformReadOnly } from "@/lib/ops/read-only";
 import { runInTenant } from "@/lib/tenancy/context";
 import { paymentOwnerForIntent } from "@/lib/tenancy/discover";
 import { constructWebhookEvent } from "@/lib/stripe/payments";
@@ -56,6 +57,13 @@ function ignored(kind: WebhookKind, event: Stripe.Event, why: string): Response 
 }
 
 export async function handleStripeWebhook(request: Request, kind: WebhookKind): Promise<Response> {
+  // Read-only mode (module 18, phase 6): refused, not accepted-and-dropped —
+  // a 2xx that never applied the event is a charge this system never hears
+  // about again. 503 tells Stripe to retry once the window is over.
+  if ((await isPlatformReadOnly()).enabled) {
+    return new Response("Read-only mode: retry later", { status: 503 });
+  }
+
   const rawBody = await request.text();
   const signature = request.headers.get("stripe-signature");
   if (!signature) return new Response("Missing signature", { status: 400 });

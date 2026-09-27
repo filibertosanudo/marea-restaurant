@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe/client";
 import { applyStripeEvent } from "@/lib/payments/webhook-handlers";
+import { clearReadOnlyCache } from "@/lib/ops/read-only";
 import { POST } from "./route";
 import { makeBusiness, makeOrder } from "@/test/factories";
 
@@ -637,6 +638,26 @@ describe("POST /api/webhooks/stripe: what is not a platform event", () => {
 
     expect((await POST(signedRequest(paymentIntentEvent("payment_intent.succeeded", "pi_on_acct")))).status).toBe(200);
 
+    expect((await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } })).status).toBe("PENDING");
+    expect(await prisma.stripeWebhookEvent.count()).toBe(0);
+  });
+});
+
+describe("read-only mode", () => {
+  afterEach(async () => {
+    await prisma.readOnlyMode.deleteMany({ where: { scope: "PLATFORM" } });
+    clearReadOnlyCache();
+  });
+
+  it("answers 503 instead of applying the event — never a 2xx that silently dropped a payment", async () => {
+    const business = await makeBusiness();
+    const payment = await makePendingCardPayment(business.id, "pi_during_maintenance");
+    await prisma.readOnlyMode.create({ data: { scope: "PLATFORM" } });
+    clearReadOnlyCache();
+
+    const response = await POST(signedRequest(paymentIntentEvent("payment_intent.succeeded", "pi_during_maintenance")));
+
+    expect(response.status).toBe(503);
     expect((await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } })).status).toBe("PENDING");
     expect(await prisma.stripeWebhookEvent.count()).toBe(0);
   });
