@@ -17,7 +17,7 @@ import {
   getReservationByConfirmationCode,
 } from "./queries";
 import { reservationSlotsQuerySchema, createReservationSchema, parseDateParam, isWithinBookingHorizon } from "./schemas";
-import { isExclusionConstraintError } from "./prisma-errors";
+import { isSlotConflictError } from "./prisma-errors";
 import { canCancelReservation } from "./dto";
 
 const CANCELLATION_REASON_BY_LOCALE: Record<string, string> = {
@@ -212,7 +212,7 @@ export async function createReservationAction(input: {
       return created;
     });
   } catch (err) {
-    if (isExclusionConstraintError(err)) return { ok: false, error: "slot_taken" };
+    if (isSlotConflictError(err)) return { ok: false, error: "slot_taken" };
     throw err;
   }
 
