@@ -1,7 +1,10 @@
+import { createId } from "@paralleldrive/cuid2";
 import type { PrismaClient, Business, Organization, User } from "@/lib/generated/prisma/client";
 import { hashPassword } from "@/lib/auth/password";
 import { generateTemporaryPassword } from "@/lib/auth/temporary-password";
 import { validateSlug } from "@/lib/business-host";
+import { runWithoutTenant } from "@/lib/tenancy/context";
+import { signupSqlError } from "@/lib/tenants/signup-errors";
 
 /**
  * Creating organizations, businesses and their first administrators, without
@@ -48,7 +51,11 @@ export async function createOrganization(db: Db, input: { name: string; slug: st
 export type NewBusiness = {
   slug: string;
   name: string;
-  organizationSlug?: string;
+  /** The chain this business joins. Always required: a business with no
+   * organization is created only by signUp() below, which gives it a new
+   * one of its own — this function is for adding a branch to a chain that
+   * already exists. */
+  organizationSlug: string;
   timezone?: string;
   currency?: string;
   defaultLocale?: "en" | "es";
@@ -60,13 +67,20 @@ export type NewBusiness = {
  * and hours are the new administrator's to set up, or copied from a sister
  * branch in the panel. Card payments start OFF: with more than one business on
  * a deployment a business needs a Stripe account of its own first (module 17b).
+ *
+ * Owner-connection only, same as createOrganization — row level security
+ * gives marea_app no INSERT policy on Business at all. Adding a branch from
+ * inside the app (module 19, phase 7) needs a narrower SECURITY DEFINER
+ * primitive that checks the caller's own business against the target
+ * organization; until that exists, growing a chain is done from here, by
+ * the platform operator.
  */
 export async function createBusiness(db: Db, input: NewBusiness): Promise<Business> {
   assertSlug("Business", input.slug);
   if (await db.business.findUnique({ where: { slug: input.slug } })) {
     throw new ProvisionError(`Business "${input.slug}" already exists.`);
   }
-  const organization = input.organizationSlug ? await organizationBySlug(db, input.organizationSlug) : null;
+  const organization = await organizationBySlug(db, input.organizationSlug);
   const defaultLocale = input.defaultLocale ?? "es";
 
   return db.$transaction(async (tx) => {
@@ -79,7 +93,7 @@ export async function createBusiness(db: Db, input: NewBusiness): Promise<Busine
         ...(input.timezone ? { timezone: input.timezone } : {}),
         ...(input.currency ? { currency: input.currency } : {}),
         acceptsOnlinePayment: false,
-        organizationId: organization?.id ?? null,
+        organizationId: organization.id,
       },
     });
     for (const locale of ["en", "es"]) {
@@ -87,6 +101,50 @@ export async function createBusiness(db: Db, input: NewBusiness): Promise<Busine
     }
     return business;
   });
+}
+
+export type NewSignup = { slug: string; name: string };
+export type SignedUp = { organizationId: string; businessId: string };
+
+/**
+ * A business with a brand-new organization of its own — the only shape
+ * signing up ever creates (module 19: every business belongs to an
+ * organization, even a chain of one, and that organization is never shown
+ * to the user as such when there's only one business in it).
+ *
+ * Goes through marea_signup(), the one SECURITY DEFINER door into
+ * Organization/Business for a connection that is not the database owner.
+ * scripts/tenants.ts calls this same function for its own "no --organization
+ * given" case, so there is one way to create a fresh business, not two that
+ * can drift apart: see the migration's own header for the function's exact
+ * contract (what it validates in the database, not just in TypeScript).
+ *
+ * The ids are generated here, not by the database: a hand-written INSERT
+ * has no Prisma default to fall back on for a cuid() column, so this uses
+ * the same generator lib/tables/actions.ts already reaches for when it needs
+ * one outside a Prisma .create() call.
+ */
+export async function signUp(db: Pick<PrismaClient, "$executeRaw">, input: NewSignup): Promise<SignedUp> {
+  assertSlug("Business", input.slug);
+  const organizationId = createId();
+  const businessId = createId();
+  const translationIdEn = createId();
+  const translationIdEs = createId();
+
+  try {
+    await runWithoutTenant(
+      () =>
+        db.$executeRaw`SELECT marea_signup(${organizationId}, ${businessId}, ${input.slug}, ${input.name}, ${translationIdEn}, ${translationIdEs})`
+    );
+  } catch (err) {
+    const reason = signupSqlError(err);
+    if (reason === "slug_taken") throw new ProvisionError(`Business "${input.slug}" already exists.`);
+    if (reason === "invalid_slug") throw new ProvisionError(`Business slug "${input.slug}": use 1 to 32 lowercase letters, digits and inner hyphens`);
+    if (reason === "reserved_slug") throw new ProvisionError(`Business slug "${input.slug}": that name is reserved`);
+    throw err;
+  }
+
+  return { organizationId, businessId };
 }
 
 export type Provisioned = { user: User; temporaryPassword: string };

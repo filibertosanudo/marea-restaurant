@@ -271,8 +271,9 @@ that terminal, and the person must change it at first sign-in. Then:
    its own Stripe account and Stripe says it can take cards (next section).
    Until then guests pay at the register, and the panel says why.
 
-`npm run tenants` does the same from a checkout with `DIRECT_URL` (or
-`DATABASE_URL`) pointing at the owner. The seed (`npm run db:seed`, local only)
+`npm run tenants` does the same from a checkout with `TENANTS_OWNER_DATABASE_URL`
+pointing at the owner — its own variable, never `DIRECT_URL`/`DATABASE_URL`.
+The seed (`npm run db:seed`, local only)
 creates the two-business example the tests use: `marea` and `cala`, one chain,
 and `owner@marea.test` to move between them.
 

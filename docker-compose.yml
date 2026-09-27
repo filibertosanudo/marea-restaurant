@@ -47,6 +47,11 @@ services:
       DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
       APP_DB_PASSWORD: ${APP_DB_PASSWORD}
       WORKER_DB_PASSWORD: ${WORKER_DB_PASSWORD}
+      # Same owner connection, under its own name: what scripts/tenants.ts
+      # requires when this service is reused for "docker compose run --rm
+      # --entrypoint "" migrate npx tsx scripts/tenants.ts ..." (see that
+      # script's own header comment).
+      TENANTS_OWNER_DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
     depends_on:
       db:
         condition: service_healthy
