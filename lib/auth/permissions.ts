@@ -2,6 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { UserRole } from "@/lib/generated/prisma/client";
 import { getSession } from "@/lib/auth/session";
+import { assertWritable } from "@/lib/ops/read-only";
 import type { Session } from "next-auth";
 
 export class ForbiddenError extends Error {
@@ -20,6 +21,9 @@ export class ForbiddenError extends Error {
 export async function requireRole(
   ...roles: UserRole[]
 ): Promise<Session> {
+  // First, per this function's own rule: nothing runs before it, not even
+  // the session lookup (module 18, phase 6).
+  await assertWritable();
   const session = await getSession();
   if (!session?.user) {
     throw new ForbiddenError("Not authenticated");
