@@ -12,6 +12,7 @@ import { setTestTenantHeader } from "@/test/stubs/next-headers";
 import { testSchema } from "@/test/db";
 import { makeBusiness, makeMenuCategory, makeMenuItem, makeOrder, makeOrganization } from "@/test/factories";
 import { ProvisionError, signUp } from "@/lib/tenants/provision";
+import { listUnverifiedSignups, purgeUnverifiedSignup, verifyOrganization } from "@/lib/tenants/verification";
 
 // Row level security does nothing for the role that owns the tables, so every
 // assertion here goes through a client that connects as `marea_app` (or
@@ -434,6 +435,68 @@ describe("the worker role", () => {
     await expect(worker.reservation.findMany()).rejects.toThrow(/permission denied/);
     await expect(worker.payment.findMany()).rejects.toThrow(/permission denied/);
     await expect(worker.orderItem.findMany()).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe("email verification (module 19, phase 3)", () => {
+  it("verifies an organization once, and does nothing the second time or for one that doesn't exist", async () => {
+    const organization = await makeOrganization({ verifiedAt: null });
+    const app = appClient();
+
+    expect(await verifyOrganization(app, organization.id)).toBe(true);
+    const verified = await owner.organization.findUniqueOrThrow({ where: { id: organization.id } });
+    expect(verified.verifiedAt).not.toBeNull();
+
+    expect(await verifyOrganization(app, organization.id)).toBe(false);
+    expect(await verifyOrganization(app, "nope")).toBe(false);
+
+    // Still no ordinary UPDATE access — the function is the only door.
+    await expect(app.organization.update({ where: { id: organization.id }, data: { name: "Hijacked" } })).rejects.toThrow(/permission denied/);
+  });
+
+  it("purges an unverified signup's business, user and organization, but refuses once it's verified", async () => {
+    const organization = await makeOrganization({ verifiedAt: null });
+    const business = await makeBusiness({ slug: "purge-me", organizationId: organization.id });
+    const user = await owner.user.create({ data: { email: "purge@example.test", passwordHash: "x" } });
+    await owner.businessMembership.create({ data: { userId: user.id, businessId: business.id, role: "BUSINESS_ADMIN", isActive: true } });
+    const category = await makeMenuCategory(business.id);
+    await makeMenuItem(business.id, category.id);
+    const app = appClient();
+
+    const untouchedOrg = await makeOrganization({ verifiedAt: new Date() });
+    const untouchedBusiness = await makeBusiness({ slug: "keep-me", organizationId: untouchedOrg.id });
+
+    expect(await purgeUnverifiedSignup(app, { organizationId: organization.id, userId: user.id })).toBe(true);
+    expect(await owner.business.findUnique({ where: { id: business.id } })).toBeNull();
+    expect(await owner.user.findUnique({ where: { id: user.id } })).toBeNull();
+    expect(await owner.organization.findUnique({ where: { id: organization.id } })).toBeNull();
+    // Cascaded away with the business, not left orphaned.
+    expect(await owner.menuCategory.findUnique({ where: { id: category.id } })).toBeNull();
+
+    // A verified organization is refused outright, business and all.
+    expect(await purgeUnverifiedSignup(app, { organizationId: untouchedOrg.id, userId: "irrelevant" })).toBe(false);
+    expect(await owner.business.findUnique({ where: { id: untouchedBusiness.id } })).not.toBeNull();
+  });
+
+  it("lists only unverified organizations older than the cutoff, each with its own signup's user id", async () => {
+    const app = appClient();
+    const old = await makeOrganization({ verifiedAt: null, createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000) });
+    const recent = await makeOrganization({ verifiedAt: null });
+    const verified = await makeOrganization({ verifiedAt: new Date(), createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000) });
+    const oldUser = await owner.user.create({ data: { email: "old-signup@example.test", passwordHash: "x" } });
+    await owner.emailVerificationToken.create({
+      data: { userId: oldUser.id, organizationId: old.id, tokenHash: "hash-old", expiresAt: new Date(Date.now() - 1000) },
+    });
+    const recentUser = await owner.user.create({ data: { email: "recent-signup@example.test", passwordHash: "x" } });
+    await owner.emailVerificationToken.create({
+      data: { userId: recentUser.id, organizationId: recent.id, tokenHash: "hash-recent", expiresAt: new Date(Date.now() + 60_000) },
+    });
+    void verified;
+
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const candidates = await listUnverifiedSignups(app, cutoff);
+
+    expect(candidates).toEqual([{ organizationId: old.id, userId: oldUser.id }]);
   });
 });
 

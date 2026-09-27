@@ -45,7 +45,10 @@ export async function createOrganization(db: Db, input: { name: string; slug: st
   if (await db.organization.findUnique({ where: { slug: input.slug } })) {
     throw new ProvisionError(`Organization "${input.slug}" already exists.`);
   }
-  return db.organization.create({ data: { name: input.name, slug: input.slug } });
+  // Verified at creation (module 19): the operator running this by hand is
+  // the verification — nobody is waiting on an email for an alta done this
+  // way. Only marea_signup()'s own organizations start unverified.
+  return db.organization.create({ data: { name: input.name, slug: input.slug, verifiedAt: new Date() } });
 }
 
 export type NewBusiness = {

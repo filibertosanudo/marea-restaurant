@@ -21,4 +21,22 @@ describe("renderTemplate", () => {
     const email = await renderTemplate("order.ready", payload, "fr", business);
     expect(email.subject).toContain("listo");
   });
+
+  it("renders both module 19 signup templates", async () => {
+    const verify = await renderTemplate(
+      "signup.verify",
+      { verifyUrl: "https://marea.test/admin/verify-email/tok", businessName: "Cala", expiresInHours: 48 },
+      "es",
+      business
+    );
+    expect(verify.html).toContain("Cala");
+
+    const taken = await renderTemplate(
+      "signup.email-taken",
+      { loginUrl: "https://marea.test/admin/login", forgotPasswordUrl: "https://marea.test/admin/forgot-password" },
+      "en",
+      business
+    );
+    expect(taken.subject).toMatch(/sign up/i);
+  });
 });

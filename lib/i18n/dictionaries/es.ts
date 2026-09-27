@@ -22,8 +22,7 @@ export const es = {
       invalidCurrentPassword: "La contraseña actual no es correcta.",
       notAuthenticated: "Tu sesión expiró. Inicia sesión de nuevo.",
       updatePassword: "Actualizar contraseña",
-      noPublicSignup:
-        "Solo personal — las cuentas las crea un administrador.",
+      noAccountYet: "¿Tu restaurante no está en Marea todavía?",
       signOut: "Cerrar sesión",
       forgotPassword: "¿Olvidaste tu contraseña?",
       forgotPasswordTitle: "Recupera tu contraseña",
@@ -42,6 +41,26 @@ export const es = {
       resetPasswordSuccessTitle: "Contraseña actualizada",
       resetPasswordSuccessBody:
         "Ya puedes iniciar sesión con tu nueva contraseña.",
+      backToSignup: "Volver al registro",
+      signupTitle: "Registra tu restaurante",
+      signupBody:
+        "Crea tu cuenta y confirma tu correo para empezar a configurar tu restaurante.",
+      signupBusinessName: "Nombre del restaurante",
+      signupSlug: "Dirección web",
+      signupSlugHint:
+        "1 a 32 letras minúsculas, números y guiones — es la dirección de tu página.",
+      signupYourName: "Tu nombre",
+      signupSubmit: "Crear cuenta",
+      signupRateLimited: "Demasiados intentos. Intenta de nuevo en unos minutos.",
+      signupSuccessTitle: "Revisa tu correo",
+      signupSuccessBody:
+        "Si ese correo no tiene cuenta todavía, te enviamos un enlace para confirmarlo y empezar a configurar tu restaurante. Si ya tiene una, te avisamos ahí.",
+      verifyEmailTitle: "Confirma tu correo",
+      verifyEmailBody: "Un último paso antes de configurar tu restaurante.",
+      verifyEmailButton: "Confirmar mi correo",
+      verifyEmailSuccessTitle: "Correo confirmado",
+      verifyEmailSuccessBody:
+        "Tu cuenta ya está activa. Inicia sesión para empezar a configurar tu restaurante.",
     },
     nav: {
       menu: "Menú",

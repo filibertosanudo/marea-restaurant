@@ -79,11 +79,15 @@ export function makeOrder(businessId: string, overrides: Partial<Prisma.OrderUnc
   });
 }
 
+// verifiedAt defaults set (module 19): most tests that make an organization
+// want an ordinary, publicly visible one — pass verifiedAt: null to get the
+// unverified-signup shape lib/business.ts's publishable() gates on.
 export function makeOrganization(overrides: Partial<Prisma.OrganizationCreateInput> = {}) {
   return prisma.organization.create({
     data: {
       slug: `org-${createId()}`,
       name: "Test Organization",
+      verifiedAt: new Date(),
       ...overrides,
     },
   });

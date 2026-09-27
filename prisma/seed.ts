@@ -327,7 +327,9 @@ async function seedSecondBusiness(marea: { id: string }) {
   const organization = await prisma.organization.upsert({
     where: { slug: "marea-group" },
     update: {},
-    create: { slug: "marea-group", name: "Marea Group" },
+    // verifiedAt set: seed data is meant to behave like a live business, not
+    // one stuck behind module 19's email-verification gate.
+    create: { slug: "marea-group", name: "Marea Group", verifiedAt: new Date() },
   });
   await prisma.business.update({ where: { id: marea.id }, data: { organizationId: organization.id } });
 
