@@ -1837,3 +1837,12 @@ model OpsTaskRun {
   @@unique([task, slot])
   @@index([task, status, finishedAt])
 }
+
+/// Un latido de scripts/worker.ts: actualizado cada vuelta del bucle, sin
+/// esperar a que haya trabajo en la cola. Una sola fila (id fijo). Tabla de
+/// la plataforma, sin RLS, como OpsTaskRun: /api/status la lee para saber si
+/// el worker sigue vivo, sin agregar ningún proceso nuevo.
+model WorkerHeartbeat {
+  id        String   @id
+  updatedAt DateTime @updatedAt
+}

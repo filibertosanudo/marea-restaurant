@@ -1,6 +1,7 @@
 [
   "lib/db/system.ts",
   "lib/notifications/queue.ts",
+  "lib/ops/health.ts",
   "lib/ops/media-sweep.ts",
   "lib/privacy/guest-retention.ts",
   "lib/realtime/sweep.ts",

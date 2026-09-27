@@ -16,6 +16,7 @@
  */
 import "dotenv/config";
 import { processQueue } from "../lib/notifications/queue";
+import { writeWorkerHeartbeat } from "../lib/ops/health";
 import { prisma } from "../lib/prisma";
 
 const BATCH_LIMIT = 20;
@@ -43,6 +44,12 @@ function sleep(ms: number): Promise<void> {
 async function main() {
   console.log("[notifications worker] started");
   while (!shuttingDown) {
+    // Written every tick, whether or not there was anything to claim — this
+    // is /api/status's only way to know the loop is still turning
+    // (lib/ops/health.ts), and it is not conditioned on any work existing.
+    await writeWorkerHeartbeat().catch((err: unknown) => {
+      console.error("[notifications worker] could not write heartbeat:", err instanceof Error ? err.message : err);
+    });
     const result = await processQueue(BATCH_LIMIT);
     if (result.claimed > 0) {
       console.log(
