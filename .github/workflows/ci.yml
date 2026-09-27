@@ -218,16 +218,18 @@ jobs:
             sleep 2
           done
           echo "::error::services did not start"; docker logs minio; exit 1
-      - name: Run the backup test
+      - name: Run the backup and restore tests
         run: |
           docker run --rm --network host \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -e OPS_TEST_DOCKER=1 \
             -e AUTH_SECRET=ci-test-secret \
             -e DATABASE_URL=postgresql://marea:marea@localhost:5432/marea \
             -e OPS_TEST_ADMIN_DATABASE_URL=postgresql://marea:marea@localhost:5432/postgres \
             -e OPS_TEST_S3_ENDPOINT=http://localhost:9000 \
             -e OPS_TEST_S3_ADMIN_KEY=minioadmin \
             -e OPS_TEST_S3_ADMIN_SECRET=minioadmin-secret \
-            --entrypoint npx marea-ops:local vitest run --project integration lib/ops/backup.integration
+            --entrypoint npx marea-ops:local vitest run --project integration lib/ops/backup.integration lib/ops/restore.integration
 
   commits:
     runs-on: ubuntu-latest
