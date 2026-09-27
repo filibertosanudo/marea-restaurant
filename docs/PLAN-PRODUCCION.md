@@ -41,7 +41,7 @@
 depende de esas dos.
 
 ---
-## Estado (17 de septiembre de 2026, tras el módulo 15)
+## Estado (27 de septiembre de 2026, tras el módulo 18)
 
 Actualiza esta tabla al cerrar cada módulo. Es lo primero que se lee al volver
 al proyecto después de un tiempo fuera.
@@ -58,7 +58,7 @@ al proyecto después de un tiempo fuera.
 | 6 · Rendimiento y tiempo real | 16 | **Terminada** (PRs #73–#79 y la del cierre). Cinco pantallas quietas de 605 a 2 sentencias por minuto, cambios en ~130 ms, prueba de carga de 200 pedidos sin errores. Dos criterios se cumplen distinto a como se escribieron: ver el módulo 16 |
 | 7 · Multi-sucursal | 17 | **Terminada** (PRs #81, #82–#87, fusionados en `main`). Un negocio por petición, RLS con `marea_app`, organización y `ORG_ADMIN`, alta de negocios sin tocar la base. Los pagos multi-negocio salieron a la 7b: ver abajo |
 | 7b · Stripe Connect | 17b | **Terminada** (PRs #88–#93, fusionados en `main`). Cada negocio cobra en su propia cuenta de Stripe (cargos directos): la plataforma no retiene fondos ajenos, así que ya puede entrar un restaurante que no sea tuyo. Se conecta desde la configuración, sin tocar la base ni el entorno; una cuenta que Stripe restringe o que el negocio desconecta deja de ofrecer tarjeta sola. Sin comisión de plataforma por ahora (decidido; la política de devolución está escrita en `lib/payments/platform-fee.ts`). **Antes del primer restaurante ajeno, a mano:** registrar los dos webhooks (`docs/DEPLOY.md`) y probar su entrega real, que en las pruebas sólo se ejerció con eventos firmados; y probar el alta completa con una cuenta de Stripe activada de verdad, no sólo hasta el enlace de Stripe |
-| 8 · Producto vendible | 18, 19, 20 | Dividida en tres módulos. **18, operación como servicio** (8.5: respaldos, restauración probada, tareas programadas, monitoreo, modo de sólo lectura, manual): prompt escrito, sin empezar, y va primero porque guardar datos de un restaurante ajeno sin un respaldo restaurado es la siguiente condición. **19, alta autoservicio y suscripción** (8.1 y 8.3) y **20, CFDI 4.0** (8.2): sin escribir. La PWA offline (8.4) se pospone, ver abajo |
+| 8 · Producto vendible | 18, 19, 20 | Dividida en tres módulos. **18, operación como servicio** (8.5) **terminada** (PRs #95–#102, fusionados en `main`). Respaldo cifrado cada seis horas con bloqueo de objetos (MinIO real, no simulado), retención 2 días/7 días/28 días/90 días aplicada por el almacenamiento, restauración probada y cronometrada (7.4 s contra la base de desarrollo, sube con datos reales — ver `docs/RUNBOOK.md`), corre sola cada mes en CI. Purgas de privacidad y barrido de medios programados con `crond`; aviso mensual de anonimización pendiente sin automatizarla. `/api/status` separado de `/api/health`, con umbrales escritos. Modo de sólo lectura probado con una prueba que recorre los Server Actions, no una lista a mano — encontró dos que no la tenían. Dos correcciones de carrera encontradas en el camino, fuera de alcance del módulo: `promotion_exhausted` sin manejar (#94) y un candado de reservación bajo `deadlock` en vez de la violación esperada (#97). Antes del primer restaurante ajeno, a mano: crear el bucket de respaldos, guardar la llave de cifrado fuera del servidor, conectar el monitor externo (`docs/DEPLOY.md`). **19, alta autoservicio y suscripción** (8.1 y 8.3) y **20, CFDI 4.0** (8.2): sin escribir. La PWA offline (8.4) se pospone, ver abajo |
 
 ### Pospuesto a propósito
 
@@ -1833,25 +1833,50 @@ completo al iniciar turno.
 
 Constrúyelo cuando un cliente real lo pida. Antes de eso es especulación cara.
 
-## 8.5 — Operación como servicio
+## 8.5 — Operación como servicio ✅ terminada (módulo 18, PRs #95–#102)
 
-- **Respaldos que sirven:** `pg_dump` cifrado a almacenamiento S3-compatible,
-  diario, con retención 7/4/12 (días/semanas/meses) y **prueba de restauración
-  mensual automatizada**. Un respaldo que nunca se restauró no es un respaldo.
-- **Manual de operación** (`docs/RUNBOOK.md`): cómo desplegar, cómo revertir,
-  cómo restaurar, qué hacer si el webhook de Stripe se atasca, cómo rotar el
-  `AUTH_SECRET`, a quién llamar.
-- **Página de estado** pública y monitor externo sobre `/api/health`.
-- **Ventana de mantenimiento** y modo de sólo lectura para migraciones grandes:
-  nunca a la hora de la comida.
+- **Respaldos que sirven:** `pg_dump -Fc` cifrado con `age` a almacenamiento
+  S3-compatible con bloqueo de objetos, cada seis horas (no diario: el punto
+  de recuperación baja a 6 h y el volcado pesa 220 KB en desarrollo, casi
+  gratis), retención 2 días/7 días/28 días/90 días aplicada por el
+  almacenamiento mismo (bloqueo + ciclo de vida), nunca por un script que
+  borra. **Prueba de restauración mensual automatizada** en CI, contra un
+  Postgres 17 desechable que ella misma crea y destruye — nunca contra la
+  producción. Un respaldo que nunca se restauró no es un respaldo; éste se
+  restauró, se verificó como `marea_app` dentro de cada negocio (no sólo
+  como dueño), y quedó cronometrado: 7.4 s contra la base de desarrollo, ver
+  `docs/RUNBOOK.md` para el número que hay que volver a medir con datos
+  reales.
+- **Manual de operación** (`docs/RUNBOOK.md`): desplegar y revertir (con qué
+  migraciones traen su propio SQL de reversión), restaurar paso a paso,
+  activar y quitar el modo de sólo lectura, qué hacer si un webhook de
+  Stripe se atasca, cómo rotar cada secreto (`AUTH_SECRET` incluido, sin un
+  día de todos vuelven a entrar de golpe), cuándo toca la anonimización.
+- **`/api/status`**, separado de `/api/health` a propósito: el balanceador
+  nunca debe sacar el sitio de servicio por un respaldo viejo o una cola
+  lenta, que no afectan a un comensal. Latido del worker, cola de
+  notificaciones, edad del último respaldo — código público, detalle con
+  token.
+- **Modo de sólo lectura** para migraciones grandes: nunca a la hora de la
+  comida. Punto de control central en `requireRole` más un puñado de
+  acciones sin sesión (carrito, pedido, pago, reservación, boletín, reseña),
+  verificado por una prueba que recorre los Server Actions del repositorio
+  en vez de una lista escrita a mano — encontró dos acciones sin el guardia
+  que un repaso manual no vio. Los dos webhooks de Stripe y la ruta de cron
+  responden 503, nunca 2xx, durante la ventana.
 
 ## Criterio de terminado — Fase 8
 
 - [ ] Un restaurante nuevo se da de alta y toma su primer pedido **sin que tú
-      toques nada**.
+      toques nada**. *(módulo 19)*
 - [ ] Un ticket se factura y el XML valida contra el esquema del SAT.
-- [ ] Una restauración de respaldo probada, cronometrada y documentada.
-- [ ] El manual de operación lo puede seguir alguien que no escribió el código.
+      *(módulo 20)*
+- [x] Una restauración de respaldo probada, cronometrada y documentada.
+      *(módulo 18 — corre sola cada mes en CI; el primer tiempo medido está
+      en `docs/RUNBOOK.md`, marcado para remedirse con datos reales)*
+- [ ] El manual de operación lo puede seguir alguien que no escribió el
+      código. *(módulo 18 — `docs/RUNBOOK.md` existe y se escribió siguiendo
+      la restauración en vivo; falta la prueba con una segunda persona)*
 
 ---
 

@@ -362,3 +362,109 @@ the reservation `EXCLUDE` constraint depends on) ships in every official
 Postgres image via `contrib`, alpine included — verified directly against
 this image as part of building this module (`\dx` inside the container
 lists it after migrations run).
+
+## Backups, scheduled maintenance and monitoring
+
+Module 18. `docs/RUNBOOK.md` is the operational how-to (restoring, rotating
+secrets, read-only mode); this section is the one-time setup a new
+deployment needs before any of that applies.
+
+### 1. Create the backup bucket
+
+The backup needs its own S3-compatible bucket, in an account other than the
+one holding uploaded media, with object lock available (Backblaze B2,
+Wasabi and AWS S3 all support it; Cloudflare R2 does not — pick a different
+provider for backups if the deployment's media already lives on R2). Create
+an **admin** key for that account (never given to the server) and run:
+
+```bash
+BACKUP_ADMIN_S3_ENDPOINT=https://s3.your-provider.example \
+BACKUP_ADMIN_S3_ACCESS_KEY_ID=... BACKUP_ADMIN_S3_SECRET_ACCESS_KEY=... \
+BACKUP_ADMIN_S3_BUCKET=marea-backups \
+  docker compose run --rm --entrypoint "" ops npm run ops:backup-bucket
+```
+
+This turns on object lock and versioning (irreversible — object lock can
+only be enabled at bucket creation), sets one lifecycle rule per retention
+tier, and prints a policy. Create a second key — **write-only**
+(`s3:PutObject`, `s3:PutObjectRetention`; nothing else) — and attach that
+printed policy to it. That write-only key is `BACKUP_S3_ACCESS_KEY_ID` /
+`BACKUP_S3_SECRET_ACCESS_KEY` in `.env`; the admin key is never stored on the
+server.
+
+### 2. Generate and place the encryption key
+
+```bash
+age-keygen -o backup-key.txt
+```
+
+The **public** key (`age1...`, printed to stdout, also in the file's own
+comment) goes in `.env` as `BACKUP_AGE_RECIPIENT` — the server can encrypt
+with it, never decrypt. The **private** key (the file itself) goes
+somewhere that is not this server and not this repository — see
+`docs/RUNBOOK.md`'s "Where secrets live". Losing it means every backup ever
+taken becomes unopenable; there is no recovery for a lost private key.
+
+### 3. Fill in the rest of the backup and monitoring variables
+
+`.env.example`'s "Backups" and "Scheduled maintenance" blocks list every
+variable, each with a placeholder. At minimum: `BACKUP_DATABASE_URL` (Compose
+builds this one for you from `POSTGRES_PASSWORD`), the bucket and its
+write-only credential from step 1, `BACKUP_AGE_RECIPIENT` from step 2, and
+`OPS_ALERT_EMAIL` if you want the monthly overdue-guests report to go
+somewhere.
+
+### 4. Connect the external monitor
+
+The plan is an external monitoring service (healthchecks.io, Cronitor, or
+similar) rather than a page hosted on this same server — a status page that
+lives on the machine that just went down is the one nobody can read when it
+matters:
+
+- **Uptime, and whether the deployment as a whole is healthy:** point it at
+  `GET /api/health` for the load balancer's own check (database reachable),
+  and `GET /api/status` with an `Authorization: Bearer $STATUS_CHECK_TOKEN`
+  header for the full breakdown (worker heartbeat, notification queue,
+  backup age) — set `STATUS_CHECK_TOKEN` in `.env` first. Most providers'
+  status pages can show `/api/status`'s plain `{"ok": true/false}` body (no
+  token) as the public-facing status; keep the tokened, detailed check for
+  your own alerting only.
+- **Dead man's switches, one per scheduled task:** each of `BACKUP_MONITOR_URL`,
+  `OPS_MONITOR_PURGE_IP_URL`, `OPS_MONITOR_RATE_LIMITS_URL`,
+  `OPS_MONITOR_MEDIA_SWEEP_URL`, `OPS_MONITOR_ANONYMIZE_ALERT_URL`, and the
+  monthly restore test's `RESTORE_MONITOR_URL` (a GitHub Actions secret, not
+  `.env` — see below) is a URL the task pings only when it finishes
+  successfully. Create one check per variable in the monitoring service (most
+  providers call these "cron monitors" or "heartbeat checks"), set an
+  expected interval matching `docker/ops-crontab`'s own schedule for that
+  task, and it alerts on silence — a backup that stopped running three
+  weeks ago with nobody told is the most common way to not have a backup.
+
+### 5. Start the scheduler
+
+```bash
+docker compose up -d scheduler
+```
+
+Runs the backup (every six hours), the two privacy purges, the orphaned-media
+sweep, and the monthly overdue-guests report — all from `docker/ops-crontab`,
+all idempotent, all logged in `OpsTaskRun` (`npm run ops:read-only -- status`
+runs through the same image). It holds both the database owner's connection
+(for the backup) and the application's own `marea_app` connection (for
+everything else) — the one service in this stack with both, because it is the
+one thing whose job is to run both.
+
+### 6. Enable the monthly restore test
+
+`.github/workflows/restore-test.yml` runs on the 1st of each month against
+the real backup bucket, on a GitHub Actions runner — deliberately "a machine
+that is not production," per module 18's own requirement, without paying for
+a second server. It needs its own **read-only** S3 credential (never the
+server's write-only key) and the backup's age private key, as repository
+secrets (Settings → Secrets and variables → Actions):
+`RESTORE_S3_ENDPOINT`, `RESTORE_S3_BUCKET`, `RESTORE_S3_REGION`,
+`RESTORE_S3_ACCESS_KEY_ID`, `RESTORE_S3_SECRET_ACCESS_KEY`,
+`RESTORE_AGE_IDENTITY`, `RESTORE_MONITOR_URL`. This means anyone who can edit
+that workflow file, or read those secrets, can read every restaurant's
+backed-up data — see `docs/RUNBOOK.md`'s note on keeping that access small.
+It can also be run by hand from the Actions tab at any time.
