@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { isPlatformReadOnly } from "@/lib/ops/read-only";
 import { getPublicBusiness } from "@/lib/business";
 import type { Business } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
@@ -114,7 +115,8 @@ export type CreateReservationResult =
   | { ok: true; confirmationCode: string }
   | { ok: false; error: "invalid_input"; fieldErrors: Record<string, string> }
   | { ok: false; error: "slot_taken" }
-  | { ok: false; error: "rate_limited" };
+  | { ok: false; error: "rate_limited" }
+  | { ok: false; error: "read_only" };
 
 /**
  * Reserving without an account, same as ordering without one: guestName is
@@ -139,6 +141,8 @@ export async function createReservationAction(input: {
   notes?: string;
   lang: Lang;
 }): Promise<CreateReservationResult> {
+  if ((await isPlatformReadOnly()).enabled) return { ok: false, error: "read_only" };
+
   const parsed = createReservationSchema.safeParse(input);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
@@ -230,7 +234,7 @@ export async function createReservationAction(input: {
   return { ok: true, confirmationCode: reservation.confirmationCode };
 }
 
-export type CancelReservationResult = { ok: true } | { ok: false; error: "not_found" | "too_late" };
+export type CancelReservationResult = { ok: true } | { ok: false; error: "not_found" | "too_late" | "read_only" };
 
 /**
  * confirmationCode is this action's entire auth model, same as the lookup
@@ -241,6 +245,8 @@ export type CancelReservationResult = { ok: true } | { ok: false; error: "not_fo
  * oracle to enumerate codes beyond what loading the page itself would take.
  */
 export async function cancelReservationByCodeAction(confirmationCode: string): Promise<CancelReservationResult> {
+  if ((await isPlatformReadOnly()).enabled) return { ok: false, error: "read_only" };
+
   const ip = getClientIp(await headers());
   // Rate-limited attempts collapse into the same not_found a genuinely
   // missing code returns — a distinct "you're being throttled" response

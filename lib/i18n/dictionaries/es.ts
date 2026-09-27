@@ -840,6 +840,7 @@ export const es = {
     errorModifierInvalidNamed:
       "Las opciones elegidas para {dish} ya no son válidas — revisa tu carrito.",
     errorRateLimited: "Demasiados intentos. Espera unos minutos y vuelve a intentar.",
+    errorReadOnly: "Este restaurante está en mantenimiento por un momento. Vuelve a intentarlo en unos minutos.",
     errorPromotionExhausted: "Esa promoción acaba de alcanzar su límite de uso — quita el código e intenta de nuevo.",
     promoErrorNotFound: "No reconocemos ese código.",
     promoErrorNotActive: "Ese código ya no está activo.",
@@ -938,6 +939,7 @@ export const es = {
     postedAs: "Publicado como {name}",
     errorGeneric: "Algo salió mal. Intenta de nuevo.",
     errorRateLimited: "Demasiados intentos. Espera un momento e intenta de nuevo.",
+    errorReadOnly: "Este restaurante está en mantenimiento por un momento. Vuelve a intentarlo en unos minutos.",
     orderNotFoundTitle: "No encontramos ese pedido",
     orderNotFoundBody: "El enlace puede estar mal escrito, o el pedido ya no existe.",
     notReviewableTitle: "Este pedido todavía no se puede reseñar",

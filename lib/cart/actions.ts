@@ -12,6 +12,7 @@ import { getOrCreateCartForMutation, getCartItemForMutation } from "@/lib/cart/q
 import { setTableIdCookie } from "@/lib/cart/cookie";
 import { addToCartSchema, updateCartItemQuantitySchema } from "@/lib/cart/schemas";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
+import { isPlatformReadOnly } from "@/lib/ops/read-only";
 import type { Lang } from "@/lib/i18n/lang";
 
 // One shared scope across add/update/remove: a guest bypassing a limit on
@@ -47,6 +48,8 @@ export async function addToCartAction(
   _prevState: AddToCartState,
   formData: FormData
 ): Promise<AddToCartState> {
+  if ((await isPlatformReadOnly()).enabled) return { error: "read_only" };
+
   const parsed = addToCartSchema.safeParse({
     menuItemId: formData.get("menuItemId"),
     quantity: formData.get("quantity"),
@@ -99,6 +102,10 @@ export async function addToCartAction(
 }
 
 export async function updateCartItemQuantityAction(cartItemId: string, quantity: number) {
+  // Silent no-op, like the rate-limit check right below: this action has no
+  // error channel today (see AddToCartState vs. this one's plain void).
+  if ((await isPlatformReadOnly()).enabled) return;
+
   const parsed = updateCartItemQuantitySchema.safeParse({ cartItemId, quantity });
   if (!parsed.success) return;
 
@@ -124,6 +131,8 @@ export async function updateCartItemQuantityAction(cartItemId: string, quantity:
 }
 
 export async function removeCartItemAction(cartItemId: string) {
+  if ((await isPlatformReadOnly()).enabled) return;
+
   const ip = getClientIp(await headers());
   if (await isScopeRateLimited(MUTATE_SCOPE, ip, MUTATE_MAX_ATTEMPTS, MUTATE_WINDOW_MS)) return;
 

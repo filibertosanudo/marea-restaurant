@@ -6,6 +6,7 @@ import { getPublicBusiness } from "@/lib/business";
 import { businessOrigin } from "@/lib/business-origin";
 import type { Lang } from "@/lib/i18n/lang";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
+import { isPlatformReadOnly } from "@/lib/ops/read-only";
 import { subscribeSchema } from "@/lib/newsletter/schemas";
 
 // A public, unauthenticated form — same class of endpoint as reservation
@@ -17,7 +18,7 @@ const SUBSCRIBE_SCOPE = "newsletter:subscribe";
 const SUBSCRIBE_MAX_ATTEMPTS = 10;
 const SUBSCRIBE_WINDOW_MS = 60 * 60 * 1000;
 
-export type SubscribeResult = { ok: true } | { ok: false; error: "invalid_input" | "rate_limited" };
+export type SubscribeResult = { ok: true } | { ok: false; error: "invalid_input" | "rate_limited" | "read_only" };
 
 /**
  * Always the same success response whether the address is brand new,
@@ -27,6 +28,11 @@ export type SubscribeResult = { ok: true } | { ok: false; error: "invalid_input"
  * specific than "check your email."
  */
 export async function subscribeAction(email: string, lang: Lang): Promise<SubscribeResult> {
+  // confirmSubscriptionAction and unsubscribeAction stay exempt: a token
+  // already emailed before the window opened is the same class of "let
+  // someone finish what they started" as the password-reset flow.
+  if ((await isPlatformReadOnly()).enabled) return { ok: false, error: "read_only" };
+
   const parsed = subscribeSchema.safeParse({ email });
   if (!parsed.success) return { ok: false, error: "invalid_input" };
 

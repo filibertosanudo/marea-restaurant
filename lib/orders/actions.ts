@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getPublicBusiness } from "@/lib/business";
+import { isPlatformReadOnly } from "@/lib/ops/read-only";
 import { invalidatePublicCache } from "@/lib/cache/public";
 import { createOrderFromCart, CheckoutError } from "@/lib/orders/create-order";
 import { checkoutSchema } from "@/lib/orders/schemas";
@@ -24,7 +25,8 @@ export type CheckoutState =
         | "modifier_unavailable"
         | "modifier_invalid"
         | "promotion_exhausted"
-        | "rate_limited";
+        | "rate_limited"
+        | "read_only";
       dishName?: string;
     }
   | undefined;
@@ -34,6 +36,8 @@ export async function createOrderAction(
   _prevState: CheckoutState,
   formData: FormData
 ): Promise<CheckoutState> {
+  if ((await isPlatformReadOnly()).enabled) return { error: "read_only" };
+
   const parsed = checkoutSchema.safeParse({
     guestName: formData.get("guestName"),
     guestPhone: formData.get("guestPhone"),
