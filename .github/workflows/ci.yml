@@ -202,24 +202,28 @@ jobs:
         run: |
           docker buildx build --target ops --tag marea-ops:local \
             --cache-from type=gha,scope=ops --cache-to type=gha,mode=max,scope=ops --load .
+      # MinIO no longer publishes its image on Docker Hub, so the server
+      # binary runs on the runner itself; the ops container reaches it, and
+      # Postgres, over the host network.
       - name: Start Postgres 17 and MinIO
         run: |
-          docker network create ops-ci
-          docker run -d --name pg --network ops-ci -e POSTGRES_USER=marea -e POSTGRES_PASSWORD=marea -e POSTGRES_DB=marea postgres:17-alpine
-          docker run -d --name minio --network ops-ci --network-alias minio -p 9000:9000 \
-            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin-secret minio/minio server /data
+          docker run -d --name pg --network host -e POSTGRES_USER=marea -e POSTGRES_PASSWORD=marea -e POSTGRES_DB=marea postgres:17-alpine
+          curl -sSfL https://dl.min.io/server/minio/release/linux-amd64/minio -o "$RUNNER_TEMP/minio"
+          chmod +x "$RUNNER_TEMP/minio"
+          export MINIO_ROOT_USER=minioadmin MINIO_ROOT_PASSWORD=minioadmin-secret
+          nohup "$RUNNER_TEMP/minio" server "$RUNNER_TEMP/minio-data" > "$RUNNER_TEMP/minio.log" 2>&1 &
           for i in $(seq 1 30); do
             if curl -sf http://localhost:9000/minio/health/live > /dev/null && docker exec pg pg_isready -U marea > /dev/null; then exit 0; fi
             sleep 2
           done
-          echo "::error::services did not start"; exit 1
+          echo "::error::services did not start"; cat "$RUNNER_TEMP/minio.log"; exit 1
       - name: Run the backup test
         run: |
-          docker run --rm --network ops-ci \
+          docker run --rm --network host \
             -e AUTH_SECRET=ci-test-secret \
-            -e DATABASE_URL=postgresql://marea:marea@pg:5432/marea \
-            -e OPS_TEST_ADMIN_DATABASE_URL=postgresql://marea:marea@pg:5432/postgres \
-            -e OPS_TEST_S3_ENDPOINT=http://minio:9000 \
+            -e DATABASE_URL=postgresql://marea:marea@localhost:5432/marea \
+            -e OPS_TEST_ADMIN_DATABASE_URL=postgresql://marea:marea@localhost:5432/postgres \
+            -e OPS_TEST_S3_ENDPOINT=http://localhost:9000 \
             -e OPS_TEST_S3_ADMIN_KEY=minioadmin \
             -e OPS_TEST_S3_ADMIN_SECRET=minioadmin-secret \
             --entrypoint npx marea-ops:local vitest run --project integration lib/ops/backup.integration
