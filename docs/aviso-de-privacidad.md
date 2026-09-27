@@ -32,6 +32,11 @@
   para efectos contables, sin datos que identifiquen a la persona.
 - Si te diste de alta en nuestro boletín, tus datos se conservan hasta que
   te des de baja usando el enlace de cualquier correo que te enviemos.
+- Mantenemos copias de seguridad cifradas para poder recuperar el servicio
+  ante una falla. Estas copias conservan los datos tal como estaban al
+  momento de crearse y se eliminan automáticamente a más tardar 90 días
+  después. Si es necesario restaurar una copia, los plazos de eliminación
+  anteriores se vuelven a aplicar de inmediato.
 
 ## Cómo pedir que se borren tus datos
 

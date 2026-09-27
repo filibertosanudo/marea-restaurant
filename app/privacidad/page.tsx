@@ -59,6 +59,13 @@ export default function PrivacyNoticePage() {
           que te des de baja usando el enlace de cualquier correo que te
           enviemos.
         </li>
+        <li>
+          Mantenemos copias de seguridad cifradas para poder recuperar el
+          servicio ante una falla. Estas copias conservan los datos tal como
+          estaban al momento de crearse y se eliminan automáticamente a más
+          tardar 90 días después. Si es necesario restaurar una copia, los
+          plazos de eliminación anteriores se vuelven a aplicar de inmediato.
+        </li>
       </ul>
 
       <h2 className="mb-sm mt-xl text-[18px] font-semibold">Cómo pedir que se borren tus datos</h2>
