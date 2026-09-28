@@ -7,11 +7,17 @@ import { createId } from "@paralleldrive/cuid2";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, UserRole } from "@/lib/generated/prisma/client";
 
+// onboardingCompletedAt defaults set (module 19): most tests want an
+// ordinary business past the wizard — pass onboardingCompletedAt: null (and
+// onboardingStep, if the test cares which one) for the mid-wizard shape
+// /admin/asistente resumes.
 export function makeBusiness(overrides: Partial<Prisma.BusinessUncheckedCreateInput> = {}) {
   return prisma.business.create({
     data: {
       slug: `business-${createId()}`,
       name: "Test Business",
+      onboardingStep: 4,
+      onboardingCompletedAt: new Date(),
       ...overrides,
     },
   });

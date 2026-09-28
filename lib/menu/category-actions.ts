@@ -13,7 +13,10 @@ import { slugify } from "@/lib/menu/slugify";
 const ADMIN_ROLES = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
 
 export type CategoryFormState =
-  | { success: true }
+  // id: only createCategoryAction sets it — the wizard's menu step
+  // (module 19) needs the fresh row's id to add items to it in the same
+  // flow, without a second query just to look back up what was just created.
+  | { success: true; id?: string }
   | { error: string; fieldErrors?: Record<string, string> }
   | undefined;
 
@@ -61,7 +64,7 @@ export async function createCategoryAction(
     _max: { sortOrder: true },
   });
 
-  await prisma.menuCategory.create({
+  const category = await prisma.menuCategory.create({
     data: {
       businessId: business.id,
       slug,
@@ -82,7 +85,7 @@ export async function createCategoryAction(
   revalidatePath("/admin/menu/categorias");
   revalidatePath("/");
   invalidatePublicCache("menu", business.id);
-  return { success: true };
+  return { success: true, id: category.id };
 }
 
 export async function updateCategoryAction(

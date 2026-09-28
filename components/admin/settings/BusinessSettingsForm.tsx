@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
@@ -36,7 +36,16 @@ const labelClass = "mb-[4px] block text-[12.5px] font-medium text-on-surface";
 const fieldClass = "mb-md";
 const cardClass = "mb-md rounded-md border border-border bg-surface p-md";
 
-export function BusinessSettingsForm({ dict, business }: { dict: SettingsDict; business: BusinessSettings }) {
+export function BusinessSettingsForm({
+  dict,
+  business,
+  onSaved,
+}: {
+  dict: SettingsDict;
+  business: BusinessSettings;
+  /** Module 19: the wizard's step 1 advances on a successful save. Unused by the plain settings page. */
+  onSaved?: () => void;
+}) {
   const [state, formAction, pending] = useActionState<SettingsFormState, FormData>(
     updateBusinessSettingsAction,
     undefined
@@ -45,6 +54,11 @@ export function BusinessSettingsForm({ dict, business }: { dict: SettingsDict; b
   const timezoneConfirmedRef = useRef(false);
   const [confirmingTimezone, setConfirmingTimezone] = useState(false);
   const [acceptsOnlinePayment, setAcceptsOnlinePayment] = useState(business.acceptsOnlinePayment);
+
+  useEffect(() => {
+    if (state && "success" in state) onSaved?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onSaved is read once per successful save, not tracked as a dependency: the wizard passes a fresh closure every render, and re-firing on that would call it again with no new success.
+  }, [state]);
 
   /**
    * requestSubmit() below re-dispatches through this same handler, so a
