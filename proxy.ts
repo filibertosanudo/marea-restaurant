@@ -11,6 +11,10 @@ const STAFF_HOME = "/admin/menu";
 // the case where requiring one would lock someone out for good.
 const FORGOT_PASSWORD_PATH = "/admin/forgot-password";
 const RESET_PASSWORD_PREFIX = "/admin/reset-password/";
+// Module 19: signing up and confirming an email both happen before anyone
+// has a session to check.
+const SIGNUP_PATH = "/admin/signup";
+const VERIFY_EMAIL_PREFIX = "/admin/verify-email/";
 
 // Every response carries the CSP, keyed to a nonce generated fresh per
 // request — layout.tsx reads it back via headers() to stamp the inline
@@ -43,7 +47,12 @@ export default auth(async (req) => {
     return withSecurityHeaders(NextResponse.next({ request: { headers: requestHeaders } }), nonce);
   }
 
-  if (pathname === FORGOT_PASSWORD_PATH || pathname.startsWith(RESET_PASSWORD_PREFIX)) {
+  if (
+    pathname === FORGOT_PASSWORD_PATH ||
+    pathname.startsWith(RESET_PASSWORD_PREFIX) ||
+    pathname === SIGNUP_PATH ||
+    pathname.startsWith(VERIFY_EMAIL_PREFIX)
+  ) {
     return withSecurityHeaders(NextResponse.next({ request: { headers: requestHeaders } }), nonce);
   }
 

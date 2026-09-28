@@ -28,7 +28,10 @@ export default async function AdminLoginPage() {
         </div>
 
         <p className="text-center text-[12px] text-on-surface-muted">
-          {dict.auth.noPublicSignup}
+          {dict.auth.noAccountYet}{" "}
+          <a href="/admin/signup" className="font-medium text-primary underline">
+            {dict.auth.signupTitle}
+          </a>
         </p>
       </div>
     </div>

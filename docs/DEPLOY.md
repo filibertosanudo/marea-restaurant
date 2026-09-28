@@ -432,7 +432,8 @@ matters:
   your own alerting only.
 - **Dead man's switches, one per scheduled task:** each of `BACKUP_MONITOR_URL`,
   `OPS_MONITOR_PURGE_IP_URL`, `OPS_MONITOR_RATE_LIMITS_URL`,
-  `OPS_MONITOR_MEDIA_SWEEP_URL`, `OPS_MONITOR_ANONYMIZE_ALERT_URL`, and the
+  `OPS_MONITOR_MEDIA_SWEEP_URL`, `OPS_MONITOR_ANONYMIZE_ALERT_URL`,
+  `OPS_MONITOR_PURGE_UNVERIFIED_SIGNUPS_URL` (module 19), and the
   monthly restore test's `RESTORE_MONITOR_URL` (a GitHub Actions secret, not
   `.env` — see below) is a URL the task pings only when it finishes
   successfully. Create one check per variable in the monitoring service (most
@@ -448,7 +449,8 @@ docker compose up -d scheduler
 ```
 
 Runs the backup (every six hours), the two privacy purges, the orphaned-media
-sweep, and the monthly overdue-guests report — all from `docker/ops-crontab`,
+sweep, the unverified-signup cleanup (module 19), and the monthly
+overdue-guests report — all from `docker/ops-crontab`,
 all idempotent, all logged in `OpsTaskRun` (`npm run ops:read-only -- status`
 runs through the same image). It holds both the database owner's connection
 (for the backup) and the application's own `marea_app` connection (for

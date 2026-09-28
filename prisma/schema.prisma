@@ -226,9 +226,21 @@ model Organization {
   slug      String   @unique
   createdAt DateTime @default(now())
 
+  /// Module 19: null until the signup's own admin verifies their email, at
+  /// which point marea_verify_organization() (SECURITY DEFINER — marea_app
+  /// has no UPDATE grant on this table) stamps it. Until then this
+  /// organization's business exists for its owner to configure — the wizard
+  /// works, Stripe connect does not — but is not shown to the public
+  /// (lib/business.ts). createOrganization() sets this at creation for an
+  /// operator-run alta (scripts/tenants.ts): nobody is waiting on an email
+  /// there. Never re-checked once set: a later Stripe/subscription lapse is
+  /// the read-only degradation (module 19, phase 8), not this.
+  verifiedAt DateTime?
+
   businesses Business[]
   /// Usuarios ORG_ADMIN de esta organización (User.organizationId).
   admins     User[]
+  emailVerificationTokens EmailVerificationToken[]
 }
 
 /// El "tenant". En v1 hay exactamente una fila (Marea) y el código puede
@@ -442,6 +454,7 @@ model User {
   refunds             Refund[]
   notifications       NotificationJob[]
   passwordResetTokens PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
   membershipEvents    MembershipEvent[]
   openedCashSessions  CashSession[]        @relation("CashSessionOpenedBy")
   closedCashSessions  CashSession[]        @relation("CashSessionClosedBy")
@@ -1723,6 +1736,30 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+}
+
+/// Module 19: the one-time link a signup emails to confirm the address is
+/// real, before its business is shown to anyone. Same shape as
+/// PasswordResetToken on purpose (see lib/auth/reset-token.ts's own
+/// comment): a raw, single-use, 256-bit CSPRNG value that only ever exists
+/// in the emailed link and the browser that opens it, hashed at rest.
+/// organizationId is denormalized rather than looked up through the user's
+/// membership at verify time — signup gives a user exactly one business and
+/// one organization, so the token can simply say which one it unlocks.
+model EmailVerificationToken {
+  id             String    @id @default(cuid())
+  userId         String
+  organizationId String
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([organizationId])
 }
 
 /// Suscriptores del footer ("Let's connect with us").

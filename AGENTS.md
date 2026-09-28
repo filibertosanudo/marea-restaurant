@@ -85,7 +85,15 @@ instead of duplicating it here.
   `PERF_BUSINESS`. Order folios come from `OrderCounter`, keyed by business
   and local day, so two businesses both start at `-001`. A new script that
   reads or writes business data walks the businesses or takes one on the
-  command line.
+  command line. `signup:purge-unverified` (module 19) is the one exception:
+  it deletes a whole organization/business/admin before any of them belong to
+  a request-shaped "business" at all (row level security would otherwise
+  hide every candidate from it, the same way it hides everything from a
+  script with no business set), so it goes through
+  `marea_unverified_signups`/`marea_purge_unverified_signup`, the
+  `SECURITY DEFINER` functions in
+  `prisma/migrations/20261003000000_add_signup_cleanup`, instead of either
+  pattern above.
 - **Card payments go to the business's own Stripe account, and every payment
   call names it.** `stripeFor(account)` (`lib/stripe/payments.ts`) is the only
   way to make them: the account is a required argument (`null` = the platform's

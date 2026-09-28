@@ -121,6 +121,7 @@ const schema = z
     OPS_MONITOR_RATE_LIMITS_URL: optional(z.string().url()),
     OPS_MONITOR_MEDIA_SWEEP_URL: optional(z.string().url()),
     OPS_MONITOR_ANONYMIZE_ALERT_URL: optional(z.string().url()),
+    OPS_MONITOR_PURGE_UNVERIFIED_SIGNUPS_URL: optional(z.string().url()),
     // Where the monthly "guests are overdue for anonymization" report goes
     // (scripts/ops/anonymize-alert.ts) — the platform owner, not a business:
     // the decision itself stays manual (privacy:anonymize-guests), this only

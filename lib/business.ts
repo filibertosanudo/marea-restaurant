@@ -75,6 +75,28 @@ async function loadRow(id: string): Promise<Business | null> {
   return runInTenant(id, () => prisma.business.findFirst({ where: { id, deletedAt: null } }));
 }
 
+/**
+ * Whether a business may be shown to the public right now (module 19). Null
+ * organizationId (no organization at all — every business before this
+ * module, and the platform-operator path in lib/tenants/provision.ts) is
+ * always publishable: nobody is waiting on an email there. An organization
+ * is read from inside the business's own tenant scope, same as loadRow —
+ * its row level security policy (prisma/migrations/20261001000000_add_signup_primitive)
+ * only opens from there. This gates byHost()'s two callers (bySlug,
+ * onlyBusiness) only — byId, used by getBusinessForRequest for the signed-in
+ * admin panel, is deliberately untouched: an unverified signup's own admin
+ * must still reach the wizard.
+ */
+async function publishable(business: Business | null): Promise<Business | null> {
+  if (!business || !business.organizationId) return business;
+  const organizationId = business.organizationId;
+  const verified = await runInTenant(business.id, async () => {
+    const organization = await prisma.organization.findUnique({ where: { id: organizationId }, select: { verifiedAt: true } });
+    return organization?.verifiedAt != null;
+  });
+  return verified ? business : null;
+}
+
 async function byId(id: string): Promise<Business | null> {
   const cached = await cachedPublicRead("business", "business-row", idScope(id), async () => {
     const row = await loadRow(id);
@@ -90,7 +112,7 @@ async function bySlug(slug: string): Promise<Business | null> {
     slugScope(slug),
     async () => {
       const id = await businessIdForSlug(slug);
-      const row = id ? await loadRow(id) : null;
+      const row = id ? await publishable(await loadRow(id)) : null;
       return row ? toCacheable(row) : null;
     },
     { tenantScoped: false }
@@ -106,7 +128,7 @@ async function onlyBusiness(): Promise<Business | null> {
     DEFAULT_SCOPE,
     async () => {
       const id = await onlyBusinessId();
-      const row = id ? await loadRow(id) : null;
+      const row = id ? await publishable(await loadRow(id)) : null;
       return row ? toCacheable(row) : null;
     },
     { tenantScoped: false }
@@ -158,7 +180,7 @@ export async function getPublicBusinessForToken(kind: LegacyTokenKind, token: st
   if (!env.BUSINESS_ROOT_DOMAIN) notFound();
 
   const ownerId = await businessIdForToken(kind, token);
-  const business = ownerId ? await byId(ownerId) : null;
+  const business = ownerId ? await publishable(await byId(ownerId)) : null;
   if (!business) notFound();
   redirect(`${businessOrigin(business)}${path}`);
 }

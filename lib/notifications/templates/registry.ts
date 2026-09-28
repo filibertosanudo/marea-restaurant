@@ -6,6 +6,8 @@ import { orderReadyTemplate, orderDeliveredTemplate } from "@/lib/notifications/
 import { orderCancelledTemplate } from "@/lib/notifications/templates/order-cancelled";
 import { passwordResetTemplate } from "@/lib/notifications/templates/password-reset";
 import { newsletterConfirmTemplate } from "@/lib/notifications/templates/newsletter-confirm";
+import { signupVerifyTemplate } from "@/lib/notifications/templates/signup-verify";
+import { signupEmailTakenTemplate } from "@/lib/notifications/templates/signup-email-taken";
 import type { RenderedEmail, Template, TemplateBusiness, TemplateKey, TemplatePayloadMap } from "@/lib/notifications/templates/types";
 
 const registry: { [K in TemplateKey]: Template<TemplatePayloadMap[K]> } = {
@@ -16,6 +18,8 @@ const registry: { [K in TemplateKey]: Template<TemplatePayloadMap[K]> } = {
   "order.cancelled": orderCancelledTemplate,
   "password.reset": passwordResetTemplate,
   "newsletter.confirm": newsletterConfirmTemplate,
+  "signup.verify": signupVerifyTemplate,
+  "signup.email-taken": signupEmailTakenTemplate,
 };
 
 /** Thrown by renderTemplate for a templateKey with no matching template — never swallowed. A job that names one is a bug in whoever enqueued it, not something a retry fixes. */

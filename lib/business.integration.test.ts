@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { getBusinessForRequest, getPublicBusiness, getPublicBusinessForToken } from "@/lib/business";
 import { prisma } from "@/lib/prisma";
-import { makeBusiness, makeOrder, makeStaff } from "@/test/factories";
+import { makeBusiness, makeOrder, makeOrganization, makeStaff } from "@/test/factories";
 import { setTestSession, sessionUserFromRow } from "@/test/stubs/auth-session";
 import { setTestHost } from "@/test/stubs/next-headers";
 
@@ -46,6 +46,46 @@ describe("getPublicBusiness", () => {
 
     setTestHost("cala.localhost:3000");
     expect((await getPublicBusiness()).id).toBe(cala.id);
+  });
+});
+
+describe("publication gate for an unverified signup (module 19)", () => {
+  it("hides a business whose organization is unverified from the public, on both a subdomain and a bare domain", async () => {
+    const organization = await makeOrganization({ verifiedAt: null });
+    await makeBusiness({ slug: "nuevo", organizationId: organization.id });
+
+    setTestHost("nuevo.localhost:3000");
+    await expect(getPublicBusiness()).rejects.toThrow("NOT_FOUND");
+
+    setTestHost("localhost:3000");
+    await expect(getPublicBusiness()).rejects.toThrow("NOT_FOUND");
+  });
+
+  it("shows it once the organization is verified", async () => {
+    const organization = await makeOrganization({ verifiedAt: null });
+    const business = await makeBusiness({ slug: "nuevo", organizationId: organization.id });
+
+    setTestHost("nuevo.localhost:3000");
+    await expect(getPublicBusiness()).rejects.toThrow("NOT_FOUND");
+
+    await prisma.organization.update({ where: { id: organization.id }, data: { verifiedAt: new Date() } });
+    expect((await getPublicBusiness()).id).toBe(business.id);
+  });
+
+  it("never hides a business with no organization at all — the legacy, operator-onboarded shape", async () => {
+    const standalone = await makeBusiness({ slug: "standalone" });
+    setTestHost("standalone.localhost:3000");
+    expect((await getPublicBusiness()).id).toBe(standalone.id);
+  });
+
+  it("still lets a signed-in admin reach the panel of their own unverified business", async () => {
+    const organization = await makeOrganization({ verifiedAt: null });
+    const business = await makeBusiness({ slug: "nuevo", organizationId: organization.id });
+    const staff = await makeStaff("BUSINESS_ADMIN");
+    setTestSession(sessionUserFromRow(staff, { businessId: business.id }));
+
+    setTestHost("cala.localhost:3000");
+    expect((await getBusinessForRequest()).id).toBe(business.id);
   });
 });
 

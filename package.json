@@ -30,6 +30,7 @@
     "storage:sweep": "tsx --conditions=react-server scripts/sweep-orphaned-media.ts",
     "rate-limits:purge": "tsx --conditions=react-server scripts/purge-rate-limits.ts",
     "privacy:purge-ip-data": "tsx --conditions=react-server scripts/purge-old-ip-data.ts",
+    "signup:purge-unverified": "tsx --conditions=react-server scripts/purge-unverified-signups.ts",
     "privacy:anonymize-guests": "tsx --conditions=react-server scripts/anonymize-old-guests.ts",
     "ops:backup": "tsx scripts/ops/backup.ts",
     "ops:backup-bucket": "tsx scripts/ops/backup-bucket.ts",

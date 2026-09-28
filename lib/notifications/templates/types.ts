@@ -50,6 +50,19 @@ export type NewsletterConfirmPayload = {
   confirmUrl: string;
 };
 
+export type SignupVerifyPayload = {
+  verifyUrl: string;
+  businessName: string;
+  expiresInHours: number;
+};
+
+/** Sent instead of a verification link when someone signs up with an email
+ * that already has an account — never both, see lib/auth/signup-actions.ts. */
+export type SignupEmailTakenPayload = {
+  loginUrl: string;
+  forgotPasswordUrl: string;
+};
+
 /** One entry per templateKey the queue can carry — see prisma/schema.prisma's NotificationJob comment for where each is enqueued. */
 export type TemplatePayloadMap = {
   "reservation.confirmed": ReservationConfirmedPayload;
@@ -59,6 +72,8 @@ export type TemplatePayloadMap = {
   "order.cancelled": OrderCancelledPayload;
   "password.reset": PasswordResetPayload;
   "newsletter.confirm": NewsletterConfirmPayload;
+  "signup.verify": SignupVerifyPayload;
+  "signup.email-taken": SignupEmailTakenPayload;
 };
 
 export type TemplateKey = keyof TemplatePayloadMap;
