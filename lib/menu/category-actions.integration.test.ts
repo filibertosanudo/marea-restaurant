@@ -31,8 +31,8 @@ describe("createCategoryAction", () => {
       categoryForm({ "en.name": "Main Dishes", "en.description": "", "es.name": "", "es.description": "", isActive: "on" })
     );
 
-    expect(result).toEqual({ success: true });
     const category = await prisma.menuCategory.findFirstOrThrow({ where: { businessId: business.id } });
+    expect(result).toEqual({ success: true, id: category.id });
     expect(category.slug).toBe("main-dishes");
   });
 

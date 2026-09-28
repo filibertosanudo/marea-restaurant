@@ -307,6 +307,19 @@ model Business {
   /// orders keep their old folios, and dropping a column buys nothing.
   orderSequence Int @default(0)
 
+  /// Module 19, phase 4: the self-service wizard's own progress — 1..4, which
+  /// step /admin/asistente resumes at if the browser closes mid-way.
+  /// onboardingCompletedAt null means "still going", set means the wizard is
+  /// done and /admin sends this business straight to the normal panel.
+  /// Everything provisioned before this column existed, and everything
+  /// createOrganization()/createBusiness() create afterward (an operator
+  /// already vouches for those — nobody is waiting on a wizard there), is
+  /// backfilled/created as already complete; only marea_signup()'s own
+  /// businesses start the wizard. Same "no existing business changes
+  /// behavior" rule as minBookingLeadMinutes/minCancelLeadMinutes above.
+  onboardingStep        Int       @default(1)
+  onboardingCompletedAt DateTime?
+
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

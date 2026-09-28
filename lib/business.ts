@@ -27,6 +27,7 @@ function toCacheable(b: Business) {
     updatedAt: b.updatedAt.toISOString(),
     deletedAt: b.deletedAt?.toISOString() ?? null,
     stripeStatusCheckedAt: b.stripeStatusCheckedAt?.toISOString() ?? null,
+    onboardingCompletedAt: b.onboardingCompletedAt?.toISOString() ?? null,
   };
 }
 
@@ -40,6 +41,7 @@ export function fromCacheable(c: ReturnType<typeof toCacheable>): Business {
     updatedAt: new Date(c.updatedAt),
     deletedAt: c.deletedAt === null ? null : new Date(c.deletedAt),
     stripeStatusCheckedAt: c.stripeStatusCheckedAt === null ? null : new Date(c.stripeStatusCheckedAt),
+    onboardingCompletedAt: c.onboardingCompletedAt === null ? null : new Date(c.onboardingCompletedAt),
   };
 }
 

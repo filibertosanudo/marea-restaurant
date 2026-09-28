@@ -77,12 +77,15 @@ export function ScheduleEditor({
   timezone,
   openingHours,
   closures,
+  onSaved,
 }: {
   dict: SettingsDict;
   lang: Lang;
   timezone: string;
   openingHours: OpeningHourRow[];
   closures: ClosureRow[];
+  /** Module 19: the wizard's step 2 advances once the weekly hours save — never fired by a closure, which is optional. Unused by the plain settings page. */
+  onSaved?: () => void;
 }) {
   const [days, setDays] = useState<DayScheduleInput[]>(() => buildInitialDays(openingHours));
   const [dayErrors, setDayErrors] = useState<Record<number, string>>({});
@@ -137,6 +140,7 @@ export function ScheduleEditor({
       } else {
         setDayErrors({});
         setSaved(true);
+        onSaved?.();
       }
     });
   }

@@ -352,6 +352,8 @@ async function seedSecondBusiness(marea: { id: string }) {
       acceptsOnlinePayment: false, // sin cuenta de Stripe propia todavía (módulo 17b)
       acceptsPayAtCounter: true,
       organizationId: organization.id,
+      onboardingStep: 4,
+      onboardingCompletedAt: new Date(),
     },
   });
 
@@ -494,6 +496,9 @@ async function main() {
       addressLine2: "Marina District, Portside 90210",
       acceptsOnlinePayment: true,
       acceptsPayAtCounter: true,
+      // Past module 19's wizard: seed data behaves like a live business.
+      onboardingStep: 4,
+      onboardingCompletedAt: new Date(),
     },
   });
 

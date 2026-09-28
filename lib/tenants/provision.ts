@@ -97,6 +97,10 @@ export async function createBusiness(db: Db, input: NewBusiness): Promise<Busine
         ...(input.currency ? { currency: input.currency } : {}),
         acceptsOnlinePayment: false,
         organizationId: organization.id,
+        // An operator is running this by hand — nobody is waiting on the
+        // self-service wizard for a branch created this way (module 19).
+        onboardingStep: 4,
+        onboardingCompletedAt: new Date(),
       },
     });
     for (const locale of ["en", "es"]) {
