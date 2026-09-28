@@ -18,6 +18,19 @@ export type VerifyReport = {
 
 const MEDIA_PATH = "/api/media/";
 
+/**
+ * Row level security scopes every other table to exactly one business, so
+ * summing what marea_app sees across every business always equals the
+ * owner's total — a row can't be double-counted if only one business can
+ * ever see it. Organization breaks that on purpose (module 19): a chain's
+ * organization is visible from every one of its own businesses, so the sum
+ * over-counts it by however many businesses share it. Counted by distinct
+ * id instead, for this table only — the general sum stays a cheap
+ * count(*) per table per business, not a full id scan, for every table
+ * that doesn't need the exception.
+ */
+const SHARED_ACROSS_BUSINESSES_TABLES = new Set(["Organization"]);
+
 type VerifyInput = {
   ownerUrl: string;
   appUrl: string;
@@ -94,18 +107,32 @@ export async function verifyRestore(input: VerifyInput): Promise<VerifyReport> {
     } as unknown as Pick<PrismaClient, "$queryRaw">);
 
     const count = async (table: string) => Number((await app.query<{ n: string }>(`SELECT count(*) AS n FROM "${table}"`)).rows[0].n);
+    const ids = async (table: string) => (await app.query<{ id: string }>(`SELECT id FROM "${table}"`)).rows.map((r) => r.id);
 
     await app.query("SELECT set_config('app.business_id', '', false)");
     let appRowsWithoutBusiness = 0;
     for (const table of rlsTables) appRowsWithoutBusiness += await count(table);
 
-    const seen = new Map<string, number>();
+    const summed = new Map<string, number>();
+    const distinctIds = new Map<string, Set<string>>();
     for (const id of businessIds) {
       await app.query("SELECT set_config('app.business_id', $1, false)", [id]);
-      for (const table of rlsTables) seen.set(table, (seen.get(table) ?? 0) + (await count(table)));
+      for (const table of rlsTables) {
+        if (SHARED_ACROSS_BUSINESSES_TABLES.has(table)) {
+          const set = distinctIds.get(table) ?? new Set<string>();
+          for (const rowId of await ids(table)) set.add(rowId);
+          distinctIds.set(table, set);
+        } else {
+          summed.set(table, (summed.get(table) ?? 0) + (await count(table)));
+        }
+      }
     }
     return {
-      rls: rlsTables.map((table) => ({ table, ownerRows: ownerCounts.get(table) ?? 0, appRows: seen.get(table) ?? 0 })),
+      rls: rlsTables.map((table) => ({
+        table,
+        ownerRows: ownerCounts.get(table) ?? 0,
+        appRows: SHARED_ACROSS_BUSINESSES_TABLES.has(table) ? (distinctIds.get(table)?.size ?? 0) : (summed.get(table) ?? 0),
+      })),
       appRowsWithoutBusiness,
       roleProblem,
     };
