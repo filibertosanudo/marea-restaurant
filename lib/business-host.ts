@@ -27,7 +27,11 @@ export function originFor(slug: string, appOrigin: string, rootDomain: string | 
 
 // Names that would be confusing or dangerous as a subdomain: infrastructure a
 // deployment may serve on the same domain, and words that read as the platform.
-const RESERVED_SLUGS = new Set([
+// Exported so lib/db/reserved-slugs.test.ts can hold it against the copy
+// marea_signup() checks in the database (prisma/migrations/
+// 20261001000000_add_signup_primitive) — the two are hand-written in two
+// different languages and have to be kept equal on purpose, by a test.
+export const RESERVED_SLUGS = new Set([
   "www", "admin", "api", "app", "auth", "mail", "smtp", "imap", "ftp", "static", "assets", "cdn", "media",
   "status", "docs", "help", "support", "billing", "dashboard", "login", "signup", "root", "localhost", "test",
 ]);

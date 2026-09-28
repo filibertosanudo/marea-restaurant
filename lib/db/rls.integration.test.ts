@@ -11,6 +11,7 @@ import { currentTenant } from "@/lib/tenancy/request-tenant";
 import { setTestTenantHeader } from "@/test/stubs/next-headers";
 import { testSchema } from "@/test/db";
 import { makeBusiness, makeMenuCategory, makeMenuItem, makeOrder, makeOrganization } from "@/test/factories";
+import { ProvisionError, signUp } from "@/lib/tenants/provision";
 
 // Row level security does nothing for the role that owns the tables, so every
 // assertion here goes through a client that connects as `marea_app` (or
@@ -287,14 +288,69 @@ describe("organizations under the application role", () => {
     expect(await app.business.count()).toBe(0);
   });
 
-  it("can read an organization but neither create, rename nor delete one", async () => {
+  it("reads an organization only from inside one of its own businesses, and can neither create, rename nor delete one (module 19)", async () => {
     const org = await makeOrganization({ name: "Chain" });
+    const inChain = await makeBusiness({ slug: "in-chain", organizationId: org.id });
+    const outside = await makeBusiness({ slug: "outside" });
     const app = appClient();
 
-    expect((await app.organization.findUnique({ where: { id: org.id } }))?.name).toBe("Chain");
+    // No business set at all: invisible, same as everything else.
+    expect(await app.organization.findMany()).toEqual([]);
+    expect(await app.organization.findUnique({ where: { id: org.id } })).toBeNull();
+
+    await runInTenant(inChain.id, async () => {
+      expect((await app.organization.findUnique({ where: { id: org.id } }))?.name).toBe("Chain");
+    });
+    // A different business, in no organization of its own: still nothing.
+    await runInTenant(outside.id, async () => {
+      expect(await app.organization.findUnique({ where: { id: org.id } })).toBeNull();
+    });
+
     await expect(app.organization.create({ data: { name: "Mine", slug: "mine" } })).rejects.toThrow(/permission denied/);
     await expect(app.organization.update({ where: { id: org.id }, data: { name: "Hijacked" } })).rejects.toThrow(/permission denied/);
     await expect(app.organization.delete({ where: { id: org.id } })).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe("marea_signup()", () => {
+  it("creates a fresh organization, a business in it and both translation rows, atomically", async () => {
+    const app = appClient();
+
+    const { organizationId, businessId } = await signUp(app, { slug: "nuevo", name: "Nuevo Restaurante" });
+
+    const org = await owner.organization.findUniqueOrThrow({ where: { id: organizationId } });
+    const business = await owner.business.findUniqueOrThrow({ where: { id: businessId } });
+    expect(org).toMatchObject({ slug: "nuevo", name: "Nuevo Restaurante" });
+    expect(business).toMatchObject({ slug: "nuevo", name: "Nuevo Restaurante", organizationId, acceptsOnlinePayment: false });
+    expect(await owner.businessTranslation.count({ where: { businessId } })).toBe(2);
+
+    // The one door: direct writes to either table are still refused exactly
+    // as before this migration — marea_signup grants no new permission.
+    await expect(app.organization.create({ data: { name: "Sneaky", slug: "sneaky" } })).rejects.toThrow(/permission denied/);
+    await expect(app.business.create({ data: { name: "Sneaky", slug: "sneaky2" } as never })).rejects.toThrow(/row-level security/);
+  });
+
+  it("cannot be pointed at an existing organization: it always makes a new one", async () => {
+    // signUp() takes no organization id at all — the type system already
+    // enforces this, so the guarantee lives in NewSignup's shape, not in a
+    // runtime check. This asserts the two signups it makes never collide,
+    // which is the observable half of that guarantee.
+    const app = appClient();
+    const a = await signUp(app, { slug: "cadena-a", name: "Cadena A" });
+    const b = await signUp(app, { slug: "cadena-b", name: "Cadena B" });
+    expect(a.organizationId).not.toBe(b.organizationId);
+  });
+
+  it("refuses a reserved slug, an invalid one, and a duplicate, with a legible error and nothing half-created", async () => {
+    const app = appClient();
+    await signUp(app, { slug: "cala", name: "Cala" });
+
+    await expect(signUp(app, { slug: "admin", name: "x" })).rejects.toThrow(/reserved/);
+    await expect(signUp(app, { slug: "Not Valid", name: "x" })).rejects.toThrow(ProvisionError);
+    await expect(signUp(app, { slug: "cala", name: "again" })).rejects.toThrow(/already exists/);
+
+    expect(await owner.business.count()).toBe(1);
+    expect(await owner.organization.count()).toBe(1);
   });
 });
 
