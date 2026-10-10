@@ -23,3 +23,14 @@ export function toTeamMemberDTO(
     mustChangePassword: membership.user.mustChangePassword,
   };
 }
+
+/** An ORG_ADMIN of the business's organization: shown to the team, never edited from here. */
+export type TeamOwnerDTO = {
+  userId: string;
+  name: string;
+  email: string;
+};
+
+export function toTeamOwnerDTO(owner: { id: string; name: string | null; email: string | null }): TeamOwnerDTO {
+  return { userId: owner.id, name: owner.name ?? "", email: owner.email ?? "" };
+}
