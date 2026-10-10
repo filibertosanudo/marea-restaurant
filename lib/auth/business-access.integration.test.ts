@@ -49,6 +49,18 @@ describe("authorizeBusiness", () => {
     expect(await authorizeBusiness(owner.id, "no-such-business")).toBeNull();
   });
 
+  it("does not let a membership narrow an ORG_ADMIN: the organization answers first", async () => {
+    const { orgA, a1, a2 } = await world();
+    const owner = await makeOrgAdmin(orgA.id);
+    await makeMembership(owner.id, a1.id, { role: "STAFF" });
+    await makeMembership(owner.id, a2.id, { role: "STAFF", isActive: false });
+
+    // A STAFF row and an inactive one at their own businesses change nothing:
+    // roleAtBusiness reads User.role and organizationId before any membership.
+    expect(await authorizeBusiness(owner.id, a1.id)).toBe("BUSINESS_ADMIN");
+    expect(await authorizeBusiness(owner.id, a2.id)).toBe("BUSINESS_ADMIN");
+  });
+
   it("lets the platform operator act on any business that exists", async () => {
     const { a1, b1 } = await world();
     const operator = await makeStaff("SUPER_ADMIN");

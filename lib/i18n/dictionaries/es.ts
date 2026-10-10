@@ -421,6 +421,9 @@ export const es = {
       lastAdminError:
         "No puedes hacer esto: es el último administrador activo del negocio.",
       genericMutationError: "No se pudo completar el cambio. Intenta de nuevo.",
+      ownerError: "Un dueño de la organización no se cambia desde aquí.",
+      ownersTitle: "Dueños",
+      ownersLead: "Administran todas las sucursales de la organización. Aquí solo se muestran.",
     },
     reports: {
       orgReportLink: "Todas las sucursales",

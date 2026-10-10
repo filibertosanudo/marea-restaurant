@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { UserRole } from "@/lib/generated/prisma/client";
 import { requirePageRole } from "@/lib/auth/permissions";
+import { listOrganizationBusinesses } from "@/lib/auth/business-access";
 import { getBusinessForRequest } from "@/lib/business";
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
@@ -40,10 +41,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const dict = getDictionary(lang).reports;
   const locale = toIntlLocale(lang);
 
+  // A chain-wide report of one branch is the branch's own report: the link
+  // appears once the organization has a second one to compare it with.
+  const hasSeveralBranches = session.user.orgAdmin && (await listOrganizationBusinesses(session.user.id)).length > 1;
+
   const view = params.view === "cortes" ? "cortes" : "ventas";
   const viewTabs = (
     <div className="flex flex-wrap items-center gap-md">
-      {session.user.orgAdmin && (
+      {hasSeveralBranches && (
         <Link href="/admin/reportes/organizacion" className="text-[12.5px] font-medium text-primary hover:underline">
           {dict.orgReportLink}
         </Link>
