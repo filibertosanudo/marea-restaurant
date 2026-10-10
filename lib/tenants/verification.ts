@@ -1,21 +1,23 @@
 import type { PrismaClient } from "@/lib/generated/prisma/client";
 import { runWithoutTenant } from "@/lib/tenancy/context";
 
-/**
- * Stamps Organization.verifiedAt, the one write marea_app cannot make
- * directly (organization_access revoked UPDATE along with INSERT/DELETE —
- * module 19, phase 0). Idempotent: a second call, or a call for an
- * organization that was never unverified to begin with, is a no-op that
- * returns false rather than an error — see the migration's own comment on
- * marea_verify_organization for why a 0-row UPDATE isn't a failure here.
- */
-export async function verifyOrganization(db: Pick<PrismaClient, "$queryRaw">, organizationId: string): Promise<boolean> {
-  const [row] = await runWithoutTenant(() =>
-    db.$queryRaw<Array<{ marea_verify_organization: boolean | null }>>`SELECT marea_verify_organization(${organizationId})`
-  );
-  return row?.marea_verify_organization === true;
-}
+export type Verified = { userId: string; organizationId: string };
 
+/**
+ * Verifies a signup from its emailed token's hash, in one call inside the
+ * database: finds the token, requires it unused and unexpired, marks it used
+ * and stamps the user's email and the organization as verified. Null for a
+ * token that is unknown, expired or already used, all alike. There is no
+ * function that verifies an organization without its token: the write marea_app
+ * cannot make with an ordinary UPDATE (Organization is read-only to it) has
+ * exactly this one door.
+ */
+export async function verifyByToken(db: Pick<PrismaClient, "$queryRaw">, tokenHash: string): Promise<Verified | null> {
+  const [row] = await runWithoutTenant(() =>
+    db.$queryRaw<Array<{ user_id: string; organization_id: string }>>`SELECT user_id, organization_id FROM marea_verify_organization(${tokenHash})`
+  );
+  return row ? { userId: row.user_id, organizationId: row.organization_id } : null;
+}
 /**
  * Organizations still unverified past `cutoff`. marea_app has no way to read
  * this from "Organization" directly outside a business context (this

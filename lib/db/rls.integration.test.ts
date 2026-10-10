@@ -12,7 +12,7 @@ import { setTestTenantHeader } from "@/test/stubs/next-headers";
 import { testSchema } from "@/test/db";
 import { makeBusiness, makeMenuCategory, makeMenuItem, makeOrder, makeOrganization } from "@/test/factories";
 import { ProvisionError, signUp } from "@/lib/tenants/provision";
-import { listUnverifiedSignups, purgeUnverifiedSignup, verifyOrganization } from "@/lib/tenants/verification";
+import { listUnverifiedSignups, purgeUnverifiedSignup, verifyByToken } from "@/lib/tenants/verification";
 
 // Row level security does nothing for the role that owns the tables, so every
 // assertion here goes through a client that connects as `marea_app` (or
@@ -439,19 +439,42 @@ describe("the worker role", () => {
 });
 
 describe("email verification (module 19, phase 3)", () => {
-  it("verifies an organization once, and does nothing the second time or for one that doesn't exist", async () => {
+  it("verifies from the token alone, once, and not for an expired or unknown one", async () => {
     const organization = await makeOrganization({ verifiedAt: null });
+    const user = await owner.user.create({ data: { email: "verify@example.test", passwordHash: "x" } });
+    const token = (hash: string, expiresAt: Date) =>
+      owner.emailVerificationToken.create({ data: { userId: user.id, organizationId: organization.id, tokenHash: hash, expiresAt } });
+    await token("good", new Date(Date.now() + 60_000));
+    await token("expired", new Date(Date.now() - 60_000));
     const app = appClient();
 
-    expect(await verifyOrganization(app, organization.id)).toBe(true);
-    const verified = await owner.organization.findUniqueOrThrow({ where: { id: organization.id } });
-    expect(verified.verifiedAt).not.toBeNull();
+    expect(await verifyByToken(app, "expired")).toBeNull();
+    expect(await verifyByToken(app, "nope")).toBeNull();
+    expect((await owner.organization.findUniqueOrThrow({ where: { id: organization.id } })).verifiedAt).toBeNull();
 
-    expect(await verifyOrganization(app, organization.id)).toBe(false);
-    expect(await verifyOrganization(app, "nope")).toBe(false);
+    expect(await verifyByToken(app, "good")).toEqual({ userId: user.id, organizationId: organization.id });
+    expect((await owner.organization.findUniqueOrThrow({ where: { id: organization.id } })).verifiedAt).not.toBeNull();
+    expect((await owner.user.findUniqueOrThrow({ where: { id: user.id } })).emailVerified).not.toBeNull();
+    // Single use, and every other open token of the same user closed with it.
+    expect(await verifyByToken(app, "good")).toBeNull();
+    expect(await owner.emailVerificationToken.count({ where: { userId: user.id, usedAt: null } })).toBe(0);
 
-    // Still no ordinary UPDATE access — the function is the only door.
+    // No door takes an organization id any more, and the table is still read-only to marea_app.
     await expect(app.organization.update({ where: { id: organization.id }, data: { name: "Hijacked" } })).rejects.toThrow(/permission denied/);
+    expect(await app.$queryRaw`SELECT * FROM marea_verify_organization(${organization.id})`).toEqual([]);
+  });
+
+  it("verifies an organization once under concurrent calls with the same token", async () => {
+    const organization = await makeOrganization({ verifiedAt: null });
+    const user = await owner.user.create({ data: { email: "race@example.test", passwordHash: "x" } });
+    await owner.emailVerificationToken.create({
+      data: { userId: user.id, organizationId: organization.id, tokenHash: "race", expiresAt: new Date(Date.now() + 60_000) },
+    });
+    const app = appClient();
+
+    const results = await Promise.all(Array.from({ length: 5 }, () => verifyByToken(app, "race")));
+
+    expect(results.filter((r) => r !== null)).toHaveLength(1);
   });
 
   it("purges an unverified signup's business, user and organization, but refuses once it's verified", async () => {

@@ -9,7 +9,7 @@ import { signupSchema } from "@/lib/auth/schemas";
 import { generateVerificationToken, hashVerificationToken, SIGNUP_VERIFICATION_TOKEN_TTL_MS } from "@/lib/auth/signup-token";
 import { firstBusinessFor } from "@/lib/auth/business-access";
 import { ProvisionError, signUp } from "@/lib/tenants/provision";
-import { verifyOrganization } from "@/lib/tenants/verification";
+import { verifyByToken } from "@/lib/tenants/verification";
 import { runInTenant } from "@/lib/tenancy/context";
 import { appOrigin } from "@/lib/env";
 import { expireBusinessCache } from "@/lib/business";
@@ -192,31 +192,20 @@ export async function verifyEmailAction(_prevState: VerifyEmailState, formData: 
   const token = String(formData.get("token") ?? "");
   if (!token) return { error: "invalidOrExpiredToken" };
 
-  const tokenHash = hashVerificationToken(token);
-  const record = await prisma.emailVerificationToken.findUnique({ where: { tokenHash } });
-
-  // Invalid, expired and already-used all collapse into the same error —
-  // same reasoning as resetPasswordAction: telling them apart tells whoever
-  // is guessing which guess landed closest.
-  const isUsable = record && !record.usedAt && record.expiresAt > new Date();
-  if (!isUsable) {
+  // One call, inside the database: it finds the token, requires it unused
+  // and unexpired, closes it and verifies the user and the organization.
+  // Unknown, expired and used collapse into the same error, as in
+  // resetPasswordAction: telling them apart tells whoever is guessing which
+  // guess landed closest.
+  const verified = await verifyByToken(prisma, hashVerificationToken(token));
+  if (!verified) {
     return { error: "invalidOrExpiredToken" };
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: record.userId }, data: { emailVerified: new Date() } });
-    await tx.emailVerificationToken.updateMany({ where: { userId: record.userId, usedAt: null }, data: { usedAt: new Date() } });
-    // The one write marea_app cannot make with an ordinary UPDATE — see the
-    // migration's own comment on marea_verify_organization. Inside the same
-    // transaction as the two updates above: the token is only ever marked
-    // used together with the organization actually becoming verified.
-    await verifyOrganization(tx, record.organizationId);
-  });
-
   // Best-effort: the public cache would catch up within PUBLIC_CACHE_TTL_SECONDS
-  // on its own, but there's no reason to make someone who just confirmed
+  // on its own, but there is no reason to make someone who just confirmed
   // their email wait up to a minute to see their own page exist.
-  const businessId = await firstBusinessFor(record.userId);
+  const businessId = await firstBusinessFor(verified.userId);
   if (businessId) {
     const business = await runInTenant(businessId, () => prisma.business.findUnique({ where: { id: businessId }, select: { id: true, slug: true } }));
     if (business) expireBusinessCache(business);
