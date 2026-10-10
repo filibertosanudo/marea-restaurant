@@ -150,11 +150,16 @@ export async function signupAction(_prevState: SignupState, formData: FormData):
         data: {
           email,
           name,
-          role: "CUSTOMER",
+          // The owner of the organization they just created, not a member of
+          // its one branch: authorizeBusiness answers BUSINESS_ADMIN at every
+          // business of the organization from this alone, so a second branch
+          // needs no extra row, and no BUSINESS_ADMIN of a branch can edit
+          // them (lib/team/actions.ts).
+          role: "ORG_ADMIN",
+          organizationId,
           passwordHash,
           mustChangePassword: false,
           locale,
-          memberships: { create: { businessId, role: "BUSINESS_ADMIN", isActive: true } },
         },
       });
 
