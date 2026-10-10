@@ -19,6 +19,9 @@ import {
 import { MenuSectionTabs } from "@/components/admin/menu/MenuSectionTabs";
 import { ItemTable } from "@/components/admin/menu/ItemTable";
 import { CopyMenuPanel } from "@/components/admin/menu/CopyMenuPanel";
+import { MenuImportPanel } from "@/components/admin/menu/MenuImportPanel";
+import { SampleDataBanner } from "@/components/admin/onboarding/SampleDataBanner";
+import { countSampleRows } from "@/lib/onboarding/sample-queries";
 import type { Lang } from "@/lib/i18n/lang";
 
 const PAGE_SIZE = 8;
@@ -66,6 +69,8 @@ export default async function MenuItemsPage({
     listModifierGroupsRaw(business.id),
   ]);
 
+  const sampleCount = canManage ? await countSampleRows(business.id) : 0;
+
   // A branch with no menu, run by someone who runs another one too, can copy
   // that one's menu instead of typing it again (lib/menu/copy.ts).
   const menuIsEmpty = canManage && categories.length === 0 && total === 0;
@@ -76,6 +81,8 @@ export default async function MenuItemsPage({
   return (
     <div className="flex h-full flex-col">
       <MenuSectionTabs active="items" dict={dict} />
+      {sampleCount > 0 && <SampleDataBanner dict={dict.onboarding} cancelLabel={dict.common.cancel} />}
+      {canManage && <MenuImportPanel dict={dict.menuImport} />}
       {copySources.length > 0 && <CopyMenuPanel dict={dict.menu} sources={copySources.map((b) => ({ id: b.id, name: b.name }))} />}
       <ItemTable
         items={items.map((i) => toMenuItemListDTO(i, lang))}

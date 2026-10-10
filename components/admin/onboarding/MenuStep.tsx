@@ -8,6 +8,8 @@ import type { Lang } from "@/lib/i18n/lang";
 import { createCategoryAction, type CategoryFormState } from "@/lib/menu/category-actions";
 import { createMenuItemAction, type MenuItemFormState } from "@/lib/menu/item-actions";
 import { advanceOnboardingAction } from "@/lib/onboarding/actions";
+import { createSampleDataAction } from "@/lib/onboarding/sample-actions";
+import { MenuImportPanel } from "@/components/admin/menu/MenuImportPanel";
 import { WizardChrome } from "./WizardChrome";
 
 const inputClass =
@@ -81,6 +83,21 @@ export function MenuStep({ dict, defaultLocale }: { dict: AdminDictionary; defau
     }
   }, [categoryState]);
 
+  const [sampleError, setSampleError] = useState(false);
+  const [sampling, startSampling] = useTransition();
+
+  function startSampleData() {
+    startSampling(async () => {
+      const result = await createSampleDataAction();
+      if (result.ok) {
+        await advanceOnboardingAction(5);
+        router.push("/admin");
+      } else {
+        setSampleError(result.error === "not_empty");
+      }
+    });
+  }
+
   async function finish() {
     await advanceOnboardingAction(5);
     router.push("/admin");
@@ -95,6 +112,16 @@ export function MenuStep({ dict, defaultLocale }: { dict: AdminDictionary; defau
       onSkip={() => startSkip(finish)}
       skipping={skipping}
     >
+      {!categoryId && (
+        <div className="rounded-md border border-border bg-surface p-md">
+          <Button type="button" variant="secondary" onClick={startSampleData} disabled={sampling} className="w-full">
+            {dict.onboarding.useSample}
+          </Button>
+          <p className="mt-[6px] text-[12px] text-on-surface-muted">{dict.onboarding.useSampleHint}</p>
+          {sampleError && <p role="alert" className="mt-[6px] text-[12px] text-error">{dict.onboarding.sampleNotEmpty}</p>}
+        </div>
+      )}
+      {!categoryId && <MenuImportPanel dict={dict.menuImport} />}
       {!categoryId ? (
         <form action={categoryAction} className="rounded-md border border-border bg-surface p-md">
           <div className={fieldClass}>
