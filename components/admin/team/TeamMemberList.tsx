@@ -6,15 +6,17 @@ import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { TeamMemberFormModal } from "./TeamMemberFormModal";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
-import type { TeamMemberDTO } from "@/lib/dto/team";
+import type { TeamMemberDTO, TeamOwnerDTO } from "@/lib/dto/team";
 import { setTeamMemberActiveAction, setTeamMemberRoleAction, type TeamMutationResult } from "@/lib/team/actions";
 
 export function TeamMemberList({
   members,
+  owners,
   currentUserId,
   dict,
 }: {
   members: TeamMemberDTO[];
+  owners: TeamOwnerDTO[];
   currentUserId: string;
   dict: AdminDictionary;
 }) {
@@ -25,7 +27,9 @@ export function TeamMemberList({
   const [error, setError] = useState<string | null>(null);
 
   function errorMessage(result: Extract<TeamMutationResult, { ok: false }>): string {
-    return result.error === "last_admin" ? dict.team.lastAdminError : dict.team.genericMutationError;
+    if (result.error === "last_admin") return dict.team.lastAdminError;
+    if (result.error === "owner") return dict.team.ownerError;
+    return dict.team.genericMutationError;
   }
 
   async function handleConfirmToggle() {
@@ -143,6 +147,26 @@ export function TeamMemberList({
           </tbody>
         </table>
       </div>
+
+      {owners.length > 0 && (
+        <section className="mt-lg" aria-labelledby="team-owners-title">
+          <h2 id="team-owners-title" className="font-display text-[16px] font-semibold text-on-surface">
+            {dict.team.ownersTitle}
+          </h2>
+          <p className="mb-sm text-[12.5px] text-on-surface-muted">{dict.team.ownersLead}</p>
+          <ul className="overflow-hidden rounded-md border border-border bg-surface text-[13px]">
+            {owners.map((owner, index) => (
+              <li
+                key={owner.userId}
+                className={`flex items-center justify-between gap-md px-md py-[8px] ${index > 0 ? "border-t border-border" : ""}`}
+              >
+                <span className="font-medium text-on-surface">{owner.name}</span>
+                <span className="text-on-surface-muted">{owner.email}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {showForm && <TeamMemberFormModal onClose={() => setShowForm(false)} dict={dict} />}
 

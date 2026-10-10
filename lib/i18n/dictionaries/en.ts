@@ -414,6 +414,9 @@ export const en = {
       deactivateConfirm: "Deactivate this team member?",
       lastAdminError: "You can't do this: they're the business's last active administrator.",
       genericMutationError: "Couldn't complete that change. Try again.",
+      ownerError: "An organization owner can't be changed from here.",
+      ownersTitle: "Owners",
+      ownersLead: "They manage every branch of the organization. Shown here, not editable.",
     },
     reports: {
       orgReportLink: "All branches",
