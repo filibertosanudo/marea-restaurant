@@ -606,6 +606,9 @@ model MenuCategory {
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  /// Module 19: inserted by the wizard's sample data, cleared when the owner
+  /// touches this row; the only thing "delete sample data" may select on.
+  isSample Boolean @default(false)
   deletedAt DateTime?
 
   business     Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -669,6 +672,9 @@ model MenuItem {
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  /// Module 19: inserted by the wizard's sample data, cleared when the owner
+  /// touches this row; the only thing "delete sample data" may select on.
+  isSample Boolean @default(false)
   deletedAt DateTime?
 
   business       Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -895,6 +901,9 @@ model RestaurantTable {
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  /// Module 19: inserted by the wizard's sample data, cleared when the owner
+  /// touches this row; the only thing "delete sample data" may select on.
+  isSample Boolean @default(false)
   deletedAt DateTime?
 
   business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
