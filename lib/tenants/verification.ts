@@ -1,50 +1,49 @@
 import type { PrismaClient } from "@/lib/generated/prisma/client";
 import { runWithoutTenant } from "@/lib/tenancy/context";
 
+export type Verified = { userId: string; organizationId: string };
+
 /**
- * Stamps Organization.verifiedAt, the one write marea_app cannot make
- * directly (organization_access revoked UPDATE along with INSERT/DELETE —
- * module 19, phase 0). Idempotent: a second call, or a call for an
- * organization that was never unverified to begin with, is a no-op that
- * returns false rather than an error — see the migration's own comment on
- * marea_verify_organization for why a 0-row UPDATE isn't a failure here.
+ * Verifies a signup from its emailed token's hash, in one call inside the
+ * database: finds the token, requires it unused and unexpired, marks it used
+ * and stamps the user's email and the organization as verified. Null for a
+ * token that is unknown, expired or already used, all alike. There is no
+ * function that verifies an organization without its token: the write marea_app
+ * cannot make with an ordinary UPDATE (Organization is read-only to it) has
+ * exactly this one door.
  */
-export async function verifyOrganization(db: Pick<PrismaClient, "$queryRaw">, organizationId: string): Promise<boolean> {
+export async function verifyByToken(db: Pick<PrismaClient, "$queryRaw">, tokenHash: string): Promise<Verified | null> {
   const [row] = await runWithoutTenant(() =>
-    db.$queryRaw<Array<{ marea_verify_organization: boolean | null }>>`SELECT marea_verify_organization(${organizationId})`
+    db.$queryRaw<Array<{ user_id: string; organization_id: string }>>`SELECT user_id, organization_id FROM marea_verify_organization(${tokenHash})`
   );
-  return row?.marea_verify_organization === true;
+  return row ? { userId: row.user_id, organizationId: row.organization_id } : null;
 }
-
-export type UnverifiedSignup = { organizationId: string; userId: string };
-
 /**
- * Organizations still unverified past `cutoff`, each paired with its own
- * signup's user id — marea_app has no way to read this from "Organization"
- * directly outside a business context (this module's own row level security),
- * which is exactly the situation lib/ops/purge-unverified-signups.ts runs in.
+ * Organizations still unverified past `cutoff`. marea_app has no way to read
+ * this from "Organization" directly outside a business context (this
+ * module's own row level security), which is exactly the situation
+ * lib/ops/purge-unverified-signups.ts runs in. Ids only: the purge derives
+ * everything else itself, inside the database.
  */
-export async function listUnverifiedSignups(db: Pick<PrismaClient, "$queryRaw">, cutoff: Date): Promise<UnverifiedSignup[]> {
+export async function listUnverifiedSignups(db: Pick<PrismaClient, "$queryRaw">, cutoff: Date): Promise<string[]> {
   const rows = await runWithoutTenant(() =>
-    db.$queryRaw<Array<{ organization_id: string; user_id: string }>>`SELECT * FROM marea_unverified_signups(${cutoff})`
+    db.$queryRaw<Array<{ organization_id: string }>>`SELECT organization_id FROM marea_unverified_signups(${cutoff})`
   );
-  return rows.map((row) => ({ organizationId: row.organization_id, userId: row.user_id }));
+  return rows.map((row) => row.organization_id);
 }
 
 /**
- * Deletes a signup nobody verified: its business (and everything under it —
- * every direct child of Business cascades), its one admin user, and the
- * organization itself. Re-checks verifiedAt IS NULL inside the same
- * SECURITY DEFINER call, so a stale caller can never delete a business that
- * got verified in the meantime; that case returns false, same shape as
- * verifyOrganization's own "nothing to do".
+ * Deletes a signup nobody verified: its business (every direct child of
+ * Business cascades), the users that only existed for it, and the
+ * organization. Takes the organization and nothing else: which users go is
+ * decided inside the database, and one with a foot outside this organization
+ * stays. Re-checks verifiedAt IS NULL itself, so a stale caller can never
+ * delete a business that got verified in the meantime; that case returns
+ * false, the same "nothing to do" shape.
  */
-export async function purgeUnverifiedSignup(
-  db: Pick<PrismaClient, "$queryRaw">,
-  input: { organizationId: string; userId: string }
-): Promise<boolean> {
+export async function purgeUnverifiedSignup(db: Pick<PrismaClient, "$queryRaw">, organizationId: string): Promise<boolean> {
   const [row] = await runWithoutTenant(() =>
-    db.$queryRaw<Array<{ marea_purge_unverified_signup: boolean | null }>>`SELECT marea_purge_unverified_signup(${input.organizationId}, ${input.userId})`
+    db.$queryRaw<Array<{ marea_purge_unverified_signup: boolean | null }>>`SELECT marea_purge_unverified_signup(${organizationId})`
   );
   return row?.marea_purge_unverified_signup === true;
 }

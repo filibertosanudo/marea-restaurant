@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth/permissions";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
-import { getBusinessForRequest, invalidateBusinessCache } from "@/lib/business";
+import { getBusinessForRequest, invalidateBusinessCache, isOrganizationVerified } from "@/lib/business";
 import { businessOrigin } from "@/lib/business-origin";
 import { prisma } from "@/lib/prisma";
 import type { Business, StripeCapabilityStatus } from "@/lib/generated/prisma/client";
@@ -23,12 +23,18 @@ import { isUniqueConstraintError } from "@/lib/payments/prisma-errors";
  *    business to an account that is not its own, or to point two businesses at one.
  * 2. One business, one account: the column is unique and a second connection
  *    attempt is a conditional update that changes nothing.
- * 3. Turning card payments on still goes through the server (settings action and
+ * 3. An organization whose owner has not verified their email cannot connect
+ *    one (module 19): nobody has proven the address it would be created with,
+ *    and an unverified signup is deleted for real by the cleanup task, which
+ *    would leave a connected account at Stripe with no owner. Checked here, in
+ *    the server, from the row; the settings card hiding the button is not it.
+ * 4. Turning card payments on still goes through the server (settings action and
  *    stripe-actions): this file only learns and records what Stripe says the
  *    account can do.
  */
 
 export type ConnectError =
+  | "organization_unverified"
   | "country_required"
   | "account_in_use"
   | "no_account"
@@ -61,6 +67,8 @@ async function saveStatus(business: Pick<Business, "id" | "slug">, accountId: st
 export async function startStripeOnboardingAction(): Promise<StartOnboardingResult> {
   const session = await requireRole(...ADMIN_ROLES);
   const business = await getBusinessForRequest();
+
+  if (!(await isOrganizationVerified(business))) return { ok: false, error: "organization_unverified" };
 
   // The country belongs to the restaurant, not to the deployment, and Stripe
   // cannot create the account without it.

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { refreshStripeAccountAction, startStripeOnboardingAction } from "@/lib/payments/connect-actions";
 import { onlinePaymentAvailability } from "@/lib/payments/availability";
-import { makeBusiness, makeStaff } from "@/test/factories";
+import { makeBusiness, makeOrganization, makeStaff } from "@/test/factories";
 import { setTestSession, sessionUserFromRow } from "@/test/stubs/auth-session";
 import { setTestHost } from "@/test/stubs/next-headers";
 
@@ -73,6 +73,20 @@ describe("startStripeOnboardingAction", () => {
 
     await expect(startStripeOnboardingAction()).rejects.toThrow("Insufficient role");
     expect(stripeFake.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses an organization nobody has verified, and creates no account at Stripe", async () => {
+    const organization = await makeOrganization({ verifiedAt: null });
+    const { business } = await adminOf("a", { organizationId: organization.id });
+
+    expect(await startStripeOnboardingAction()).toEqual({ ok: false, error: "organization_unverified" });
+    expect(stripeFake.create).not.toHaveBeenCalled();
+    expect((await row(business.id)).stripeAccountId).toBeNull();
+
+    // Verified: the same request goes through to Stripe, so the refusal above was the guard and nothing else.
+    await prisma.organization.update({ where: { id: organization.id }, data: { verifiedAt: new Date() } });
+    expect(await startStripeOnboardingAction()).toMatchObject({ ok: true });
+    expect(stripeFake.create).toHaveBeenCalledTimes(1);
   });
 
   it("does not start without the restaurant's country", async () => {

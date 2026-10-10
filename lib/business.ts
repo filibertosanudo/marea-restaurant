@@ -90,13 +90,23 @@ async function loadRow(id: string): Promise<Business | null> {
  * must still reach the wizard.
  */
 async function publishable(business: Business | null): Promise<Business | null> {
-  if (!business || !business.organizationId) return business;
+  if (!business) return null;
+  return (await isOrganizationVerified(business)) ? business : null;
+}
+
+/**
+ * Whether this business's organization has proven its owner's email. Read from
+ * the row every time, never the public cache: whoever asks decides something
+ * with it (publishing a page, connecting Stripe). No organization at all is
+ * verified, the legacy shape nobody is waiting on.
+ */
+export async function isOrganizationVerified(business: Pick<Business, "id" | "organizationId">): Promise<boolean> {
   const organizationId = business.organizationId;
-  const verified = await runInTenant(business.id, async () => {
-    const organization = await prisma.organization.findUnique({ where: { id: organizationId }, select: { verifiedAt: true } });
-    return organization?.verifiedAt != null;
-  });
-  return verified ? business : null;
+  if (!organizationId) return true;
+  const organization = await runInTenant(business.id, () =>
+    prisma.organization.findUnique({ where: { id: organizationId }, select: { verifiedAt: true } })
+  );
+  return organization?.verifiedAt != null;
 }
 
 async function byId(id: string): Promise<Business | null> {

@@ -633,6 +633,7 @@ export const en = {
         },
       },
       stripeErrors: {
+        organization_unverified: "Confirm your email first: we sent you a link when you signed up.",
         country_required: "Set the country of your business first.",
         account_in_use: "That Stripe account is already connected to another business.",
         no_account: "There is no Stripe account to check yet.",

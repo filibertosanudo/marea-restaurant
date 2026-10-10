@@ -26,8 +26,8 @@ export async function purgeUnverifiedSignups(now: Date, dryRun: boolean): Promis
   }
 
   let purged = 0;
-  for (const candidate of candidates) {
-    if (await purgeUnverifiedSignup(prisma, candidate)) purged += 1;
+  for (const organizationId of candidates) {
+    if (await purgeUnverifiedSignup(prisma, organizationId)) purged += 1;
   }
   return { candidates: candidates.length, purged, cutoff };
 }
