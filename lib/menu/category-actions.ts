@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { adoptSampleCategory } from "@/lib/onboarding/sample-adoption";
 import { invalidatePublicCache } from "@/lib/cache/public";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
@@ -135,6 +136,7 @@ export async function updateCategoryAction(
       ),
   ]);
 
+  await adoptSampleCategory(prisma, business.id, id);
   revalidatePath("/admin/menu/categorias");
   revalidatePath("/");
   invalidatePublicCache("menu", business.id);
@@ -148,6 +150,7 @@ export async function toggleCategoryActiveAction(id: string, isActive: boolean) 
     where: { id, businessId: business.id },
     data: { isActive },
   });
+  await adoptSampleCategory(prisma, business.id, id);
   revalidatePath("/admin/menu/categorias");
   revalidatePath("/");
   invalidatePublicCache("menu", business.id);
