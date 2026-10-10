@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { adoptSampleTable } from "@/lib/onboarding/sample-adoption";
 import { createId } from "@paralleldrive/cuid2";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
@@ -143,6 +144,7 @@ export async function updateTableAction(
     throw err;
   }
 
+  await adoptSampleTable(prisma, business.id, id);
   revalidatePath("/admin/mesas");
   return { success: true };
 }
@@ -154,6 +156,7 @@ export async function toggleTableActiveAction(id: string, isActive: boolean): Pr
     where: { id, businessId: business.id },
     data: { isActive },
   });
+  await adoptSampleTable(prisma, business.id, id);
   revalidatePath("/admin/mesas");
 }
 
@@ -181,6 +184,7 @@ export async function toggleOutOfServiceAction(id: string, outOfService: boolean
     where: { id, businessId: business.id },
     data: { status: outOfService ? "OUT_OF_SERVICE" : "AVAILABLE" },
   });
+  await adoptSampleTable(prisma, business.id, id);
   revalidatePath("/admin/mesas");
   return { blocked: false };
 }
@@ -224,6 +228,7 @@ export async function rotateTableQrAction(id: string): Promise<{ error?: string 
     where: { id },
     data: { qrToken: createId(), qrRotatedAt: new Date() },
   });
+  await adoptSampleTable(prisma, business.id, id);
   revalidatePath("/admin/mesas");
   revalidatePath("/admin/mesas/imprimir");
   return {};

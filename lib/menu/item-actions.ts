@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { adoptSampleMenuItem } from "@/lib/onboarding/sample-adoption";
 import { invalidatePublicCache } from "@/lib/cache/public";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/permissions";
@@ -235,6 +236,7 @@ export async function updateMenuItemAction(
     }
   }
 
+  await adoptSampleMenuItem(prisma, business.id, id);
   revalidatePath("/admin/menu");
   revalidatePath("/");
   invalidatePublicCache("menu", business.id);
@@ -248,6 +250,7 @@ export async function toggleAvailabilityAction(id: string, isAvailable: boolean)
     where: { id, businessId: business.id },
     data: { isAvailable },
   });
+  await adoptSampleMenuItem(prisma, business.id, id);
   revalidatePath("/admin/menu");
   revalidatePath("/");
   invalidatePublicCache("menu", business.id);
@@ -318,6 +321,7 @@ export async function adjustMenuItemStockAction(
   });
 
   if ("error" in result) return result;
+  await adoptSampleMenuItem(prisma, business.id, menuItemId);
   revalidatePath("/admin/menu");
   revalidatePath("/");
   invalidatePublicCache("menu", business.id);
