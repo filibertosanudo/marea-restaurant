@@ -12,7 +12,7 @@ import { UserRole } from "@/lib/generated/prisma/client";
 
 const ADMIN_ROLES = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
 
-export type TeamMutationResult = { ok: true } | { ok: false; error: "not_found" | "self" | "last_admin" };
+export type TeamMutationResult = { ok: true } | { ok: false; error: "not_found" | "self" | "last_admin" | "owner" };
 
 /** Active BUSINESS_ADMIN or SUPER_ADMIN memberships in this business — the count that decides whether deactivating or demoting one more would leave nobody in charge. */
 function countActiveAdmins(businessId: string) {
@@ -76,8 +76,15 @@ export async function setTeamMemberActiveAction(membershipId: string, isActive: 
 
   const membership = await prisma.businessMembership.findFirst({
     where: { id: membershipId, businessId: business.id },
+    include: { user: { select: { role: true } } },
   });
   if (!membership) return { ok: false, error: "not_found" };
+  // An organization's owner is not this screen's to change, whatever
+  // membership they may also hold here: authorizeBusiness never reads it for
+  // them (roleAtBusiness answers from User.role first), so deactivating or
+  // demoting it would only look like it worked. No BUSINESS_ADMIN can reach
+  // an ORG_ADMIN through any action in this file.
+  if (membership.user.role === UserRole.ORG_ADMIN) return { ok: false, error: "owner" };
   if (membership.userId === session.user.id) {
     // Refuse to let an admin lock themselves out from the UI layer too —
     // requireRole alone wouldn't stop this since it's their own valid session.
@@ -124,8 +131,11 @@ export async function setTeamMemberRoleAction(
 
   const membership = await prisma.businessMembership.findFirst({
     where: { id: membershipId, businessId: business.id },
+    include: { user: { select: { role: true } } },
   });
   if (!membership) return { ok: false, error: "not_found" };
+  // An owner, as above: not this screen's to change.
+  if (membership.user.role === UserRole.ORG_ADMIN) return { ok: false, error: "owner" };
   if (membership.userId === session.user.id) {
     return { ok: false, error: "self" };
   }

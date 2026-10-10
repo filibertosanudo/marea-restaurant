@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { authorizeBusiness } from "@/lib/auth/business-access";
 import { hashVerificationToken } from "@/lib/auth/signup-token";
 import { makeBusiness, makeOrganization } from "@/test/factories";
 import { runInTenant } from "@/lib/tenancy/context";
@@ -55,10 +56,11 @@ describe("signupAction", () => {
     expect(user.mustChangePassword).toBe(false);
     expect(await verifyPassword(user.passwordHash!, "greenTurtleUmbrella99")).toBe(true);
 
-    const membership = await runInTenant(business.id, () =>
-      prisma.businessMembership.findFirstOrThrow({ where: { userId: user.id, businessId: business.id } })
-    );
-    expect(membership.role).toBe("BUSINESS_ADMIN");
+    // The owner of the organization, with no membership of its own: what
+    // authorizeBusiness answers from User.role and organizationId alone.
+    expect(user).toMatchObject({ role: "ORG_ADMIN", organizationId: organization.id });
+    expect(await runInTenant(business.id, () => prisma.businessMembership.count({ where: { userId: user.id } }))).toBe(0);
+    expect(await authorizeBusiness(user.id, business.id)).toBe("BUSINESS_ADMIN");
 
     const token = await prisma.emailVerificationToken.findFirstOrThrow({ where: { userId: user.id } });
     expect(token.organizationId).toBe(organization.id);
@@ -161,12 +163,13 @@ describe("verifyEmailAction", () => {
 
   it("verifies the organization and the user, and the token cannot be reused", async () => {
     const organization = await makeOrganization({ verifiedAt: null });
-    const business = await makeBusiness({ organizationId: organization.id });
+    await makeBusiness({ organizationId: organization.id });
     const user = await prisma.user.create({
       data: {
         email: `verify-${Math.random()}@example.test`,
         passwordHash: "x",
-        memberships: { create: { businessId: business.id, role: "BUSINESS_ADMIN", isActive: true } },
+        role: "ORG_ADMIN",
+        organizationId: organization.id,
       },
     });
     const rawToken = "good-signup-token";
