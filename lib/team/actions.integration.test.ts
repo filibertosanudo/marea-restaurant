@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { createTeamMemberAction, setTeamMemberActiveAction, setTeamMemberRoleAction } from "./actions";
-import { makeBusiness, makeStaff } from "@/test/factories";
+import { makeBusiness, makeMembership, makeOrgAdmin, makeOrganization, makeStaff } from "@/test/factories";
 import { setTestSession, sessionUserFromRow } from "@/test/stubs/auth-session";
 
 async function loginAsAdmin() {
@@ -201,5 +201,53 @@ describe("setTeamMemberRoleAction", () => {
     const result = await setTeamMemberRoleAction(membership1.id, "STAFF");
 
     expect(result).toEqual({ ok: true });
+  });
+});
+
+describe("an organization's owner", () => {
+  async function ownerAtBusiness() {
+    const organization = await makeOrganization();
+    const business = await makeBusiness({ slug: "marea", organizationId: organization.id });
+    const owner = await makeOrgAdmin(organization.id);
+    // A membership row an owner should not need, but one may exist (a user
+    // promoted into ORG_ADMIN, an invitation made before) — the action must
+    // refuse whichever row it is handed.
+    const membership = await makeMembership(owner.id, business.id, { role: "STAFF", isActive: true });
+    const admin = await makeStaff("BUSINESS_ADMIN");
+    await makeMembership(admin.id, business.id, { role: "BUSINESS_ADMIN", isActive: true });
+    setTestSession(sessionUserFromRow(admin));
+    return { owner, membership };
+  }
+
+  it("cannot be deactivated by a business admin", async () => {
+    const { membership } = await ownerAtBusiness();
+
+    const result = await setTeamMemberActiveAction(membership.id, false);
+
+    expect(result).toEqual({ ok: false, error: "owner" });
+    const unchanged = await prisma.businessMembership.findUniqueOrThrow({ where: { id: membership.id } });
+    expect(unchanged.isActive).toBe(true);
+  });
+
+  it("cannot be given another role by a business admin", async () => {
+    const { membership } = await ownerAtBusiness();
+
+    const result = await setTeamMemberRoleAction(membership.id, "BUSINESS_ADMIN");
+
+    expect(result).toEqual({ ok: false, error: "owner" });
+    const unchanged = await prisma.businessMembership.findUniqueOrThrow({ where: { id: membership.id } });
+    expect(unchanged.role).toBe("STAFF");
+  });
+
+  it("cannot be re-created as a team member through the create form", async () => {
+    const { owner } = await ownerAtBusiness();
+
+    const result = await createTeamMemberAction(
+      undefined,
+      formData({ name: "Owner", email: String(owner.email), role: "STAFF" })
+    );
+
+    expect(result).toMatchObject({ error: "email_taken" });
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: owner.id } })).toMatchObject({ role: "ORG_ADMIN" });
   });
 });
