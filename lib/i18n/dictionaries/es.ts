@@ -640,6 +640,7 @@ export const es = {
         },
       },
       stripeErrors: {
+        organization_unverified: "Confirma primero tu correo: te enviamos un enlace al registrarte.",
         country_required: "Indica primero el país de tu negocio.",
         account_in_use: "Esa cuenta de Stripe ya está conectada a otro negocio.",
         no_account: "Todavía no hay una cuenta de Stripe que revisar.",
