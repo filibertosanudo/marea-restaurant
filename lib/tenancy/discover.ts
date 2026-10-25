@@ -52,6 +52,21 @@ export async function businessIdForStripeAccount(stripeAccountId: string): Promi
   return row?.id ?? null;
 }
 
+/**
+ * The organization a platform billing event is about, from the customer
+ * account it names (module 19, phase 6). Reads OrganizationSubscription's id
+ * columns only, the worker role's whole grant on that table; the account id
+ * is issued by Stripe, unique per organization, and arrives in an event whose
+ * signature has been checked.
+ */
+export async function organizationIdForBillingAccount(stripeCustomerAccountId: string): Promise<string | null> {
+  const row = await systemPrisma.organizationSubscription.findUnique({
+    where: { stripeCustomerAccountId },
+    select: { organizationId: true },
+  });
+  return row?.organizationId ?? null;
+}
+
 export type TokenKind = "table" | "order" | "reservation";
 
 export async function businessIdForToken(kind: TokenKind, token: string): Promise<string | null> {
