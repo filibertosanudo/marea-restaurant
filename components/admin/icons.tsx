@@ -89,6 +89,15 @@ export function TeamIcon({ className = "" }: IconProps) {
   );
 }
 
+export function CardIcon({ className = "" }: IconProps) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={`${base} ${className}`}>
+      <rect x="3" y="5.5" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M3 10h18M7 15h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function SettingsIcon({ className = "" }: IconProps) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={`${base} ${className}`}>
@@ -265,4 +274,5 @@ export const NAV_ICONS: Record<string, (props: IconProps) => React.ReactElement>
   reports: ReportsIcon,
   team: TeamIcon,
   settings: SettingsIcon,
+  billing: CardIcon,
 };

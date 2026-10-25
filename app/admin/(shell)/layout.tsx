@@ -5,6 +5,9 @@ import { getDictionary } from "@/lib/i18n/dictionaries";
 import { navItemsForRole } from "@/components/admin/nav-config";
 import { listAccessibleBusinesses } from "@/lib/auth/business-access";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { TrialBanner } from "@/components/admin/billing/TrialBanner";
+import { getSubscriptionSummary } from "@/lib/billing/queries";
+import { prisma } from "@/lib/prisma";
 
 export default async function AdminShellLayout({
   children,
@@ -22,10 +25,15 @@ export default async function AdminShellLayout({
 
   const lang = await getAdminLang();
   const dict = getDictionary(lang);
-  const navItems = navItemsForRole(session.user.role);
+  const navItems = navItemsForRole(session.user.role, session.user.orgAdmin);
   // What the switcher offers: every business this user may act on, each one
   // re-authorised (lib/auth/business-access.ts).
   const businesses = await listAccessibleBusinesses(session.user.id);
+  // The trial's end is for whoever pays it, from the first day (module 19).
+  const owner = session.user.orgAdmin
+    ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { organizationId: true } })
+    : null;
+  const subscription = owner?.organizationId ? await getSubscriptionSummary(owner.organizationId) : null;
 
   return (
     <AdminShell
@@ -35,6 +43,7 @@ export default async function AdminShellLayout({
       user={{ name: session.user.name ?? "", email: session.user.email }}
       businesses={businesses.map((b) => ({ id: b.id, name: b.name }))}
       activeBusinessId={session.user.businessId}
+      banner={subscription ? <TrialBanner dict={dict.billing} summary={subscription} /> : null}
     >
       {children}
     </AdminShell>
