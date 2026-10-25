@@ -5,12 +5,13 @@ import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getSubscriptionSummary } from "@/lib/billing/queries";
 import { billingEnabled } from "@/lib/stripe/billing";
-import { addCardAction, openPortalAction, startTrialAction } from "@/lib/billing/actions";
+import { addCardAction, openPortalAction, reactivateAction, startTrialAction } from "@/lib/billing/actions";
+import { NON_PAYING } from "@/lib/billing/degrade";
 import { Button } from "@/components/ui/Button";
 import { AddBranchForm } from "@/components/admin/billing/AddBranchForm";
 import { atBranchLimit, branchAllowance } from "@/lib/billing/limits";
 
-const ARRIVALS = ["card", "started", "error"] as const;
+const ARRIVALS = ["card", "started", "error", "reactivated", "declined"] as const;
 type Arrival = (typeof ARRIVALS)[number];
 
 export default async function SubscriptionPage({ searchParams }: { searchParams: Promise<{ billing?: string }> }) {
@@ -42,9 +43,18 @@ export default async function SubscriptionPage({ searchParams }: { searchParams:
   const date = new Intl.DateTimeFormat(lang === "en" ? "en-US" : "es-MX", { dateStyle: "long", timeZone: business.timezone });
   const fmt = (iso: string | null) => (iso ? date.format(new Date(iso)) : "—");
 
-  const arrivalText = arrival === "card" ? dict.arrivalCard : arrival === "started" ? dict.arrivalStarted : arrival === "error" ? dict.arrivalError : null;
+  const ARRIVAL_TEXT: Record<Arrival, string> = {
+    card: dict.arrivalCard,
+    started: dict.arrivalStarted,
+    error: dict.arrivalError,
+    reactivated: dict.arrivalReactivated,
+    declined: dict.arrivalDeclined,
+  };
+  const arrivalText = arrival ? ARRIVAL_TEXT[arrival] : null;
   const notStarted = !summary || summary.status === "NOT_STARTED";
-  const needsCard = summary && !summary.hasPaymentMethod && (summary.status === "TRIALING" || summary.status === "PAUSED");
+  // Not paying (paused, past due, unpaid, ended): one button that gets it paying again.
+  const lapsed = summary !== null && NON_PAYING.has(summary.status);
+  const needsCard = summary && !lapsed && !summary.hasPaymentMethod && summary.status === "TRIALING";
 
   const rows: Array<[string, string]> = summary && !notStarted
     ? [
@@ -87,23 +97,26 @@ export default async function SubscriptionPage({ searchParams }: { searchParams:
               </div>
             ))}
           </dl>
-          {needsCard && (
-            <p className="text-[13px] text-on-surface">
-              {summary.status === "PAUSED" ? dict.pausedNoCard : dict.trialNoCard.replace("{date}", fmt(summary.trialEndsAt))}
-            </p>
-          )}
+          {needsCard && <p className="text-[13px] text-on-surface">{dict.trialNoCard.replace("{date}", fmt(summary.trialEndsAt))}</p>}
+          {lapsed && summary.status === "PAUSED" && !summary.hasPaymentMethod && <p className="text-[13px] text-on-surface">{dict.pausedNoCard}</p>}
           <div className="flex flex-wrap items-center gap-md">
             {needsCard && (
               <form action={addCardAction}>
                 <Button type="submit">{dict.addCard}</Button>
               </form>
             )}
+            {lapsed && (
+              <form action={reactivateAction}>
+                <Button type="submit">{dict.reactivate}</Button>
+              </form>
+            )}
             <form action={openPortalAction}>
-              <Button type="submit" variant={needsCard ? "secondary" : "primary"}>
+              <Button type="submit" variant={needsCard || lapsed ? "secondary" : "primary"}>
                 {dict.manage}
               </Button>
             </form>
           </div>
+          {lapsed && <p className="text-[12px] text-on-surface-muted">{dict.reactivateHint}</p>}
           <p className="text-[12px] text-on-surface-muted">{dict.manageHint}</p>
         </div>
       )}
