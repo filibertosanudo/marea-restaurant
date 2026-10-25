@@ -146,14 +146,14 @@ describe("POST /api/webhooks/stripe, billing events", () => {
       .mockResolvedValueOnce(stripeSubscription({ id: org.subscriptionId, status: "active", trial_end: null, default_payment_method: "pm_card" }) as never);
     const update = vi.spyOn(stripe.subscriptions, "update").mockResolvedValue({} as never);
     const resume = vi.spyOn(stripe.subscriptions, "resume").mockResolvedValue(stripeSubscription({ id: org.subscriptionId, latest_invoice: "in_resume" }) as never);
-    const pay = vi.spyOn(stripe.invoices, "pay").mockResolvedValue({} as never);
+    const pay = vi.spyOn(stripe.invoices, "pay").mockResolvedValue({ status: "paid" } as never);
 
     const response = await POST(signed(event("checkout.session.completed", { id: "cs_1", object: "checkout.session", mode: "setup", customer_account: org.accountId, setup_intent: "seti_1" })));
 
     expect(response.status).toBe(200);
     expect(update).toHaveBeenCalledWith(org.subscriptionId, { default_payment_method: "pm_card" });
     expect(resume).toHaveBeenCalledWith(org.subscriptionId, { billing_cycle_anchor: "now" });
-    expect(pay).toHaveBeenCalledWith("in_resume");
+    expect(pay).toHaveBeenCalledWith("in_resume", { payment_method: "pm_card" });
     expect(retrieve).toHaveBeenCalledTimes(2);
     expect(await rowOf(org.organization.id)).toMatchObject({ status: "ACTIVE", hasPaymentMethod: true });
   });
@@ -216,6 +216,43 @@ describe("POST /api/webhooks/stripe, billing events", () => {
     retrieve.mockResolvedValueOnce(stripeSubscription({ id: org.subscriptionId, status: "active", trial_end: null }) as never);
     await POST(signed(invoice("invoice.paid")));
     expect(await rowOf(org.organization.id)).toMatchObject({ status: "ACTIVE", lapsedSince: null });
+  });
+
+  it("pays the open invoice of a past-due subscription with the card a setup session added", async () => {
+    const org = await subscribedOrganization();
+    vi.spyOn(stripe.setupIntents, "retrieve").mockResolvedValue({ id: "seti_3", payment_method: "pm_new" } as never);
+    vi.spyOn(stripe.subscriptions, "retrieve")
+      .mockResolvedValueOnce(stripeSubscription({ id: org.subscriptionId, status: "past_due", latest_invoice: "in_overdue" }) as never)
+      .mockResolvedValueOnce(stripeSubscription({ id: org.subscriptionId, status: "active", trial_end: null, default_payment_method: "pm_new" }) as never);
+    vi.spyOn(stripe.subscriptions, "update").mockResolvedValue({} as never);
+    const pay = vi.spyOn(stripe.invoices, "pay").mockResolvedValue({ status: "paid" } as never);
+
+    await POST(signed(event("checkout.session.completed", { id: "cs_3", object: "checkout.session", mode: "setup", customer_account: org.accountId, setup_intent: "seti_3" })));
+
+    expect(pay).toHaveBeenCalledWith("in_overdue", { payment_method: "pm_new" });
+    expect(await rowOf(org.organization.id)).toMatchObject({ status: "ACTIVE", lapsedSince: null });
+  });
+
+  it("adopts the new subscription of an organization whose old one ended", async () => {
+    const org = await subscribedOrganization();
+    await owner.organizationSubscription.update({ where: { organizationId: org.organization.id }, data: { status: "CANCELED", lapsedSince: new Date() } });
+    const retrieve = vi.spyOn(stripe.subscriptions, "retrieve").mockResolvedValue(stripeSubscription({ id: "sub_new", status: "active", trial_end: null }) as never);
+
+    await POST(signed(event("checkout.session.completed", { id: "cs_4", object: "checkout.session", mode: "subscription", customer_account: org.accountId, subscription: "sub_new" })));
+
+    expect(retrieve).toHaveBeenCalledWith("sub_new", { expand: ["customer"] });
+    expect(await rowOf(org.organization.id)).toMatchObject({ stripeSubscriptionId: "sub_new", status: "ACTIVE", lapsedSince: null });
+  });
+
+  it("never swaps a subscription that is still running", async () => {
+    const org = await subscribedOrganization();
+    const retrieve = vi.spyOn(stripe.subscriptions, "retrieve");
+
+    const response = await POST(signed(event("checkout.session.completed", { id: "cs_5", object: "checkout.session", mode: "subscription", customer_account: org.accountId, subscription: "sub_second" })));
+
+    expect(await response.json()).toMatchObject({ ignored: true });
+    expect(retrieve).not.toHaveBeenCalled();
+    expect((await rowOf(org.organization.id)).stripeSubscriptionId).toBe(org.subscriptionId);
   });
 
   it("refuses a billing event on the Connect endpoint", async () => {
