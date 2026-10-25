@@ -6,6 +6,26 @@ import { runConcurrently, partitionSettled } from "@/test/concurrency";
 import { checkout, defaultGuest as guest } from "@/test/checkout";
 
 describe("createOrderFromCart", () => {
+  it("takes the order whatever the restaurant's subscription says: over its branch limit and paused", async () => {
+    // Module 19: limits never block a guest. The order path does not read
+    // the subscription at all; this pins that down for an organization in the
+    // worst state a subscription reaches before suspension.
+    const organization = await prisma.organization.create({ data: { name: "Over", slug: `over-${Date.now()}`, verifiedAt: new Date() } });
+    const business = await makeBusiness({ organizationId: organization.id });
+    await makeBusiness({ organizationId: organization.id });
+    await prisma.organizationSubscription.create({
+      data: { organizationId: organization.id, stripeCustomerAccountId: `acct_over_${organization.id}`, stripeSubscriptionId: `sub_over_${organization.id}`, status: "PAUSED", planLookupKey: "marea_basico" },
+    });
+    const category = await makeMenuCategory(business.id);
+    const item = await makeMenuItem(business.id, category.id, { basePrice: "10.00" });
+    const cart = await makeCart(business.id);
+    await prisma.cartItem.create({ data: { cartId: cart.id, menuItemId: item.id, quantity: 1 } });
+
+    const order = await checkout(cart, business);
+
+    expect(order.subtotal.toString()).toBe("10");
+  });
+
   it("freezes the order's price at the moment it's created, immune to later basePrice changes", async () => {
     const business = await makeBusiness();
     const category = await makeMenuCategory(business.id);
