@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { authorizeBusiness } from "@/lib/auth/business-access";
@@ -6,7 +6,15 @@ import { hashVerificationToken } from "@/lib/auth/signup-token";
 import { makeBusiness, makeOrganization } from "@/test/factories";
 import { runInTenant } from "@/lib/tenancy/context";
 import { runWithCookies } from "@/test/stubs/next-headers";
+import { ensureSubscription } from "@/lib/billing/start";
 import { signupAction, verifyEmailAction, type SignupState } from "./signup-actions";
+
+// The trial starts against Stripe; lib/billing/start.integration.test.ts covers
+// it. Here only that verifying asks for it, and that a failure there does not
+// undo the verification.
+vi.mock("@/lib/billing/start", () => ({ ensureSubscription: vi.fn() }));
+vi.mock("@/lib/stripe/billing", () => ({ billingEnabled: () => true }));
+beforeEach(() => vi.mocked(ensureSubscription).mockReset());
 
 const PAST_RENDER = String(Date.now() - 10_000);
 
@@ -187,5 +195,26 @@ describe("verifyEmailAction", () => {
 
     const second = await verifyEmailAction(undefined, tokenForm(rawToken));
     expect(second).toEqual({ error: "invalidOrExpiredToken" });
+  });
+
+  it("starts the trial once the organization is verified, and a Stripe failure does not undo the verification", async () => {
+    const organization = await makeOrganization({ verifiedAt: null });
+    const business = await makeBusiness({ organizationId: organization.id });
+    const email = `trial-${Math.random()}@example.test`;
+    const user = await prisma.user.create({ data: { email, passwordHash: "x", role: "ORG_ADMIN", organizationId: organization.id } });
+    const rawToken = "trial-signup-token";
+    await prisma.emailVerificationToken.create({
+      data: { userId: user.id, organizationId: organization.id, tokenHash: hashVerificationToken(rawToken), expiresAt: new Date(Date.now() + 60_000) },
+    });
+    vi.mocked(ensureSubscription).mockRejectedValueOnce(new Error("Stripe is down"));
+
+    expect(await verifyEmailAction(undefined, tokenForm(rawToken))).toEqual({ success: true });
+    expect(ensureSubscription).toHaveBeenCalledWith({ organizationId: organization.id, businessId: business.id, email });
+    expect((await prisma.organization.findUniqueOrThrow({ where: { id: organization.id } })).verifiedAt).not.toBeNull();
+  });
+
+  it("starts no trial for a token that verifies nothing", async () => {
+    await verifyEmailAction(undefined, tokenForm("not-a-real-token"));
+    expect(ensureSubscription).not.toHaveBeenCalled();
   });
 });
