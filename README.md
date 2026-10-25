@@ -1,6 +1,6 @@
 # Marea — Seafood Restaurant
 
-Landing page and (in progress) ordering system for Marea, a boutique seafood restaurant. This is the flagship demo — "Grupo 1: Comida y Bebida" — of a portfolio of small, deployable business verticals.
+Restaurant platform for Marea, a boutique seafood restaurant: public website, QR ordering, reservations, payments, and an admin panel to run the business, built to serve several restaurants from one deployment. This is the flagship demo — "Grupo 1: Comida y Bebida" — of a portfolio of small, deployable business verticals.
 
 ## Stack
 
@@ -8,6 +8,9 @@ Landing page and (in progress) ordering system for Marea, a boutique seafood res
 - TypeScript
 - Tailwind CSS
 - React 19
+- PostgreSQL + Prisma 7
+- Auth.js (NextAuth v5)
+- Stripe and Stripe Connect
 
 ## Getting started
 
@@ -118,9 +121,9 @@ stripe trigger payment_intent.succeeded
 
 ## Admin panel
 
-`/admin` — staff-only, no public signup. Auth.js (NextAuth v5) with a Credentials provider, argon2id password hashing, JWT sessions.
+`/admin` — for restaurant staff. Auth.js (NextAuth v5) with a Credentials provider, argon2id password hashing, JWT sessions. A new restaurant signs up on its own at `/admin/signup` (with email verification) and is walked through `/admin/asistente`, the onboarding wizard; staff accounts are created from the team screen.
 
-Built so far: menu management (`/admin/menu` dishes, `/admin/menu/categorias` with drag-to-reorder, `/admin/menu/modificadores`) and `/admin/equipo` (team, BUSINESS_ADMIN/SUPER_ADMIN only). STAFF gets a read-only dish list with just the availability toggle — the one catalog edit their role is allowed. Orders, reservations, promotions, tables/QR, testimonials, and settings are visible in the sidebar (locked) but not built yet.
+Sections: menu (`/admin/menu` dishes, `/admin/menu/categorias` with drag-to-reorder, `/admin/menu/modificadores`), orders (`/admin/pedidos`), kitchen display (`/admin/cocina`), reservations, tables and QR codes, promotions, testimonials, reports and cash register, settings, and team (`/admin/equipo`, BUSINESS_ADMIN/SUPER_ADMIN only). STAFF gets a read-only dish list with just the availability toggle — the one catalog edit their role is allowed.
 
 Dev accounts (seeded, password hash regenerated on every `npm run db:seed`):
 
@@ -146,14 +149,35 @@ Brand anchor: navy `#1B367B`, matched to the author's portfolio site so this pro
 
 ## Roadmap
 
-- [x] Landing page (hero, about, menu, offers, testimonials, reservation form)
-- [x] Component library (Button, Input, Select, Modal, Table, Tabs, Toast, Nav, MenuCard, StatItem, TestimonialCard, OfferBadge)
-- [x] Dark mode
-- [x] Admin panel: auth, shell, menu management (categories, dishes, modifiers, team) — the landing's menu now reads from the database instead of `content.ts`
-- [ ] Digital menu with QR codes
-- [ ] Live order cart (realtime status) and kitchen order board
-- [ ] Stripe payments
-- [ ] Table reservations backend
+The phase-by-phase status, with what was verified and what is still pending,
+lives in [`docs/PLAN-PRODUCCION.md`](docs/PLAN-PRODUCCION.md) (Spanish).
+
+**Done**
+
+- [x] Landing page (hero, about, menu, offers, testimonials, reservation form), driven by the database, with per-page metadata, JSON-LD, `sitemap.xml` and `robots.txt`
+- [x] Component library (Button, Input, Select, Modal, Table, Tabs, Toast, Nav, MenuCard, StatItem, TestimonialCard, OfferBadge) and dark mode
+- [x] Admin panel: auth, roles, menu management (categories, dishes, modifiers) and team
+- [x] Digital menu with QR codes per table
+- [x] Order flow with live status, a kitchen display and printed kitchen tickets (ESC/POS agent in `agent/`)
+- [x] Stripe payments (test mode), with Stripe Connect so each business is paid into its own account
+- [x] Table reservations with a schedule view and double-booking blocked by the database
+- [x] Email notifications through a background worker
+- [x] Sales reports and cash register shifts
+- [x] Per-dish inventory and promotions applied at checkout
+- [x] Guest reviews with moderation
+- [x] Multi-location: organizations, owner accounts, and Postgres Row-Level Security per business
+- [x] Security hardening: session revalidation, security headers, CSP and rate limiting
+- [x] CI with unit, integration (real Postgres) and E2E tests, plus coverage thresholds
+- [x] Operations: Docker Compose deploy, encrypted backups with a tested restore, privacy purges and a read-only mode
+- [x] Self-service signup with email verification and an onboarding wizard (sample data, menu import)
+
+**Next**
+
+- [ ] Platform subscriptions and plans
+- [ ] CFDI 4.0 electronic invoicing (Mexico)
+- [ ] Two-factor authentication (TOTP)
+- [ ] WhatsApp and SMS notifications
+- [ ] Offline PWA for waiters
 - [ ] Optional AI assistant for FAQs
 
 ## Deployment
