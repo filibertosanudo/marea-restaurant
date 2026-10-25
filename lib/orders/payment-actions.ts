@@ -1,6 +1,6 @@
 "use server";
 
-import { requireRole } from "@/lib/auth/permissions";
+import { requireRoleInAnyState } from "@/lib/auth/permissions";
 import { STAFF_ROLES } from "@/lib/auth/roles";
 import { getBusinessForRequest } from "@/lib/business";
 import { getOrderPaymentDetailRaw } from "@/lib/orders/queries";
@@ -19,7 +19,7 @@ import { toOrderPaymentDetailDTO, type OrderPaymentDetailDTO } from "@/lib/order
 export async function getOrderPaymentDetailAction(
   orderId: string
 ): Promise<OrderPaymentDetailDTO | null> {
-  await requireRole(...STAFF_ROLES);
+  await requireRoleInAnyState(...STAFF_ROLES);
   const business = await getBusinessForRequest();
 
   const order = await getOrderPaymentDetailRaw(business.id, orderId);

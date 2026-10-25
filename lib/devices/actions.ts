@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth/permissions";
+import { requireRole, requireRoleInAnyState } from "@/lib/auth/permissions";
 import { ADMIN_ROLES, STAFF_ROLES } from "@/lib/auth/roles";
 import { getBusinessForRequest } from "@/lib/business";
 import { deviceSchema } from "@/lib/devices/schemas";
@@ -78,7 +78,7 @@ export async function setDeviceActiveAction(deviceId: string, isActive: boolean)
  * audience the kitchen screen itself is gated to, not an admin-only read.
  */
 export async function getPrinterStatusAction(): Promise<{ lastSeenAt: string | null }> {
-  await requireRole(...STAFF_ROLES);
+  await requireRoleInAnyState(...STAFF_ROLES);
   const business = await getBusinessForRequest();
   const printer = await getActivePrinterStatus(business.id);
   return { lastSeenAt: printer?.lastSeenAt?.toISOString() ?? null };
