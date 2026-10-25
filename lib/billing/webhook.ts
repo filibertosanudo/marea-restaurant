@@ -3,8 +3,9 @@ import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { runInTenant } from "@/lib/tenancy/context";
 import { organizationIdForBillingAccount } from "@/lib/tenancy/discover";
-import { attachCardToSubscription, paymentMethodOfSetupSession, retrieveSubscription, type BillingStripe } from "@/lib/stripe/billing";
-import { mirrorOf } from "@/lib/billing/mirror";
+import { attachCardToSubscription, paymentMethodOfSetupSession, retrieveSubscription, setSubscriptionQuantity, type BillingStripe } from "@/lib/stripe/billing";
+import { mirrorOf, type SubscriptionMirror } from "@/lib/billing/mirror";
+import { PLANS, planForLookupKey, quantityFor } from "@/lib/billing/plans";
 import { organizationBusinessIds } from "@/lib/billing/organization";
 import { Prisma } from "@/lib/generated/prisma/client";
 
@@ -65,7 +66,8 @@ export async function applyBillingEvent(event: Stripe.Event, client?: BillingStr
 
   const organizationId = await organizationIdForBillingAccount(accountId);
   if (!organizationId) return { ignored: `customer account ${accountId} belongs to no organization` };
-  const [businessId] = await organizationBusinessIds(organizationId);
+  const businessIds = await organizationBusinessIds(organizationId);
+  const [businessId] = businessIds;
   if (!businessId) return { ignored: `organization ${organizationId} has no business` };
 
   return runInTenant(businessId, async () => {
@@ -85,6 +87,7 @@ export async function applyBillingEvent(event: Stripe.Event, client?: BillingStr
     }
 
     const fresh = mirrorOf(await retrieveSubscription(row.stripeSubscriptionId, client));
+    await reconcileQuantity(fresh, businessIds.length, client);
     await prisma.$transaction(async (tx) => {
       await tx.stripeWebhookEvent.create({
         data: { eventId: event.id, type: event.type, payload: event as unknown as Prisma.InputJsonValue, processedAt: new Date() },
@@ -93,4 +96,25 @@ export async function applyBillingEvent(event: Stripe.Event, client?: BillingStr
     });
     return { applied: true } as const;
   });
+}
+
+const LIVE = new Set(["TRIALING", "ACTIVE", "PAST_DUE"]);
+
+/**
+ * A per-branch plan bills for as many branches as the organization has (phase
+ * 7). Adding a branch sets that at once; this catches what that missed (a
+ * Stripe failure then, or a plan change in the portal) the next time Stripe
+ * says anything about the subscription. Stripe's own update event then brings
+ * the new quantity into the mirror.
+ */
+async function reconcileQuantity(mirror: SubscriptionMirror, branches: number, client?: BillingStripe): Promise<void> {
+  const plan = planForLookupKey(mirror.planLookupKey);
+  if (!plan || !PLANS[plan].perBusiness || !LIVE.has(mirror.status)) return;
+  const wanted = quantityFor(plan, branches);
+  if (mirror.quantity === wanted) return;
+  try {
+    await setSubscriptionQuantity(mirror.stripeSubscriptionId, wanted, client);
+  } catch (err) {
+    console.error(`[billing] could not set ${mirror.stripeSubscriptionId} to ${wanted} branches`, err);
+  }
 }

@@ -32,3 +32,16 @@ export function signupSqlError(err: unknown): SignupSqlError {
   if (cause.originalMessage?.startsWith("reserved_slug")) return "reserved_slug";
   return null;
 }
+
+export type BranchSqlError = SignupSqlError | "branch_limit" | "unverified_organization" | "no_business";
+
+/** Which of marea_add_branch()'s checks failed (its RAISE EXCEPTION prefixes, plus a taken slug), or null to propagate. */
+export function branchSqlError(err: unknown): BranchSqlError {
+  const signup = signupSqlError(err);
+  if (signup) return signup;
+  const message = pgCause(err)?.originalMessage ?? "";
+  if (message.startsWith("branch_limit")) return "branch_limit";
+  if (message.startsWith("unverified_organization")) return "unverified_organization";
+  if (message.startsWith("no_business")) return "no_business";
+  return null;
+}

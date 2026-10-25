@@ -72,11 +72,10 @@ export type NewBusiness = {
  * a deployment a business needs a Stripe account of its own first (module 17b).
  *
  * Owner-connection only, same as createOrganization — row level security
- * gives marea_app no INSERT policy on Business at all. Adding a branch from
- * inside the app (module 19, phase 7) needs a narrower SECURITY DEFINER
- * primitive that checks the caller's own business against the target
- * organization; until that exists, growing a chain is done from here, by
- * the platform operator.
+ * gives marea_app no INSERT policy on Business at all. An owner adds a branch
+ * from inside the app through marea_add_branch (lib/billing/branch-actions.ts),
+ * which holds it to the plan's limit; this path is the platform operator's and
+ * applies no plan limit, on purpose.
  */
 export async function createBusiness(db: Db, input: NewBusiness): Promise<Business> {
   assertSlug("Business", input.slug);

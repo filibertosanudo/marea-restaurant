@@ -171,6 +171,33 @@ describe("POST /api/webhooks/stripe, billing events", () => {
     expect(await rowOf(org.organization.id)).toMatchObject({ status: "TRIALING", hasPaymentMethod: true });
   });
 
+  it("brings a per-branch subscription's quantity to the organization's branch count", async () => {
+    const org = await subscribedOrganization();
+    await owner.business.create({ data: { name: "Second", slug: `second-${org.accountId}`, organizationId: org.organization.id } });
+    const cadena = stripeSubscription({
+      id: org.subscriptionId,
+      status: "active",
+      items: { data: [{ id: "si_1", quantity: 1, current_period_end: 1_794_127_307, price: { lookup_key: "marea_cadena" } }] },
+    });
+    vi.spyOn(stripe.subscriptions, "retrieve").mockResolvedValue(cadena as never);
+    const update = vi.spyOn(stripe.subscriptions, "update").mockResolvedValue({} as never);
+
+    await POST(signed(event("customer.subscription.updated", { id: org.subscriptionId, object: "subscription", customer_account: org.accountId })));
+
+    expect(update).toHaveBeenCalledWith(org.subscriptionId, { items: [{ id: "si_1", quantity: 2 }], proration_behavior: "create_prorations" });
+  });
+
+  it("leaves the quantity of a one-branch plan alone", async () => {
+    const org = await subscribedOrganization();
+    await owner.business.create({ data: { name: "Second", slug: `second-${org.accountId}`, organizationId: org.organization.id } });
+    vi.spyOn(stripe.subscriptions, "retrieve").mockResolvedValue(stripeSubscription({ id: org.subscriptionId, status: "active" }) as never);
+    const update = vi.spyOn(stripe.subscriptions, "update");
+
+    await POST(signed(event("customer.subscription.updated", { id: org.subscriptionId, object: "subscription", customer_account: org.accountId })));
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("refuses a billing event on the Connect endpoint", async () => {
     const org = await subscribedOrganization();
     const retrieve = vi.spyOn(stripe.subscriptions, "retrieve");
