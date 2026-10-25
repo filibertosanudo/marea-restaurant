@@ -13,6 +13,7 @@ import { setTableIdCookie } from "@/lib/cart/cookie";
 import { addToCartSchema, updateCartItemQuantitySchema } from "@/lib/cart/schemas";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import { isPlatformReadOnly } from "@/lib/ops/read-only";
+import { guestWritesBlocked } from "@/lib/billing/degrade-guard";
 import type { Lang } from "@/lib/i18n/lang";
 
 // One shared scope across add/update/remove: a guest bypassing a limit on
@@ -48,7 +49,7 @@ export async function addToCartAction(
   _prevState: AddToCartState,
   formData: FormData
 ): Promise<AddToCartState> {
-  if ((await isPlatformReadOnly()).enabled) return { error: "read_only" };
+  if ((await guestWritesBlocked()).enabled) return { error: "read_only" };
 
   const parsed = addToCartSchema.safeParse({
     menuItemId: formData.get("menuItemId"),

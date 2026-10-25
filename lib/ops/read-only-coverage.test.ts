@@ -22,7 +22,14 @@ import { describe, expect, it } from "vitest";
  * it needs the guard, or it belongs in EXEMPT with a reason.
  */
 
-const GUARD_CALLS = [/requireRole(?:OrForbidden)?\(/, /assertWritable\(/, /isPlatformReadOnly\(/];
+const GUARD_CALLS = [
+  /requireRole(?:OrForbidden)?\(/,
+  /requireOperationsRole(?:OrForbidden)?\(/,
+  /requireRoleInAnyState\(/,
+  /assertWritable\(/,
+  /isPlatformReadOnly\(/,
+  /guestWritesBlocked\(/,
+];
 
 // file path (relative to repo root, forward slashes) : function name.
 // Every entry here is a deliberate decision, not an oversight:
@@ -92,4 +99,91 @@ describe("every Server Action reaches the read-only guard", () => {
       });
     }
   }
+});
+
+/**
+ * Module 19, phase 8: the same walk, for the subscription's degrade ladder.
+ * requireRole stops at READ_ONLY and guestWritesBlocked at SUSPENDED, so an
+ * action using either is covered. The two ways around them are lists here,
+ * each entry a decision with its reason:
+ */
+
+// Serving guests: keeps working in READ_ONLY, stops at SUSPENDED (requireOperationsRole).
+const OPERATIONS: Record<string, string[]> = {
+  "lib/orders/board-actions.ts": ["advanceOrderStatusAction", "cancelOrderAction", "collectCashPaymentAction"],
+  "lib/payments/refund-actions.ts": ["createRefundAction"],
+  "lib/cash-register/actions.ts": ["openCashSessionAction", "recordCashMovementAction", "closeCashSessionAction"],
+  "lib/reservations/staff-actions.ts": [
+    "confirmReservationAction",
+    "reassignReservationTableAction",
+    "seatReservationAction",
+    "completeReservationAction",
+    "markNoShowAction",
+    "cancelReservationAction",
+  ],
+  "lib/printing/actions.ts": ["reprintKitchenTicketAction"],
+  "lib/notifications/admin-actions.ts": ["retryNotificationJobAction"],
+  // Sold out and stock, decided by the owner: a kitchen has to say "no more" mid-service.
+  "lib/menu/item-actions.ts": ["toggleAvailabilityAction", "adjustMenuItemStockAction"],
+};
+
+// Works on every step (requireRoleInAnyState).
+const ANY_STATE: Record<string, string[]> = {
+  // Paying has to work always, or a restaurant behind on payment cannot get out.
+  "lib/billing/actions.ts": ["startTrialAction", "addCardAction", "openPortalAction"],
+  // Moves the session to another branch: the owner reaches the billing page from any of them.
+  "lib/auth/switch-actions.ts": ["switchBusinessAction"],
+  // Reads.
+  "lib/orders/payment-actions.ts": ["getOrderPaymentDetailAction"],
+  "lib/devices/actions.ts": ["getPrinterStatusAction"],
+};
+
+// Guarded against the platform's read-only only, never by the subscription.
+const NO_SUBSCRIPTION_CHECK: Record<string, string[]> = {
+  // No business exists yet, or it is not public yet.
+  "lib/auth/signup-actions.ts": ["signupAction", "verifyEmailAction"],
+  // Editing or emptying a cart already started; adding to it is blocked.
+  "lib/cart/actions.ts": ["updateCartItemQuantityAction", "removeCartItemAction"],
+  // A guest withdrawing a booking only lightens a suspended restaurant.
+  "lib/reservations/actions.ts": ["cancelReservationByCodeAction"],
+  // Paying for an order that already exists.
+  "lib/payments/stripe-actions.ts": ["createPaymentIntentAction"],
+};
+
+const CONFIG_GUARDS = [/requireRole(?:OrForbidden)?\(/, /guestWritesBlocked\(/];
+
+describe("every Server Action respects the subscription's degrade ladder", () => {
+  const files = findActionFiles();
+
+  for (const file of files) {
+    const source = readFileSync(path.join(repoRoot(), file), "utf8");
+    const exempt = new Set(EXEMPT[file] ?? []);
+    const operations = new Set(OPERATIONS[file] ?? []);
+    const anyState = new Set(ANY_STATE[file] ?? []);
+    const unchecked = new Set(NO_SUBSCRIPTION_CHECK[file] ?? []);
+
+    for (const { name, body } of exportedFunctions(source)) {
+      if (exempt.has(name)) continue;
+      it(`${file}: ${name}`, () => {
+        const usesOperations = /requireOperationsRole(?:OrForbidden)?\(/.test(body);
+        const usesAnyState = /requireRoleInAnyState\(/.test(body);
+        const usesConfig = CONFIG_GUARDS.some((pattern) => pattern.test(body));
+
+        expect(usesOperations, `${name}: requireOperationsRole must be listed in OPERATIONS, and every OPERATIONS entry must use it`).toBe(operations.has(name));
+        expect(usesAnyState, `${name}: requireRoleInAnyState must be listed in ANY_STATE, and every ANY_STATE entry must use it`).toBe(anyState.has(name));
+        if (unchecked.has(name)) {
+          expect(usesConfig || usesOperations || usesAnyState, `${name} is in NO_SUBSCRIPTION_CHECK but now has a subscription guard — drop it from the list`).toBe(false);
+        } else {
+          expect(usesConfig || usesOperations || usesAnyState, `${name} skips the subscription's guard — use requireRole or guestWritesBlocked, or list it with a reason`).toBe(true);
+        }
+      });
+    }
+  }
+
+  it("lists only actions that exist", () => {
+    const names = new Set(files.flatMap((file) => exportedFunctions(readFileSync(path.join(repoRoot(), file), "utf8")).map(({ name }) => `${file}:${name}`)));
+    for (const list of [OPERATIONS, ANY_STATE, NO_SUBSCRIPTION_CHECK]) {
+      for (const [file, fns] of Object.entries(list)) for (const fn of fns) expect(names, `${file}:${fn}`).toContain(`${file}:${fn}`);
+    }
+  });
 });

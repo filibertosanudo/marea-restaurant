@@ -6,7 +6,7 @@ import { getPublicBusiness } from "@/lib/business";
 import { businessOrigin } from "@/lib/business-origin";
 import type { Lang } from "@/lib/i18n/lang";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
-import { isPlatformReadOnly } from "@/lib/ops/read-only";
+import { guestWritesBlocked } from "@/lib/billing/degrade-guard";
 import { subscribeSchema } from "@/lib/newsletter/schemas";
 
 // A public, unauthenticated form — same class of endpoint as reservation
@@ -31,7 +31,7 @@ export async function subscribeAction(email: string, lang: Lang): Promise<Subscr
   // confirmSubscriptionAction and unsubscribeAction stay exempt: a token
   // already emailed before the window opened is the same class of "let
   // someone finish what they started" as the password-reset flow.
-  if ((await isPlatformReadOnly()).enabled) return { ok: false, error: "read_only" };
+  if ((await guestWritesBlocked()).enabled) return { ok: false, error: "read_only" };
 
   const parsed = subscribeSchema.safeParse({ email });
   if (!parsed.success) return { ok: false, error: "invalid_input" };

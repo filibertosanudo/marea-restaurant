@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth/permissions";
+import { requireOperationsRole } from "@/lib/auth/permissions";
 import { STAFF_ROLES } from "@/lib/auth/roles";
 import { getBusinessForRequest } from "@/lib/business";
 import { enqueueKitchenTicket } from "@/lib/printing/queue";
@@ -19,7 +19,7 @@ export type ReprintResult = { ok: true } | { ok: false; error: "not_found" };
  * up, same as every other board action per the permission matrix.
  */
 export async function reprintKitchenTicketAction(orderId: string): Promise<ReprintResult> {
-  await requireRole(...STAFF_ROLES);
+  await requireOperationsRole(...STAFF_ROLES);
   const business = await getBusinessForRequest();
 
   const order = await prisma.order.findFirst({

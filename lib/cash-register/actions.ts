@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth/permissions";
+import { requireOperationsRole } from "@/lib/auth/permissions";
 import { STAFF_ROLES } from "@/lib/auth/roles";
 import { getBusinessForRequest } from "@/lib/business";
 import { isUniqueConstraintError } from "@/lib/payments/prisma-errors";
@@ -16,7 +16,7 @@ export type CashActionState = { error?: string } | undefined;
 
 /** Opening a shift is STAFF work, per the matrix — the cashier does this, not the owner. */
 export async function openCashSessionAction(openingFloat: string): Promise<CashActionState> {
-  const session = await requireRole(...STAFF_ROLES);
+  const session = await requireOperationsRole(...STAFF_ROLES);
   const business = await getBusinessForRequest();
 
   const parsed = openCashSessionSchema.safeParse({ openingFloat });
@@ -53,7 +53,7 @@ export async function recordCashMovementAction(input: {
   amount: string;
   reason: string;
 }): Promise<CashActionState> {
-  const session = await requireRole(...STAFF_ROLES);
+  const session = await requireOperationsRole(...STAFF_ROLES);
   const business = await getBusinessForRequest();
 
   const parsed = cashMovementSchema.safeParse(input);
@@ -94,7 +94,7 @@ export async function closeCashSessionAction(input: {
   countedAmount: string;
   notes?: string;
 }): Promise<CloseCashSessionResult> {
-  const session = await requireRole(...STAFF_ROLES);
+  const session = await requireOperationsRole(...STAFF_ROLES);
   const business = await getBusinessForRequest();
 
   const parsed = closeCashSessionSchema.safeParse(input);

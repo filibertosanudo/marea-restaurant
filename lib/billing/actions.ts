@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@/lib/generated/prisma/client";
-import { requireRole } from "@/lib/auth/permissions";
+import { requireRoleInAnyState } from "@/lib/auth/permissions";
 import { organizationOwner } from "@/lib/billing/owner";
 import { ensureSubscription } from "@/lib/billing/start";
 import { billingEnabled, createCardSetupSession, createPortalSession } from "@/lib/stripe/billing";
@@ -18,7 +18,7 @@ const PAGE = "/admin/suscripcion";
  */
 
 export async function startTrialAction(): Promise<void> {
-  const owner = await organizationOwner(await requireRole(UserRole.BUSINESS_ADMIN));
+  const owner = await organizationOwner(await requireRoleInAnyState(UserRole.BUSINESS_ADMIN));
   let outcome = "error";
   if (billingEnabled()) {
     try {
@@ -34,7 +34,7 @@ export async function startTrialAction(): Promise<void> {
 }
 
 export async function addCardAction(): Promise<void> {
-  const owner = await organizationOwner(await requireRole(UserRole.BUSINESS_ADMIN));
+  const owner = await organizationOwner(await requireRoleInAnyState(UserRole.BUSINESS_ADMIN));
   const row = await prisma.organizationSubscription.findUnique({ where: { organizationId: owner.organizationId }, select: { stripeCustomerAccountId: true } });
   let url = `${PAGE}?billing=error`;
   if (row && billingEnabled()) {
@@ -55,7 +55,7 @@ export async function addCardAction(): Promise<void> {
 }
 
 export async function openPortalAction(): Promise<void> {
-  const owner = await organizationOwner(await requireRole(UserRole.BUSINESS_ADMIN));
+  const owner = await organizationOwner(await requireRoleInAnyState(UserRole.BUSINESS_ADMIN));
   const row = await prisma.organizationSubscription.findUnique({ where: { organizationId: owner.organizationId }, select: { stripeCustomerAccountId: true } });
   let url = `${PAGE}?billing=error`;
   if (row && billingEnabled()) {

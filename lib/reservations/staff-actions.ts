@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireRole, ForbiddenError } from "@/lib/auth/permissions";
+import { requireOperationsRole, ForbiddenError } from "@/lib/auth/permissions";
 import { STAFF_ROLES, ADMIN_ROLES } from "@/lib/auth/roles";
 import { getBusinessForRequest } from "@/lib/business";
 import { canTransitionReservation } from "./state-machine";
@@ -14,9 +14,9 @@ import type { Prisma, Reservation, ReservationStatus, UserRole } from "@/lib/gen
 export type ReservationActionState = { error?: string } | undefined;
 
 /** Every action below needs the same "wrong role → graceful {error}, not a thrown 500" translation cancelReservationAction already did on its own — pulled out so all five agree instead of one drifting from the other four. */
-async function requireRoleOrForbidden(...roles: UserRole[]): Promise<{ error: "forbidden" } | undefined> {
+async function requireOperationsRoleOrForbidden(...roles: UserRole[]): Promise<{ error: "forbidden" } | undefined> {
   try {
-    await requireRole(...roles);
+    await requireOperationsRole(...roles);
   } catch (err) {
     if (err instanceof ForbiddenError) return { error: "forbidden" };
     throw err;
@@ -106,7 +106,7 @@ export async function confirmReservationAction(
   reservationId: string,
   tableId?: string
 ): Promise<ReservationActionState> {
-  const forbidden = await requireRoleOrForbidden(...STAFF_ROLES);
+  const forbidden = await requireOperationsRoleOrForbidden(...STAFF_ROLES);
   if (forbidden) return forbidden;
   const business = await getBusinessForRequest();
 
@@ -154,7 +154,7 @@ export async function reassignReservationTableAction(
   reservationId: string,
   tableId: string
 ): Promise<ReservationActionState> {
-  const forbidden = await requireRoleOrForbidden(...STAFF_ROLES);
+  const forbidden = await requireOperationsRoleOrForbidden(...STAFF_ROLES);
   if (forbidden) return forbidden;
   const business = await getBusinessForRequest();
 
@@ -183,7 +183,7 @@ export async function reassignReservationTableAction(
 
 /** STAFF and up — the point a confirmed party actually arrives. Deliberately doesn't touch RestaurantTable.status; see the module notes on why. */
 export async function seatReservationAction(reservationId: string): Promise<ReservationActionState> {
-  const forbidden = await requireRoleOrForbidden(...STAFF_ROLES);
+  const forbidden = await requireOperationsRoleOrForbidden(...STAFF_ROLES);
   if (forbidden) return forbidden;
   const business = await getBusinessForRequest();
 
@@ -196,7 +196,7 @@ export async function seatReservationAction(reservationId: string): Promise<Rese
 
 /** STAFF and up — closes out a seated party once they've left. */
 export async function completeReservationAction(reservationId: string): Promise<ReservationActionState> {
-  const forbidden = await requireRoleOrForbidden(...STAFF_ROLES);
+  const forbidden = await requireOperationsRoleOrForbidden(...STAFF_ROLES);
   if (forbidden) return forbidden;
   const business = await getBusinessForRequest();
 
@@ -214,7 +214,7 @@ export async function completeReservationAction(reservationId: string): Promise<
  * call can't mark a reservation that hasn't even started yet.
  */
 export async function markNoShowAction(reservationId: string): Promise<ReservationActionState> {
-  const forbidden = await requireRoleOrForbidden(...STAFF_ROLES);
+  const forbidden = await requireOperationsRoleOrForbidden(...STAFF_ROLES);
   if (forbidden) return forbidden;
   const business = await getBusinessForRequest();
 
@@ -235,7 +235,7 @@ export async function cancelReservationAction(
   reservationId: string,
   reason: string
 ): Promise<ReservationActionState> {
-  const forbidden = await requireRoleOrForbidden(...ADMIN_ROLES);
+  const forbidden = await requireOperationsRoleOrForbidden(...ADMIN_ROLES);
   if (forbidden) return forbidden;
 
   const business = await getBusinessForRequest();

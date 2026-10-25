@@ -1,7 +1,7 @@
 "use server";
 
 import { unstable_update } from "@/auth";
-import { requireRole } from "@/lib/auth/permissions";
+import { requireRoleInAnyState } from "@/lib/auth/permissions";
 import { STAFF_ROLES } from "@/lib/auth/roles";
 import { claimsForSwitch } from "@/lib/auth/token-claims";
 
@@ -17,7 +17,7 @@ export type SwitchBusinessResult = { ok: true } | { ok: false; error: "forbidden
  * use (lib/auth/business-access.ts).
  */
 export async function switchBusinessAction(businessId: string): Promise<SwitchBusinessResult> {
-  const session = await requireRole(...STAFF_ROLES);
+  const session = await requireRoleInAnyState(...STAFF_ROLES);
   if (typeof businessId !== "string" || !(await claimsForSwitch(session.user.id, businessId))) {
     return { ok: false, error: "forbidden" };
   }
