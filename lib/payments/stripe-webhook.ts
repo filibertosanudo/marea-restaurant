@@ -10,6 +10,7 @@ import { platformKeyIsLive } from "@/lib/stripe/mode";
 import { applyStripeEvent, resolveChargeDetailsForEvent, resolveRefundsForEvent } from "@/lib/payments/webhook-handlers";
 import { isAccountEvent, applyAccountEvent } from "@/lib/payments/account-events";
 import { isUniqueConstraintError } from "@/lib/payments/prisma-errors";
+import { applyBillingEvent, isBillingEvent } from "@/lib/billing/webhook";
 import { Prisma } from "@/lib/generated/prisma/client";
 
 /**
@@ -88,6 +89,21 @@ export async function handleStripeWebhook(request: Request, kind: WebhookKind): 
   const account = event.account ?? null;
   if (kind === "platform" && account) return ignored(kind, event, `carries account ${account}, which belongs to the Connect endpoint`);
   if (kind === "connect" && !account) return ignored(kind, event, "carries no account, which belongs to the platform endpoint");
+
+  // The platform's own subscriptions (module 19): billed on the platform's
+  // account, so they only ever arrive at the platform endpoint.
+  if (isBillingEvent(event)) {
+    if (kind !== "platform") return ignored(kind, event, "a billing event on the Connect endpoint");
+    try {
+      const outcome = await applyBillingEvent(event);
+      if ("ignored" in outcome) return ignored(kind, event, outcome.ignored);
+    } catch (err) {
+      if (isUniqueConstraintError(err)) return Response.json({ received: true });
+      console.error("Stripe webhook: billing event failed", event.type, err);
+      return new Response("Webhook handler error", { status: 500 });
+    }
+    return Response.json({ received: true });
+  }
 
   if (isAccountEvent(event)) {
     if (kind !== "connect") return ignored(kind, event, "an account event on the platform endpoint");
