@@ -14,6 +14,8 @@ import { runInTenant } from "@/lib/tenancy/context";
 import { appOrigin } from "@/lib/env";
 import { expireBusinessCache } from "@/lib/business";
 import { assertWritable } from "@/lib/ops/read-only";
+import { ensureSubscription } from "@/lib/billing/start";
+import { billingEnabled } from "@/lib/stripe/billing";
 
 const SIGNUP_MAX_ATTEMPTS = 5;
 const SIGNUP_WINDOW_MS = 60 * 60 * 1000;
@@ -214,6 +216,18 @@ export async function verifyEmailAction(_prevState: VerifyEmailState, formData: 
   if (businessId) {
     const business = await runInTenant(businessId, () => prisma.business.findUnique({ where: { id: businessId }, select: { id: true, slug: true } }));
     if (business) expireBusinessCache(business);
+  }
+
+  // The trial starts with the organization being real. Best-effort: a Stripe
+  // outage must not undo a verification, and the billing page finishes a
+  // start that failed here (ensureSubscription is safe to repeat).
+  if (businessId && billingEnabled()) {
+    try {
+      const user = await prisma.user.findUniqueOrThrow({ where: { id: verified.userId }, select: { email: true } });
+      await ensureSubscription({ organizationId: verified.organizationId, businessId, email: user.email });
+    } catch (err) {
+      console.error(`[billing] trial for organization ${verified.organizationId} did not start at verification`, err);
+    }
   }
 
   return { success: true };
