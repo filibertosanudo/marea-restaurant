@@ -7,6 +7,7 @@ import { attachCardToSubscription, paymentMethodOfSetupSession, retrieveSubscrip
 import { mirrorOf, type SubscriptionMirror } from "@/lib/billing/mirror";
 import { PLANS, planForLookupKey, quantityFor } from "@/lib/billing/plans";
 import { organizationBusinessIds } from "@/lib/billing/organization";
+import { nextLapsedSince } from "@/lib/billing/degrade";
 import { Prisma } from "@/lib/generated/prisma/client";
 
 /**
@@ -92,7 +93,10 @@ export async function applyBillingEvent(event: Stripe.Event, client?: BillingStr
       await tx.stripeWebhookEvent.create({
         data: { eventId: event.id, type: event.type, payload: event as unknown as Prisma.InputJsonValue, processedAt: new Date() },
       });
-      await tx.organizationSubscription.update({ where: { organizationId }, data: { ...fresh, syncedAt: new Date() } });
+      const now = new Date();
+      // The degrade ladder's clock: started by the first non-paying status, cleared by a payment.
+      const lapsedSince = nextLapsedSince(fresh.status, row.lapsedSince, now);
+      await tx.organizationSubscription.update({ where: { organizationId }, data: { ...fresh, lapsedSince, syncedAt: now } });
     });
     return { applied: true } as const;
   });
