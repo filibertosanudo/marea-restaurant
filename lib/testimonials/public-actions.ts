@@ -8,7 +8,7 @@ import { getOrderForReviewByPublicToken } from "@/lib/orders/queries";
 import { resolveOrderAuthorName } from "@/lib/orders/dto";
 import { getOrderLang } from "@/lib/i18n/cookie";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
-import { isPlatformReadOnly } from "@/lib/ops/read-only";
+import { guestWritesBlocked } from "@/lib/billing/degrade-guard";
 import { submitTestimonialSchema } from "@/lib/testimonials/schemas";
 
 // A public, unauthenticated form that writes text later published on the
@@ -35,7 +35,7 @@ export async function submitTestimonialAction(
   publicToken: string,
   input: { rating: number; quote?: string }
 ): Promise<SubmitTestimonialResult> {
-  if ((await isPlatformReadOnly()).enabled) return { ok: false, error: "read_only" };
+  if ((await guestWritesBlocked()).enabled) return { ok: false, error: "read_only" };
 
   const parsed = submitTestimonialSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "invalid_input" };

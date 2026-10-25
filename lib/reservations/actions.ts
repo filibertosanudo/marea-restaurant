@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { isPlatformReadOnly } from "@/lib/ops/read-only";
+import { guestWritesBlocked } from "@/lib/billing/degrade-guard";
 import { getPublicBusiness } from "@/lib/business";
 import type { Business } from "@/lib/generated/prisma/client";
 import type { Lang } from "@/lib/i18n/lang";
@@ -141,7 +142,7 @@ export async function createReservationAction(input: {
   notes?: string;
   lang: Lang;
 }): Promise<CreateReservationResult> {
-  if ((await isPlatformReadOnly()).enabled) return { ok: false, error: "read_only" };
+  if ((await guestWritesBlocked()).enabled) return { ok: false, error: "read_only" };
 
   const parsed = createReservationSchema.safeParse(input);
   if (!parsed.success) {
