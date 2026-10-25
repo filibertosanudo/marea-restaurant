@@ -240,6 +240,107 @@ resend of an event already applied hits that unique constraint and is
 ignored — never applied twice, never double-refunded, never double-marked a
 payment. Resend as many times as you need to.
 
+## Platform subscriptions
+
+Each organization's subscription lives in Stripe (the platform's account) and is
+mirrored in `OrganizationSubscription`, which only the platform webhook writes
+(`lib/billing/webhook.ts`). The degrade ladder (`lib/billing/degrade.ts`) is
+computed from that row's `lapsedSince`, never stored, so changing what Stripe
+says is how anything here is fixed; editing the row by hand is the last
+resort, and the next event overwrites it anyway.
+
+The queries below run as the owner:
+
+```bash
+docker compose exec db psql -U marea marea
+```
+
+### A suspicious signup
+
+Unverified signups need nothing: `signup:purge-unverified` (scheduled daily,
+`docker/ops-crontab`) deletes them, users and all. A verified one that is
+clearly abuse (spam menu, an impersonated brand):
+
+1. Find it:
+
+   ```sql
+   SELECT o.slug, o."verifiedAt", u.email, s.status, s."lapsedSince"
+   FROM "Organization" o
+   JOIN "User" u ON u."organizationId" = o.id
+   LEFT JOIN "OrganizationSubscription" s ON s."organizationId" = o.id
+   ORDER BY o."createdAt" DESC LIMIT 20;
+   ```
+
+2. Cancel its subscription in the Stripe Dashboard (Customers, the account named
+   after it, the subscription, Cancel immediately). The webhook starts the
+   ladder; the site pauses 15 days later, at that branch's closing time.
+3. To take the site down now, start the clock 15 days in the past. It applies at
+   the branch's next closing, never mid-service:
+
+   ```sql
+   UPDATE "OrganizationSubscription" SET "lapsedSince" = now() - interval '16 days'
+   WHERE "organizationId" = (SELECT id FROM "Organization" WHERE slug = '<slug>');
+   ```
+
+   Nothing is deleted. Deleting a verified organization is a decision for its
+   data's sake (orders, guests' contact info), not a cleanup.
+
+### Extend a trial, or give a discount
+
+Both in the Stripe Dashboard, on the organization's subscription:
+
+- **Longer trial:** Actions, Update subscription, change the trial end date. The
+  webhook mirrors the new date; the panel's banner counts the new days left.
+- **Discount:** add a coupon to the subscription (Actions, Apply coupon).
+  Nothing in the app needs to know: the invoice is smaller, and `invoice.paid`
+  arrives as usual.
+- **A month free for an organization behind on payment:** mark its open
+  invoice as paid outside of Stripe (on the invoice, "Mark as paid", out of
+  band). That sends `invoice.paid`, which clears the clock.
+
+### Lifting an organization whose payment went through but the panel did not notice
+
+The panel or the public site says the restaurant is behind, but Stripe shows the
+subscription active.
+
+1. Check what the mirror holds:
+
+   ```sql
+   SELECT s.status, s."lapsedSince", s."syncedAt", s."stripeSubscriptionId"
+   FROM "OrganizationSubscription" s JOIN "Organization" o ON o.id = s."organizationId"
+   WHERE o.slug = '<slug>';
+   ```
+
+2. An old `syncedAt` means an event never applied. Resend the latest event for
+   that subscription from the Dashboard (Developers, Webhooks, the platform
+   endpoint, the event, Resend), as in "Stripe webhooks stuck" above. Any
+   billing event will do: each one re-reads the subscription from Stripe.
+3. If the endpoint itself is down and the restaurant cannot wait, clear the
+   clock by hand. Every step lifts at once:
+
+   ```sql
+   UPDATE "OrganizationSubscription" SET status = 'ACTIVE', "lapsedSince" = NULL
+   WHERE "organizationId" = (SELECT id FROM "Organization" WHERE slug = '<slug>');
+   ```
+
+   Do this only when Stripe says it is paid: the next event that arrives
+   rewrites the row from Stripe, and if Stripe disagrees the clock starts again
+   from that moment, which gives the restaurant another 7 days.
+
+### Organizations over their plan
+
+The portal lets a chain move itself down to a one-branch plan (see
+`docs/DEPLOY.md`). Those keep working and pay the smaller price:
+
+```sql
+SELECT o.slug, s."planLookupKey", count(b.id) AS branches
+FROM "OrganizationSubscription" s
+JOIN "Organization" o ON o.id = s."organizationId"
+JOIN "Business" b ON b."organizationId" = o.id AND b."deletedAt" IS NULL
+WHERE s."planLookupKey" IN ('marea_basico', 'marea_pro')
+GROUP BY o.slug, s."planLookupKey" HAVING count(b.id) > 1;
+```
+
 ## Rotating secrets
 
 Every rotation below: change it, restart the affected service(s), then run
