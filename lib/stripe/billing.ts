@@ -123,29 +123,68 @@ export async function paymentMethodOfSetupSession(session: Stripe.Checkout.Sessi
 }
 
 /**
- * Makes `paymentMethod` the one the subscription charges, and lifts a pause
- * that was only waiting for it. Resuming opens an invoice that Stripe would
- * otherwise try to collect an hour later, with the subscription still paused
- * until then (seen against a test clock), so it is paid here: a restaurant
- * that just added its card is up to date now. A decline leaves the invoice
- * open and the subscription paused, which the next sync mirrors.
+ * Makes `paymentMethod` the one the subscription charges and collects what is
+ * owed with it, now. A paused subscription is resumed first; resuming opens an
+ * invoice that Stripe would otherwise try an hour later, with the subscription
+ * still paused until then (seen against a test clock). A past-due or unpaid
+ * one has its open invoice paid. Either way a restaurant that just gave a card
+ * is up to date at once. False when the charge was declined: the invoice stays
+ * open, and the next sync mirrors whatever Stripe says.
  */
 export async function attachCardToSubscription(
   subscription: Stripe.Subscription,
   paymentMethod: string,
   client: BillingStripe = defaultClient()
-): Promise<void> {
+): Promise<boolean> {
   await client.subscriptions.update(subscription.id, { default_payment_method: paymentMethod });
-  if (subscription.status !== "paused") return;
-  const resumed = await client.subscriptions.resume(subscription.id, { billing_cycle_anchor: "now" });
-  const invoice = resumed.latest_invoice;
-  const invoiceId = typeof invoice === "string" ? invoice : invoice?.id;
-  if (!invoiceId) return;
-  try {
-    await client.invoices.pay(invoiceId);
-  } catch (err) {
-    console.error(`[billing] resumed ${subscription.id} but its invoice ${invoiceId} was not paid`, err);
+  let invoice = subscription.latest_invoice;
+  if (subscription.status === "paused") {
+    invoice = (await client.subscriptions.resume(subscription.id, { billing_cycle_anchor: "now" })).latest_invoice;
+  } else if (subscription.status !== "past_due" && subscription.status !== "unpaid") {
+    return true;
   }
+  const invoiceId = typeof invoice === "string" ? invoice : invoice?.id;
+  if (!invoiceId) return true;
+  try {
+    const paid = await client.invoices.pay(invoiceId, { payment_method: paymentMethod });
+    return paid.status === "paid";
+  } catch (err) {
+    console.error(`[billing] ${subscription.id}: invoice ${invoiceId} was not paid`, err);
+    return false;
+  }
+}
+
+/** The card Stripe would charge: the subscription's own, else its customer's default. Needs the customer expanded (retrieveSubscription does). */
+export function paymentMethodOnFile(subscription: Stripe.Subscription): string | null {
+  const own = subscription.default_payment_method;
+  if (own) return typeof own === "string" ? own : own.id;
+  const customer = typeof subscription.customer === "object" && !subscription.customer.deleted ? subscription.customer : null;
+  const fallback = customer?.invoice_settings?.default_payment_method;
+  if (!fallback) return null;
+  return typeof fallback === "string" ? fallback : fallback.id;
+}
+
+/**
+ * Hosted Checkout for a new subscription, for an organization whose old one
+ * ended (canceled, or expired before its first payment). The new
+ * subscription reaches the organization through the webhook
+ * (checkout.session.completed), never the redirect.
+ */
+export async function createSubscriptionCheckout(
+  input: { customerAccountId: string; organizationId: string; price: Stripe.Price; quantity: number; successUrl: string; cancelUrl: string },
+  client: BillingStripe = defaultClient()
+): Promise<string> {
+  const session = await client.checkout.sessions.create({
+    mode: "subscription",
+    customer_account: input.customerAccountId,
+    line_items: [{ price: input.price.id, quantity: input.quantity }],
+    success_url: input.successUrl,
+    cancel_url: input.cancelUrl,
+    metadata: { marea_organization: input.organizationId },
+    subscription_data: { metadata: { marea_organization: input.organizationId } },
+  });
+  if (!session.url) throw new Error("Stripe returned a Checkout session without a URL");
+  return session.url;
 }
 
 /**
