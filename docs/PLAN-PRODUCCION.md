@@ -41,7 +41,7 @@
 depende de esas dos.
 
 ---
-## Estado (27 de septiembre de 2026, tras el módulo 18)
+## Estado (25 de octubre de 2026, tras el módulo 19)
 
 Actualiza esta tabla al cerrar cada módulo. Es lo primero que se lee al volver
 al proyecto después de un tiempo fuera.
@@ -58,7 +58,7 @@ al proyecto después de un tiempo fuera.
 | 6 · Rendimiento y tiempo real | 16 | **Terminada** (PRs #73–#79 y la del cierre). Cinco pantallas quietas de 605 a 2 sentencias por minuto, cambios en ~130 ms, prueba de carga de 200 pedidos sin errores. Dos criterios se cumplen distinto a como se escribieron: ver el módulo 16 |
 | 7 · Multi-sucursal | 17 | **Terminada** (PRs #81, #82–#87, fusionados en `main`). Un negocio por petición, RLS con `marea_app`, organización y `ORG_ADMIN`, alta de negocios sin tocar la base. Los pagos multi-negocio salieron a la 7b: ver abajo |
 | 7b · Stripe Connect | 17b | **Terminada** (PRs #88–#93, fusionados en `main`). Cada negocio cobra en su propia cuenta de Stripe (cargos directos): la plataforma no retiene fondos ajenos, así que ya puede entrar un restaurante que no sea tuyo. Se conecta desde la configuración, sin tocar la base ni el entorno; una cuenta que Stripe restringe o que el negocio desconecta deja de ofrecer tarjeta sola. Sin comisión de plataforma por ahora (decidido; la política de devolución está escrita en `lib/payments/platform-fee.ts`). **Antes del primer restaurante ajeno, a mano:** registrar los dos webhooks (`docs/DEPLOY.md`) y probar su entrega real, que en las pruebas sólo se ejerció con eventos firmados; y probar el alta completa con una cuenta de Stripe activada de verdad, no sólo hasta el enlace de Stripe |
-| 8 · Producto vendible | 18, 19, 20 | Dividida en tres módulos. **18, operación como servicio** (8.5) **terminada** (PRs #95–#102, fusionados en `main`). Respaldo cifrado cada seis horas con bloqueo de objetos (MinIO real, no simulado), retención 2 días/7 días/28 días/90 días aplicada por el almacenamiento, restauración probada y cronometrada (7.4 s contra la base de desarrollo, sube con datos reales — ver `docs/RUNBOOK.md`), corre sola cada mes en CI. Purgas de privacidad y barrido de medios programados con `crond`; aviso mensual de anonimización pendiente sin automatizarla. `/api/status` separado de `/api/health`, con umbrales escritos. Modo de sólo lectura probado con una prueba que recorre los Server Actions, no una lista a mano — encontró dos que no la tenían. Dos correcciones de carrera encontradas en el camino, fuera de alcance del módulo: `promotion_exhausted` sin manejar (#94) y un candado de reservación bajo `deadlock` en vez de la violación esperada (#97). Antes del primer restaurante ajeno, a mano: crear el bucket de respaldos, guardar la llave de cifrado fuera del servidor, conectar el monitor externo (`docs/DEPLOY.md`). **19, alta autoservicio y suscripción** (8.1 y 8.3): prompt escrito, sin empezar. **20, CFDI 4.0** (8.2): sin escribir. La PWA offline (8.4) se pospone, ver abajo |
+| 8 · Producto vendible | 18, 19, 20 | Dividida en tres módulos. **18, operación como servicio** (8.5) **terminada** (PRs #95–#102, fusionados en `main`). Respaldo cifrado cada seis horas con bloqueo de objetos (MinIO real, no simulado), retención 2 días/7 días/28 días/90 días aplicada por el almacenamiento, restauración probada y cronometrada (7.4 s contra la base de desarrollo, sube con datos reales — ver `docs/RUNBOOK.md`), corre sola cada mes en CI. Purgas de privacidad y barrido de medios programados con `crond`; aviso mensual de anonimización pendiente sin automatizarla. `/api/status` separado de `/api/health`, con umbrales escritos. Modo de sólo lectura probado con una prueba que recorre los Server Actions, no una lista a mano — encontró dos que no la tenían. Dos correcciones de carrera encontradas en el camino, fuera de alcance del módulo: `promotion_exhausted` sin manejar (#94) y un candado de reservación bajo `deadlock` en vez de la violación esperada (#97). Antes del primer restaurante ajeno, a mano: crear el bucket de respaldos, guardar la llave de cifrado fuera del servidor, conectar el monitor externo (`docs/DEPLOY.md`). **19, alta autoservicio y suscripción** (8.1 y 8.3) **terminada** (PRs #104, #106–#112, #114–#120 y la del cierre, fusionados en `main`). Registro público con verificación de correo que no crea el negocio con la conexión del dueño (`marea_signup`, `SECURITY DEFINER`); asistente de cuatro pasos, datos de ejemplo que se borran sin tocar lo que el restaurante hizo suyo e importación de menú por CSV de Excel en español. Suscripción de la plataforma por organización, pagada por un Account v2 de cliente: Básico MXN 799, Pro MXN 1,499 y Cadena MXN 1,299 por sucursal, IVA incluido, encontrados por `lookup_key`; prueba de 14 días sin tarjeta que se pausa si termina sin ella; el estado sólo lo cambia el webhook. Límite por sucursales comprobado en la base (`marea_add_branch`). Escalera de degradado: aviso de inmediato, configuración en sólo lectura al día 7 y suspensión al 15, siempre al cierre de cada sucursal y nunca en servicio; pagar funciona en todos los escalones y la prueba que recorre los Server Actions ahora también exige la guarda de la suscripción. Una prueba de extremo a extremo recorre registro, verificación, asistente, CSV y primer pedido. **Antes de cobrar de verdad, a mano:** crear los tres precios en la cuenta en vivo, suscribir el endpoint de plataforma a los eventos de facturación y configurar el portal (`docs/DEPLOY.md`). **20, CFDI 4.0** (8.2): sin escribir. La PWA offline (8.4) se pospone, ver abajo |
 
 ### Pospuesto a propósito
 
@@ -1787,7 +1787,7 @@ de veinte, en menos de dos. Criterio numérico, no intuición: cuando
 
 **Objetivo.** Lo que separa "tengo un software" de "tengo un negocio".
 
-## 8.1 — Alta de clientes sin tu intervención
+## 8.1 — Alta de clientes sin tu intervención ✅ terminada (módulo 19)
 
 Un asistente de cuatro pasos: datos del negocio → horario → mesas (con la alta en
 lote que ya existe) → primeros platillos. Más:
@@ -1812,7 +1812,7 @@ otro proyecto.
 Modela `Invoice` (uuid del SAT, serie, folio, XML, PDF, estado, `orderId`) y
 guarda el XML: es el documento fiscal, el PDF sólo es su representación impresa.
 
-## 8.3 — Cobrar tu propia suscripción
+## 8.3 — Cobrar tu propia suscripción ✅ terminada (módulo 19)
 
 Stripe Billing sobre la misma cuenta que ya usas. Modela `Subscription` a nivel
 de `Organization`, con planes y límites (número de sucursales, de usuarios, de
@@ -1820,6 +1820,15 @@ pedidos al mes), y un **degradado amable** al vencer: modo sólo lectura durante
 15 días antes de suspender. Cortar el servicio de golpe en hora de comida a un
 restaurante que se retrasó tres días con la tarjeta es como se pierde un cliente
 para siempre.
+
+**Cómo quedó, y en qué se apartó de lo escrito arriba.** Los límites son sólo de
+sucursales: el dueño decidió no medir usuarios ni pedidos, y un pedido de un
+comensal nunca se bloquea por la suscripción antes de la suspensión (hay una
+prueba). "Sólo lectura durante 15 días" se volvió una escalera, porque sólo
+lectura tal cual impedía tomar pedidos desde el primer día: lo primero que deja
+de funcionar es lo que usa el dueño (configuración, día 7), después el sitio
+público (suspensión, día 15). Cada cambio entra al cierre de la sucursal según su
+horario, y "Reactivar" cobra al momento en cualquier escalón.
 
 ## 8.4 — PWA offline para el mesero
 
@@ -1867,8 +1876,12 @@ Constrúyelo cuando un cliente real lo pida. Antes de eso es especulación cara.
 
 ## Criterio de terminado — Fase 8
 
-- [ ] Un restaurante nuevo se da de alta y toma su primer pedido **sin que tú
-      toques nada**. *(módulo 19)*
+- [x] Un restaurante nuevo se da de alta y toma su primer pedido **sin que tú
+      toques nada**. *(módulo 19 — `e2e/signup-to-first-order.spec.ts` lo
+      recorre contra la pila de Docker: registro, verificación, asistente, menú
+      por CSV y pedido. Sin Stripe en esa pila, el pedido se paga en caja;
+      conectar Stripe y la suscripción están cubiertos por sus pruebas de
+      integración y por las pruebas de humo contra el sandbox)*
 - [ ] Un ticket se factura y el XML valida contra el esquema del SAT.
       *(módulo 20)*
 - [x] Una restauración de respaldo probada, cronometrada y documentada.
@@ -2068,7 +2081,7 @@ la numeración de los seis existentes:
 | `17-multi-sucursal.md` | 7 | `feature/tenancy-fase-N` |
 | `17b-stripe-connect.md` | 7b (pagos) | `feature/connect-fase-N` |
 | `18-operacion-como-servicio.md` | 8.5 | `feature/ops-fase-N` |
-| `19-alta-y-suscripcion.md` | 8.1, 8.3 | `feature/onboarding-fase-N` |
+| `19-alta-y-suscripcion.md` | 8.1, 8.3 | `feature/onboarding-fase-N` — terminado |
 | `20-cfdi.md` | 8.2 | por escribir |
 
 El `08` no corresponde a ninguna fase del plan: es mantenimiento del generador de
