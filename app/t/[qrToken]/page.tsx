@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { degradeStateFor } from "@/lib/billing/degrade-guard";
+import { PausedPage } from "@/components/public/PausedPage";
 import { notFound } from "next/navigation";
 import { getPublicBusinessForToken } from "@/lib/business";
 import { getTableByQrToken } from "@/lib/tables/queries";
@@ -16,6 +18,8 @@ export default async function TablePage({
 }) {
   const { qrToken } = await params;
   const business = await getPublicBusinessForToken("table", qrToken, `/t/${qrToken}`);
+  if ((await degradeStateFor(business.id)).level === "SUSPENDED") return <PausedPage name={business.name} phone={business.phone} />;
+
   const table = await getTableByQrToken(business.id, qrToken);
 
   if (!table) {

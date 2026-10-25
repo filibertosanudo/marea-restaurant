@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getPublicBusiness } from "@/lib/business";
+import { degradeStateFor } from "@/lib/billing/degrade-guard";
+import { PausedPage } from "@/components/public/PausedPage";
 import { getCartWithLivePrices } from "@/lib/cart/queries";
 import { getOrderLang } from "@/lib/i18n/cookie";
 import { getOrderDictionary } from "@/lib/i18n/dictionaries";
@@ -10,6 +12,7 @@ import { CheckoutForm } from "@/components/order/CheckoutForm";
 
 export default async function CheckoutPage() {
   const business = await getPublicBusiness();
+  if ((await degradeStateFor(business.id)).level === "SUSPENDED") return <PausedPage name={business.name} phone={business.phone} />;
   const lang = await getOrderLang(business.defaultLocale === "en" ? "en" : "es");
   const dict = getOrderDictionary(lang);
   const cart = await getCartWithLivePrices(business.id, lang);

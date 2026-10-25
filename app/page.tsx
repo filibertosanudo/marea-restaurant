@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { degradeStateFor } from "@/lib/billing/degrade-guard";
+import { PausedPage } from "@/components/public/PausedPage";
 import { MareaLandingPage } from "@/components/marea-landing/MareaLandingPage";
 import { getPublicBusiness, getPublicBusinessTranslations } from "@/lib/business";
 import { getPublicMenuByLang, getRepresentativeMenuImageUrl } from "@/lib/menu/queries";
@@ -39,6 +41,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function Home() {
   const business = await getPublicBusiness();
+  if ((await degradeStateFor(business.id)).level === "SUSPENDED") return <PausedPage name={business.name} phone={business.phone} />;
+
 
   const [menuByLang, promotions, testimonials, businessTranslations, openingHours, image, { description }] =
     await Promise.all([
