@@ -130,7 +130,7 @@ const OPERATIONS: Record<string, string[]> = {
 // Works on every step (requireRoleInAnyState).
 const ANY_STATE: Record<string, string[]> = {
   // Paying has to work always, or a restaurant behind on payment cannot get out.
-  "lib/billing/actions.ts": ["startTrialAction", "addCardAction", "openPortalAction"],
+  "lib/billing/actions.ts": ["startTrialAction", "addCardAction", "openPortalAction", "reactivateAction"],
   // Moves the session to another branch: the owner reaches the billing page from any of them.
   "lib/auth/switch-actions.ts": ["switchBusinessAction"],
   // Reads.
