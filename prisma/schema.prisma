@@ -241,6 +241,58 @@ model Organization {
   /// Usuarios ORG_ADMIN de esta organización (User.organizationId).
   admins     User[]
   emailVerificationTokens EmailVerificationToken[]
+  subscription OrganizationSubscription?
+}
+
+/// A platform subscription's state, as Stripe reports it. NOT_STARTED is
+/// ours: the customer account exists and the subscription does not yet (a
+/// start that stopped between the two calls).
+enum SubscriptionStatus {
+  NOT_STARTED
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  UNPAID
+  PAUSED
+  CANCELED
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+}
+
+/// Module 19, phase 6: the platform's own subscription for an organization,
+/// paid by a Stripe Account v2 with only the customer configuration (never
+/// one of the organization's connected merchant accounts: a chain has several
+/// and a cash-only restaurant has none). A MIRROR: Stripe is the source of
+/// truth, and after creation only the platform webhook writes these columns,
+/// each time from a fresh retrieve of the subscription, so the order events
+/// arrive in does not matter. No screen decides a subscription is paid
+/// because someone came back from Checkout.
+model OrganizationSubscription {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// acct_... with the customer configuration. Issued by Stripe; the webhook
+  /// finds the organization through it (lib/tenancy/discover.ts).
+  stripeCustomerAccountId String  @unique
+  stripeSubscriptionId    String? @unique
+
+  status        SubscriptionStatus @default(NOT_STARTED)
+  /// The price's lookup_key (marea_basico, ...): plans are found by it, never by price id.
+  planLookupKey String?
+  /// Branches paid for; 1 except on a per-branch price.
+  quantity      Int                @default(1)
+
+  trialEndsAt         DateTime?
+  currentPeriodEndsAt DateTime?
+  cancelAtPeriodEnd   Boolean   @default(false)
+  /// Whether Stripe has a card to charge when the trial ends.
+  hasPaymentMethod    Boolean   @default(false)
+  /// When this row last copied Stripe's state.
+  syncedAt            DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// El "tenant". En v1 hay exactamente una fila (Marea) y el código puede
