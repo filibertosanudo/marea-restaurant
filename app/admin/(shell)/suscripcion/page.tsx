@@ -7,6 +7,8 @@ import { getSubscriptionSummary } from "@/lib/billing/queries";
 import { billingEnabled } from "@/lib/stripe/billing";
 import { addCardAction, openPortalAction, startTrialAction } from "@/lib/billing/actions";
 import { Button } from "@/components/ui/Button";
+import { AddBranchForm } from "@/components/admin/billing/AddBranchForm";
+import { atBranchLimit, branchAllowance } from "@/lib/billing/limits";
 
 const ARRIVALS = ["card", "started", "error"] as const;
 type Arrival = (typeof ARRIVALS)[number];
@@ -35,7 +37,7 @@ export default async function SubscriptionPage({ searchParams }: { searchParams:
     );
   }
 
-  const summary = await getSubscriptionSummary(business.organizationId);
+  const [summary, allowance] = await Promise.all([getSubscriptionSummary(business.organizationId), branchAllowance(business.organizationId)]);
   // Dates resolved here, in the business's own time zone, never in the browser.
   const date = new Intl.DateTimeFormat(lang === "en" ? "en-US" : "es-MX", { dateStyle: "long", timeZone: business.timezone });
   const fmt = (iso: string | null) => (iso ? date.format(new Date(iso)) : "—");
@@ -105,6 +107,23 @@ export default async function SubscriptionPage({ searchParams }: { searchParams:
           <p className="text-[12px] text-on-surface-muted">{dict.manageHint}</p>
         </div>
       )}
+
+      <section className="flex flex-col gap-md rounded-md border border-border bg-surface p-md">
+        <div>
+          <h2 className="text-[15px] font-semibold text-on-surface">{dict.branchesTitle}</h2>
+          <p className="text-[13px] text-on-surface-muted">
+            {allowance.max === null
+              ? dict.branchesCountUnlimited.replace("{count}", String(allowance.count))
+              : dict.branchesCount.replace("{count}", String(allowance.count)).replace("{max}", String(allowance.max))}
+          </p>
+        </div>
+        <AddBranchForm
+          dict={dict}
+          planName={allowance.plan ? dict.plans[allowance.plan] : null}
+          max={allowance.max}
+          atLimit={atBranchLimit(allowance)}
+        />
+      </section>
     </div>
   );
 }
