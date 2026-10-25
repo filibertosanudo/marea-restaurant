@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { adoptSampleMenuItem } from "@/lib/onboarding/sample-adoption";
 import { invalidatePublicCache } from "@/lib/cache/public";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth/permissions";
+import { requireRole, requireOperationsRole } from "@/lib/auth/permissions";
 import { getBusinessForRequest } from "@/lib/business";
 import { buildMenuItemSchema } from "@/lib/menu/schemas";
 import { UserRole } from "@/lib/generated/prisma/client";
@@ -244,7 +244,7 @@ export async function updateMenuItemAction(
 }
 
 export async function toggleAvailabilityAction(id: string, isAvailable: boolean) {
-  await requireRole(...STAFF_UP_ROLES);
+  await requireOperationsRole(...STAFF_UP_ROLES);
   const business = await getBusinessForRequest();
   await prisma.menuItem.update({
     where: { id, businessId: business.id },
@@ -273,7 +273,7 @@ export async function adjustMenuItemStockAction(
   menuItemId: string,
   delta: number
 ): Promise<AdjustStockState> {
-  const session = await requireRole(...STAFF_UP_ROLES);
+  const session = await requireOperationsRole(...STAFF_UP_ROLES);
   const business = await getBusinessForRequest();
   if (!Number.isInteger(delta) || delta === 0) return { error: "invalid_delta" };
 

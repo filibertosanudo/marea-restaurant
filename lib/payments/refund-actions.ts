@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth/permissions";
+import { requireOperationsRole } from "@/lib/auth/permissions";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { getBusinessForRequest } from "@/lib/business";
 import { getOrderPaymentDetailRaw } from "@/lib/orders/queries";
@@ -193,7 +193,7 @@ export async function createRefundAction(
   orderId: string,
   input: { mode: "FULL" | "PARTIAL"; amount: string; reason: string }
 ): Promise<CreateRefundResult> {
-  const session = await requireRole(...ADMIN_ROLES);
+  const session = await requireOperationsRole(...ADMIN_ROLES);
   const business = await getBusinessForRequest();
 
   const trimmedReason = input.reason.trim();
