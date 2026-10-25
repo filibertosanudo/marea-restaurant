@@ -147,3 +147,14 @@ export async function attachCardToSubscription(
     console.error(`[billing] resumed ${subscription.id} but its invoice ${invoiceId} was not paid`, err);
   }
 }
+
+/**
+ * Sets how many branches a per-branch subscription bills for. Stripe prorates
+ * the change on the next invoice; during the trial there is nothing to prorate.
+ */
+export async function setSubscriptionQuantity(subscriptionId: string, quantity: number, client: BillingStripe = defaultClient()): Promise<void> {
+  const subscription = await client.subscriptions.retrieve(subscriptionId);
+  const item = subscription.items.data[0];
+  if (!item || item.quantity === quantity) return;
+  await client.subscriptions.update(subscriptionId, { items: [{ id: item.id, quantity }], proration_behavior: "create_prorations" });
+}
