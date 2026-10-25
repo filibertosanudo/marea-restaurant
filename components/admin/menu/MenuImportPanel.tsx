@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { startTransition, useActionState, useRef } from "react";
 import { Button } from "@/components/ui/Button";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import {
@@ -30,27 +30,41 @@ function fileError(dict: Dict, error: string, missing?: string[]): string {
   }
 }
 
-/** One form, one file input, two submit buttons: the preview and the import read the same selected file. */
+/**
+ * One form, one file input, two buttons: the preview and the import read the
+ * same selected file. Neither submits the form: React resets a form after its
+ * action finishes, which emptied the file input after "Review file" and made
+ * the owner choose the file again to import it (caught by
+ * e2e/signup-to-first-order.spec.ts). Each button reads the form instead.
+ */
 export function MenuImportPanel({ dict }: { dict: Dict }) {
   const [preview, previewAction, previewing] = useActionState<PreviewState, FormData>(previewMenuImportAction, undefined);
   const [result, importAction, importing] = useActionState<ImportResultState, FormData>(commitMenuImportAction, undefined);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function run(action: (data: FormData) => void) {
+    const form = formRef.current;
+    if (!form?.reportValidity()) return;
+    const data = new FormData(form);
+    startTransition(() => action(data));
+  }
 
   return (
     <details className="mx-lg mt-md rounded-md border border-border bg-surface p-md">
       <summary className="cursor-pointer text-[13px] font-medium text-on-surface">{dict.title}</summary>
       <p className="mt-sm text-[12px] text-on-surface-muted">{dict.lead}</p>
 
-      <form className="mt-md flex flex-col gap-md">
+      <form ref={formRef} onSubmit={(event) => event.preventDefault()} className="mt-md flex flex-col gap-md">
         <input type="file" name="file" accept=".csv,text/csv" required className="text-[13px]" />
         <label className="flex items-center gap-[6px] text-[12.5px] text-on-surface">
           <input type="checkbox" name="updateExisting" />
           {dict.updateExisting}
         </label>
         <div className="flex gap-sm">
-          <Button type="submit" variant="secondary" formAction={previewAction} disabled={previewing}>
+          <Button type="button" variant="secondary" onClick={() => run(previewAction)} disabled={previewing}>
             {dict.review}
           </Button>
-          <Button type="submit" formAction={importAction} disabled={importing}>
+          <Button type="button" onClick={() => run(importAction)} disabled={importing}>
             {dict.run}
           </Button>
         </div>
