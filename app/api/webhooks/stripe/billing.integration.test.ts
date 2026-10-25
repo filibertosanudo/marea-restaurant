@@ -198,6 +198,26 @@ describe("POST /api/webhooks/stripe, billing events", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
+  it("starts the degrade clock at the first unpaid status, keeps it, and clears it on payment", async () => {
+    const org = await subscribedOrganization();
+    const retrieve = vi.spyOn(stripe.subscriptions, "retrieve");
+    const invoice = (type: string) =>
+      event(type, { id: `in_${type}`, object: "invoice", customer_account: org.accountId, parent: { subscription_details: { subscription: org.subscriptionId } } });
+
+    retrieve.mockResolvedValueOnce(stripeSubscription({ id: org.subscriptionId, status: "past_due" }) as never);
+    await POST(signed(invoice("invoice.payment_failed")));
+    const started = (await rowOf(org.organization.id)).lapsedSince;
+    expect(started).not.toBeNull();
+
+    retrieve.mockResolvedValueOnce(stripeSubscription({ id: org.subscriptionId, status: "unpaid" }) as never);
+    await POST(signed(event("customer.subscription.updated", { id: org.subscriptionId, object: "subscription", customer_account: org.accountId })));
+    expect((await rowOf(org.organization.id)).lapsedSince).toEqual(started);
+
+    retrieve.mockResolvedValueOnce(stripeSubscription({ id: org.subscriptionId, status: "active", trial_end: null }) as never);
+    await POST(signed(invoice("invoice.paid")));
+    expect(await rowOf(org.organization.id)).toMatchObject({ status: "ACTIVE", lapsedSince: null });
+  });
+
   it("refuses a billing event on the Connect endpoint", async () => {
     const org = await subscribedOrganization();
     const retrieve = vi.spyOn(stripe.subscriptions, "retrieve");
