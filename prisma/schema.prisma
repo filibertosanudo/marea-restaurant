@@ -290,6 +290,11 @@ model OrganizationSubscription {
   hasPaymentMethod    Boolean   @default(false)
   /// When this row last copied Stripe's state.
   syncedAt            DateTime?
+  /// Since when the organization has not been paying (a non-paying status
+  /// first seen by the webhook); null while it pays. The degrade ladder
+  /// counts its days from here (lib/billing/degrade.ts), and a payment
+  /// clears it, which is what lifts every step at once.
+  lapsedSince         DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
