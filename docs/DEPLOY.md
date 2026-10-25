@@ -158,6 +158,76 @@ are not per business, the payment names its business.
   `stripe listen --forward-connect-to localhost:3000/api/webhooks/stripe/connect`
   each print their own `whsec_...`; put them in the two variables.
 
+## Stripe: the platform's own subscription
+
+Separate from card payments: each organization pays Marea a monthly
+subscription, billed on the **platform's** Stripe account (the one
+`STRIPE_SECRET_KEY` names). Three things have to exist in that account, in the
+same mode as the key, before a restaurant signs up. Without them signup still
+works, but no trial starts; the owner sees "Start the free trial" on
+`/admin/suscripcion` and it fails until the prices exist.
+
+### 1. The three prices
+
+The code finds each plan by `lookup_key`, never by price id, so the ids are not
+configuration. Monthly, in MXN, with tax included (`tax_behavior=inclusive`; no
+Stripe Tax). The amounts are the owner's decision and can change in Stripe
+without a deploy; the `lookup_key`s cannot.
+
+| Plan | `lookup_key` | Monthly (MXN, tax included) | Branches |
+|---|---|---|---|
+| Básico | `marea_basico` | 799 | 1 |
+| Pro | `marea_pro` | 1,499 | 1 |
+| Cadena | `marea_cadena` | 1,299 **per branch** (quantity = branches) | no limit |
+
+With the Stripe CLI, once per mode:
+
+```bash
+stripe products create --name "Marea Básico"
+stripe prices create --product <prod_id> --currency mxn --unit-amount 79900   -d "recurring[interval]=month" --tax-behavior inclusive --lookup-key marea_basico
+```
+
+and the same for `marea_pro` (149900) and `marea_cadena` (129900). Branch limits
+live in `lib/billing/plans.ts`, the one place a number about a plan is allowed.
+`lib/stripe/billing.smoke.test.ts` checks the three against a sandbox.
+
+### 2. The platform endpoint's billing events
+
+Add these to the **platform** endpoint (`/api/webhooks/stripe`, "Events from:
+Your account"), alongside the payment events above. They are what moves a
+subscription's state; nothing else does, and the redirect back from Checkout
+proves nothing.
+
+| Event | Why |
+|---|---|
+| `customer.subscription.created`, `.updated`, `.deleted`, `.paused`, `.resumed`, `.trial_will_end` | every change of status, plan, quantity, period or cancellation |
+| `invoice.paid`, `invoice.payment_failed` | money arrived or did not; `invoice.paid` is what lifts the degrade ladder |
+| `checkout.session.completed` | a card added through Checkout (setup mode), or a new subscription for an organization whose old one ended (subscription mode) |
+
+Missing one does not lose anything for good: each event only makes the app read
+the subscription again from Stripe, so the next event that does arrive brings
+the row up to date. `docs/RUNBOOK.md` has what to do when one never comes.
+
+### 3. The billing portal
+
+"Manage subscription" opens Stripe's own portal. Configure it in the Dashboard
+(Settings, Billing, Customer portal), same mode:
+
+- **Payment methods:** allow updating.
+- **Invoice history:** on.
+- **Cancellations:** allow, at the end of the period. A canceled subscription
+  starts the degrade ladder when it ends, and "Reactivate" starts a new one.
+- **Subscriptions, switch plan:** allow, listing the three prices above, with
+  proration. Moving to Cadena sets the quantity to the branch count on the next
+  billing event (`lib/billing/webhook.ts`).
+
+Known limit: the portal cannot condition a plan change on the organization's
+branch count, so a chain with several branches can move itself down to Básico.
+Its branches keep working (an organization over its plan is not degraded; it
+only cannot add more), but it pays the one-branch price. If that matters before
+it is handled in code, leave plan switching off in the portal and change plans
+by hand, or check for it with the query in `docs/RUNBOOK.md`.
+
 ## Database roles and row level security
 
 Every business table has a Postgres row level security policy tying its rows
