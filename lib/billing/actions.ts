@@ -7,7 +7,18 @@ import { UserRole } from "@/lib/generated/prisma/client";
 import { requireRoleInAnyState } from "@/lib/auth/permissions";
 import { organizationOwner } from "@/lib/billing/owner";
 import { ensureSubscription } from "@/lib/billing/start";
-import { billingEnabled, createCardSetupSession, createPortalSession } from "@/lib/stripe/billing";
+import {
+  attachCardToSubscription,
+  billingEnabled,
+  createCardSetupSession,
+  createPortalSession,
+  createSubscriptionCheckout,
+  paymentMethodOnFile,
+  priceForPlan,
+  retrieveSubscription,
+} from "@/lib/stripe/billing";
+import { PLANS, TRIAL_PLAN, planForLookupKey, quantityFor } from "@/lib/billing/plans";
+import { organizationBusinessIds } from "@/lib/billing/organization";
 
 const PAGE = "/admin/suscripcion";
 
@@ -65,5 +76,48 @@ export async function openPortalAction(): Promise<void> {
       console.error(`[billing] portal for organization ${owner.organizationId} did not open`, err);
     }
   }
+  redirect(url);
+}
+
+/**
+ * One button for an organization that is not paying (module 19, phase 8):
+ * - a subscription that ended (canceled, expired) gets a new one through
+ *   hosted Checkout, on the plan it had;
+ * - one paused, past due or unpaid is charged now with the card on file;
+ * - with no card on file, Checkout asks for one, and the webhook charges it.
+ * What the owner sees afterwards still comes from the mirror the webhook
+ * writes; the note on arrival only says what was attempted.
+ */
+export async function reactivateAction(): Promise<void> {
+  const owner = await organizationOwner(await requireRoleInAnyState(UserRole.BUSINESS_ADMIN));
+  const row = await prisma.organizationSubscription.findUnique({ where: { organizationId: owner.organizationId } });
+  let url = `${PAGE}?billing=error`;
+  if (row?.stripeSubscriptionId && billingEnabled()) {
+    const urls = { successUrl: `${owner.origin}${PAGE}?billing=card`, cancelUrl: `${owner.origin}${PAGE}` };
+    try {
+      const subscription = await retrieveSubscription(row.stripeSubscriptionId);
+      if (subscription.status === "canceled" || subscription.status === "incomplete_expired") {
+        const plan = planForLookupKey(row.planLookupKey) ?? TRIAL_PLAN;
+        const [price, businessIds] = await Promise.all([priceForPlan(PLANS[plan].lookupKey), organizationBusinessIds(owner.organizationId)]);
+        url = await createSubscriptionCheckout({
+          customerAccountId: row.stripeCustomerAccountId,
+          organizationId: owner.organizationId,
+          price,
+          quantity: quantityFor(plan, businessIds.length),
+          ...urls,
+        });
+      } else {
+        const paymentMethod = paymentMethodOnFile(subscription);
+        if (paymentMethod) {
+          url = `${PAGE}?billing=${(await attachCardToSubscription(subscription, paymentMethod)) ? "reactivated" : "declined"}`;
+        } else {
+          url = await createCardSetupSession({ customerAccountId: row.stripeCustomerAccountId, organizationId: owner.organizationId, currency: owner.currency, ...urls });
+        }
+      }
+    } catch (err) {
+      console.error(`[billing] reactivation for organization ${owner.organizationId} failed`, err);
+    }
+  }
+  revalidatePath("/admin", "layout");
   redirect(url);
 }

@@ -23,6 +23,9 @@ import { Prisma } from "@/lib/generated/prisma/client";
  *   first, and invoice.paid is what lifts the degrade ladder (phase 8).
  * - checkout.session.completed in setup mode: the card a restaurant added
  *   through hosted Checkout, which this handler puts on the subscription.
+ * - checkout.session.completed in subscription mode: a new subscription for
+ *   an organization whose old one ended (phase 8's reactivation), which
+ *   replaces the ended one here.
  *
  * Each event only says "look again": the row is rewritten from a fresh
  * retrieve of the subscription, so the order events arrive in, a repeat, or a
@@ -44,9 +47,16 @@ function isCardSetupSession(event: Stripe.Event): event is Stripe.CheckoutSessio
   return event.type === "checkout.session.completed" && event.data.object.mode === "setup";
 }
 
-export function isBillingEvent(event: Stripe.Event): boolean {
-  return SUBSCRIPTION_EVENTS.has(event.type) || INVOICE_EVENTS.has(event.type) || isCardSetupSession(event);
+function isNewSubscriptionSession(event: Stripe.Event): event is Stripe.CheckoutSessionCompletedEvent {
+  return event.type === "checkout.session.completed" && event.data.object.mode === "subscription";
 }
+
+export function isBillingEvent(event: Stripe.Event): boolean {
+  return SUBSCRIPTION_EVENTS.has(event.type) || INVOICE_EVENTS.has(event.type) || isCardSetupSession(event) || isNewSubscriptionSession(event);
+}
+
+/** Only an ended subscription may be replaced: one still running is never swapped by an event. */
+const ENDED = new Set(["CANCELED", "INCOMPLETE_EXPIRED"]);
 
 type BillingObject = { object?: string; id?: string; customer_account?: string | null; parent?: Stripe.Invoice.Parent | null };
 
@@ -74,7 +84,16 @@ export async function applyBillingEvent(event: Stripe.Event, client?: BillingStr
   return runInTenant(businessId, async () => {
     if (await prisma.stripeWebhookEvent.findUnique({ where: { eventId: event.id }, select: { id: true } })) return { applied: true } as const;
 
-    const row = await prisma.organizationSubscription.findUniqueOrThrow({ where: { organizationId } });
+    let row = await prisma.organizationSubscription.findUniqueOrThrow({ where: { organizationId } });
+    if (isNewSubscriptionSession(event)) {
+      const ref = event.data.object.subscription;
+      const replacement = typeof ref === "string" ? ref : ref?.id;
+      if (!replacement) return { ignored: "a subscription checkout with no subscription" };
+      if (replacement !== row.stripeSubscriptionId) {
+        if (!ENDED.has(row.status)) return { ignored: `organization ${organizationId} still has ${row.stripeSubscriptionId} running` };
+        row = await prisma.organizationSubscription.update({ where: { organizationId }, data: { stripeSubscriptionId: replacement } });
+      }
+    }
     if (!row.stripeSubscriptionId) return { ignored: `organization ${organizationId} has no subscription yet` };
     const named = subscriptionIdOf(object);
     // The customer account matched; a subscription it names must too.
