@@ -10,7 +10,8 @@ export type AdminNavKey =
   | "testimonials"
   | "reports"
   | "team"
-  | "settings";
+  | "settings"
+  | "billing";
 
 export type AdminNavItem = {
   key: AdminNavKey;
@@ -18,6 +19,8 @@ export type AdminNavItem = {
   roles: UserRole[];
   /** Built and reachable in this module, vs. visible-but-locked scope preview. */
   enabled: boolean;
+  /** Shown only to the organization's owner (ORG_ADMIN), whatever the role at the business. */
+  ownerOnly?: boolean;
 };
 
 const STAFF_UP = [UserRole.STAFF, UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN];
@@ -40,8 +43,9 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: "reports", href: "/admin/reportes", roles: ADMIN_ONLY, enabled: true },
   { key: "team", href: "/admin/equipo", roles: ADMIN_ONLY, enabled: true },
   { key: "settings", href: "/admin/configuracion", roles: ADMIN_ONLY, enabled: true },
+  { key: "billing", href: "/admin/suscripcion", roles: ADMIN_ONLY, enabled: true, ownerOnly: true },
 ];
 
-export function navItemsForRole(role: UserRole): AdminNavItem[] {
-  return ADMIN_NAV_ITEMS.filter((item) => item.roles.includes(role));
+export function navItemsForRole(role: UserRole, orgAdmin = false): AdminNavItem[] {
+  return ADMIN_NAV_ITEMS.filter((item) => item.roles.includes(role) && (!item.ownerOnly || orgAdmin));
 }

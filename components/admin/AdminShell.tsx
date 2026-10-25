@@ -20,6 +20,8 @@ type AdminShellProps = {
   user: { name: string; email: string };
   businesses: Array<{ id: string; name: string }>;
   activeBusinessId: string | null;
+  /** A notice above every page, such as the trial's days left. */
+  banner?: ReactNode;
 };
 
 function SidebarLinks({
@@ -84,6 +86,7 @@ export function AdminShell({
   user,
   businesses,
   activeBusinessId,
+  banner,
 }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
@@ -177,7 +180,10 @@ export function AdminShell({
           </div>
         </header>
 
-        <main className="flex-1 overflow-x-hidden">{children}</main>
+        <main className="flex-1 overflow-x-hidden">
+          {banner}
+          {children}
+        </main>
       </div>
     </div>
   );
