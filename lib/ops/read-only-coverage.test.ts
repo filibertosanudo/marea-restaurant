@@ -38,6 +38,8 @@ const EXEMPT: Record<string, string[]> = {
   // (a forced password change, recovering a forgotten one) or sign out.
   "lib/auth/actions.ts": ["loginAction", "signOutAction", "changePasswordAction"],
   "lib/auth/reset-actions.ts": ["requestPasswordResetAction", "resetPasswordAction"],
+  // Signing in as a demo persona: loginAction with the password filled in.
+  "lib/demo/actions.ts": ["demoLoginAction"],
   // A cookie only, no database write.
   "lib/cart/actions.ts": ["setTableCookieAction"],
   "lib/i18n/actions.ts": ["setAdminLangAction", "setOrderLangAction"],
