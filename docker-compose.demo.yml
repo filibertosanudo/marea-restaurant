@@ -1,0 +1,50 @@
+# The public portfolio demo on one server, on top of docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build db migrate app worker caddy
+#
+# Caddy terminates HTTPS on 80/443 (docker/Caddyfile) and is the only thing
+# reachable from outside: the app, the database and the mail catcher lose the
+# host ports the development file gives them. Everything restarts with the
+# server. SITE_DOMAIN is the root the businesses hang off, `marea.<it>` and
+# `cala.<it>`: a domain you own, or `<your-ip-with-dashes>.sslip.io` until you
+# have one. See docs/DEPLOY.md, "Running the public demo".
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?set SITE_DOMAIN, for example 203-0-113-7.sslip.io}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  app:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      DEMO_MODE: "1"
+      BUSINESS_ROOT_DOMAIN: ${SITE_DOMAIN}
+      AUTH_URL: https://marea.${SITE_DOMAIN}
+      APP_ORIGIN: https://${SITE_DOMAIN}
+
+  worker:
+    restart: unless-stopped
+
+  db:
+    restart: unless-stopped
+    ports: !reset []
+
+  mailhog:
+    restart: unless-stopped
+    ports: !reset []
+
+volumes:
+  caddy_data:
+  caddy_config:

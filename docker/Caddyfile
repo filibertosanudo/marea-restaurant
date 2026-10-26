@@ -1,0 +1,34 @@
+# The public demo's front door (docker-compose.demo.yml): HTTPS for the
+# deployment's root domain and every business subdomain, certificates from
+# Let's Encrypt obtained the first time each name is visited.
+#
+# On-demand, not a wildcard certificate: a wildcard needs a DNS challenge and
+# DNS provider credentials, and SITE_DOMAIN may be a free sslip.io name with no
+# DNS to control. Before asking for a certificate Caddy asks the app whether it
+# serves that name (app/api/tls-allowed): only the root and existing businesses
+# get one, so nobody can make this server burn Let's Encrypt's rate limit.
+
+{
+	on_demand_tls {
+		ask http://app:3000/api/tls-allowed
+	}
+}
+
+# The bare root names no business once there are several: send it to the
+# flagship.
+{$SITE_DOMAIN} {
+	tls {
+		on_demand
+	}
+	redir https://marea.{$SITE_DOMAIN}{uri}
+}
+
+*.{$SITE_DOMAIN} {
+	tls {
+		on_demand
+	}
+	encode zstd gzip
+	# Caddy replaces any X-Forwarded-For a client sends with the address it
+	# saw, so the app's default TRUSTED_PROXY_COUNT=1 reads the real visitor.
+	reverse_proxy app:3000
+}
