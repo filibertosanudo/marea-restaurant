@@ -9,6 +9,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { generateTemporaryPassword } from "@/lib/auth/temporary-password";
 import { teamMemberSchema } from "@/lib/team/schemas";
 import { UserRole } from "@/lib/generated/prisma/client";
+import { assertNotDemo } from "@/lib/demo/mode";
 
 const ADMIN_ROLES = [UserRole.BUSINESS_ADMIN, UserRole.SUPER_ADMIN] as const;
 
@@ -31,6 +32,7 @@ export async function createTeamMemberAction(
   formData: FormData
 ): Promise<TeamFormState> {
   await requireRole(...ADMIN_ROLES);
+  assertNotDemo("adding a teammate");
   const business = await getBusinessForRequest();
 
   const parsed = teamMemberSchema.safeParse({
@@ -72,6 +74,7 @@ export async function createTeamMemberAction(
 
 export async function setTeamMemberActiveAction(membershipId: string, isActive: boolean): Promise<TeamMutationResult> {
   const session = await requireRole(...ADMIN_ROLES);
+  assertNotDemo("deactivating a teammate");
   const business = await getBusinessForRequest();
 
   const membership = await prisma.businessMembership.findFirst({
@@ -127,6 +130,7 @@ export async function setTeamMemberRoleAction(
   role: "STAFF" | "BUSINESS_ADMIN"
 ): Promise<TeamMutationResult> {
   const session = await requireRole(...ADMIN_ROLES);
+  assertNotDemo("changing a teammate's role");
   const business = await getBusinessForRequest();
 
   const membership = await prisma.businessMembership.findFirst({

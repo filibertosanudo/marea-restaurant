@@ -1,10 +1,13 @@
 import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { LoginForm } from "./LoginForm";
+import { DemoAccess } from "@/components/admin/DemoAccess";
+import { isDemo } from "@/lib/demo/mode";
 
 export default async function AdminLoginPage() {
   const lang = await getAdminLang();
   const dict = getDictionary(lang);
+  const demo = isDemo();
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-surface-ocean to-surface-subtle p-lg">
@@ -23,16 +26,20 @@ export default async function AdminLoginPage() {
           </p>
         </div>
 
+        {demo && <DemoAccess dict={dict.demo} />}
+
         <div className="rounded-lg bg-surface p-xl shadow-2">
           <LoginForm dict={dict} />
         </div>
 
-        <p className="text-center text-[12px] text-on-surface-muted">
-          {dict.auth.noAccountYet}{" "}
-          <a href="/admin/signup" className="font-medium text-primary underline">
-            {dict.auth.signupTitle}
-          </a>
-        </p>
+        {!demo && (
+          <p className="text-center text-[12px] text-on-surface-muted">
+            {dict.auth.noAccountYet}{" "}
+            <a href="/admin/signup" className="font-medium text-primary underline">
+              {dict.auth.signupTitle}
+            </a>
+          </p>
+        )}
       </div>
     </div>
   );

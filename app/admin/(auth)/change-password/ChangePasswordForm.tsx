@@ -23,7 +23,9 @@ export function ChangePasswordForm({ dict }: { dict: AdminDictionary }) {
             ? dict.auth.invalidCurrentPassword
             : state?.error === "notAuthenticated"
               ? dict.auth.notAuthenticated
-              : undefined;
+              : state?.error === "demo"
+                ? dict.demo.notAvailable
+                : undefined;
 
   return (
     <form action={action} className="flex flex-col gap-md">

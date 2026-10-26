@@ -80,6 +80,22 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # The public demo's nightly reset (docs/DEPLOY.md, "Running the public
+  # demo"): drops every table, migrates from scratch and seeds again, so what
+  # one visitor changed is gone for the next. Only under the "demo" profile,
+  # never started by a plain `up`; a host cron entry runs it at night. Never
+  # point it at a real deployment's database: it deletes everything.
+  demo-reset:
+    image: marea-seed:local
+    profiles: ["demo"]
+    command: ["sh", "-c", "npx prisma migrate reset --force && npx prisma db seed"]
+    environment:
+      DATABASE_URL: postgresql://marea:${POSTGRES_PASSWORD}@db:5432/marea
+      I_KNOW_WHAT_IM_DOING: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+
   app:
     image: marea-app:local
     build:
@@ -101,6 +117,9 @@ services:
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Marea}
       SMTP_HOST: mailhog
       SMTP_PORT: 1025
+      # The public portfolio demo (lib/demo/, docs/DEPLOY.md). Off unless set.
+      DEMO_MODE: ${DEMO_MODE:-0}
+      DEMO_SOURCE_URL: ${DEMO_SOURCE_URL:-}
     volumes:
       - media:/data/media
     ports:
