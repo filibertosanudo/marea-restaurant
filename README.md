@@ -1,192 +1,215 @@
-# Marea — Seafood Restaurant
+# Marea — restaurant platform
 
-Restaurant platform for Marea, a boutique seafood restaurant: public website, QR ordering, reservations, payments, and an admin panel to run the business, built to serve several restaurants from one deployment. This is the flagship demo — "Grupo 1: Comida y Bebida" — of a portfolio of small, deployable business verticals.
+[![CI](https://github.com/filibertosanudo/marea-restaurant/actions/workflows/ci.yml/badge.svg)](https://github.com/filibertosanudo/marea-restaurant/actions/workflows/ci.yml)
+[![Restore test](https://github.com/filibertosanudo/marea-restaurant/actions/workflows/restore-test.yml/badge.svg)](https://github.com/filibertosanudo/marea-restaurant/actions/workflows/restore-test.yml)
+
+A complete platform to run a restaurant, or a chain of them, from one deployment:
+the public website, QR-code ordering at the table, reservations, card payments
+paid straight into each restaurant's own Stripe account, a live order board and
+kitchen display, cash register shifts, reports, and self-service signup with a
+monthly subscription.
+
+Built by [Filiberto Sañudo](https://github.com/filibertosanudo) as the flagship of
+a portfolio of small, deployable business verticals.
+
+> **Live demo:** *link added once deployed.* One click signs you in as the owner
+> of a two-branch chain, the manager, a waiter or the kitchen; everything resets
+> every night.
+>
+> **En español:** ver el [resumen al final](#resumen-en-español).
+
+<p align="center">
+  <img src="docs/screenshots/landing.jpg" alt="The restaurant's public website" width="49%">
+  <img src="docs/screenshots/order-board.jpg" alt="The live order board" width="49%">
+  <img src="docs/screenshots/menu-admin.jpg" alt="Menu management" width="49%">
+  <img src="docs/screenshots/reports.jpg" alt="Sales reports" width="49%">
+</p>
+
+<details>
+<summary>More screens</summary>
+<p align="center">
+  <img src="docs/screenshots/kitchen.jpg" alt="The kitchen display" width="70%">
+  <img src="docs/screenshots/menu-phone.jpg" alt="Ordering from the phone" width="25%">
+</p>
+</details>
+
+## What it does
+
+**For guests**
+- A website driven entirely by the restaurant's own data: menu, offers, reviews,
+  hours, with per-page metadata, JSON-LD and a sitemap.
+- Scan the QR code on the table, order from the phone, pay by card or at the counter,
+  and follow the order live.
+- Book a table; double bookings are impossible because the database refuses them.
+
+**For staff**
+- A live order board and a kitchen display that update in about 130 ms, with
+  printed kitchen tickets through a small agent that drives a thermal printer.
+- Cash register shifts with a frozen closing difference, refunds tied to the shift.
+- Menu with modifiers, per-dish stock, promotions applied at checkout, review
+  moderation, tables with printable QR sheets.
+
+**For the owner**
+- Sales reports compared against the previous period, exportable to CSV.
+- Several branches under one account, each on its own subdomain, each paid into its
+  own Stripe account (Stripe Connect, direct charges).
+- Sign up alone: email verification, a four-step setup wizard, sample data, menu
+  import from an Excel CSV, a 14-day trial and a monthly subscription.
+- If a payment lapses, nothing breaks at lunch: the panel warns, configuration
+  freezes on day 7 while orders keep flowing, the site pauses on day 15, and every
+  step only ever takes effect after the branch's closing time.
+
+## Engineering highlights
+
+The parts most worth a reviewer's time, each with the file that explains it.
+
+- **Tenant isolation enforced by Postgres, not by discipline.** Every business table
+  has a row level security policy. The app connects as a role that is neither the
+  table owner nor a superuser (and refuses to boot in production as anything else),
+  and each pooled connection is stamped with the request's business as it is handed
+  out. A query that forgets its `where` sees nothing instead of everything.
+  `lib/db/tenant-pool.ts`, `prisma/migrations/*_enable_row_level_security`.
+- **Money paths that cannot double-apply.** A payment is marked paid only by Stripe's
+  signed webhook, recorded in the same transaction as its effect, so a redelivery is
+  a no-op. Every call names the connected account it acts on, and the raw Stripe
+  client is unreachable outside one folder (enforced by ESLint).
+  `lib/payments/stripe-webhook.ts`, `lib/stripe/payments.ts`.
+- **Realtime without polling.** Postgres triggers `pg_notify` on every write that
+  matters; one `LISTEN` connection per web process fans out to the screens over
+  server-sent events, with a recovery sweep after reconnects. Five idle screens went
+  from 605 database statements a minute to 2. `lib/realtime/`, `docs/perf-baseline.md`.
+- **Writes guarded by construction.** A test walks every Server Action in the
+  repository, not a hand-written list, and fails if one skips the role check, the
+  maintenance read-only switch or the subscription's degrade step. It found actions
+  a manual review had missed. `lib/ops/read-only-coverage.test.ts`.
+- **Self-service signup without handing the web process the keys.** Creating a
+  business is a narrow `SECURITY DEFINER` function that validates in the database;
+  plan limits are checked with the organization row locked, so two requests cannot
+  both take the last branch. `prisma/migrations/*_add_signup_primitive`,
+  `lib/billing/branch-actions.ts`.
+- **A business-hours-aware billing ladder.** The degrade step is computed from the
+  subscription mirror and the branch's opening hours, never stored, so there is no
+  job to forget. `lib/billing/degrade.ts`.
+- **Operations taken seriously.** Encrypted backups every six hours to object storage
+  with object lock, and a restore that is actually tested monthly in CI against a
+  throwaway database. `docs/RUNBOOK.md`.
+
+## Tests
+
+1,600+ tests across 179 files, run on every pull request:
+
+- **Integration tests against a real Postgres** (85 files): row level security is
+  exercised as the application role, races are run as real concurrent transactions.
+- **End-to-end tests** (Playwright) against the production Docker image, including a
+  new restaurant going from signup to its first order.
+- **Smoke tests against a Stripe sandbox**, including a test clock that runs a trial
+  to its end.
+- Coverage thresholds that fail the build, a pull-request size check, and a
+  Lighthouse budget for the public site.
 
 ## Stack
 
-- [Next.js](https://nextjs.org/) 16 (App Router)
-- TypeScript
-- Tailwind CSS
-- React 19
-- PostgreSQL + Prisma 7
-- Auth.js (NextAuth v5)
-- Stripe and Stripe Connect
+Next.js 16 (App Router, Server Actions) · React 19 · TypeScript · Tailwind CSS ·
+PostgreSQL 17 with row level security · Prisma 7 · Auth.js v5 · Stripe and Stripe
+Connect · Vitest · Playwright · Docker Compose · Caddy
 
-## Getting started
+```mermaid
+flowchart LR
+  guest[Guest phone] --> caddy[Caddy, HTTPS]
+  staff[Staff, kitchen screen] --> caddy
+  caddy --> app[Next.js app]
+  app -- "marea_app role, RLS" --> pg[(PostgreSQL)]
+  pg -- "LISTEN / NOTIFY" --> app
+  app -- "server-sent events" --> staff
+  worker[Notification worker] --> pg
+  worker --> smtp[SMTP]
+  stripe[Stripe and Connect] -- "signed webhooks" --> app
+  agent[Print agent] -- "device token" --> app
+  agent --> printer[Thermal printer]
+  scheduler[Scheduler] -- "encrypted backups" --> s3[(Object storage)]
+```
+
+About 39,000 lines of TypeScript, 57 database models in 34 hand-reviewed migrations,
+built over 120+ pull requests with a written plan (`docs/PLAN-PRODUCCION.md`) and one
+reviewed phase at a time.
+
+## Run it locally
+
+With Docker, nothing else to install:
 
 ```bash
-npm install
-npm run dev
+cp .env.example .env    # set POSTGRES_PASSWORD, APP_DB_PASSWORD, WORKER_DB_PASSWORD, AUTH_SECRET
+docker compose up -d --build db migrate app worker
+docker compose run --rm seed
 ```
 
-The app runs at [http://localhost:3000](http://localhost:3000).
+Then open [http://marea.localhost:3000](http://marea.localhost:3000) (set
+`BUSINESS_ROOT_DOMAIN=localhost` and `AUTH_URL=http://marea.localhost:3000` in
+`.env`; browsers resolve `*.localhost` on their own). The seed creates two
+restaurants, Marea and Cala, in one chain; the admin panel is at `/admin/login`.
 
-Other scripts:
-
-```bash
-npm run build   # production build
-npm run start   # serve the production build
-npm run lint    # eslint
-```
-
-## Project structure
-
-```
-app/               → pages (Next.js App Router)
-  admin/(auth)/     → login, forced password change
-  admin/(shell)/    → sidebar+topbar shell, menu/categorías/modificadores, equipo
-packages/ui/        → published design system components (Button, Input, Select,
-                       Modal, Table, Tabs, Toast, Nav, MenuCard, StatItem,
-                       TestimonialCard, OfferBadge) — its own workspace
-                       package (`@marea/ui`), synced to Claude Design;
-                       `@/components/ui/*` imports resolve straight to its
-                       source via a tsconfig path, no build step in dev
-components/admin/   → admin-only components (denser variant of the same tokens)
-lib/auth/           → Auth.js config, password hashing, role/permission helpers
-lib/menu/, lib/team/→ Server Actions, Zod schemas, and centralized queries
-lib/dto/            → Prisma.Decimal → string conversion at the client boundary
-lib/env.ts          → the only module that reads process.env — every other
-                       file gets config through it, validated at boot
-lib/storage/         → image storage behind a driver interface (local disk,
-                       s3-compatible) — see docs/DEPLOY.md
-docs/               → design system spec + database rationale + deploy guide
-                       design.md/.html — tokens (source of truth + visual guide)
-                       DATABASE.md — schema rationale
-                       DEPLOY.md — how to run this in production
-styles/             → shared design tokens + stylesheet, used by both the
-                       app (`app/globals.css`) and the `packages/ui` build
-```
-
-## Database
-
-Prisma 7 + plain Postgres — no managed-provider dependency. See
-[`docs/DATABASE.md`](docs/DATABASE.md) for the schema rationale.
-
-```bash
-npm run db:migrate    # apply migrations
-npm run db:seed       # seed dev data (menu, business, users, orders...) — local only, see below
-npm run db:studio     # visual inspector
-```
-
-Needs `DATABASE_URL` in `.env` (see `.env.example`); any Postgres 17+ works,
-local or hosted. `DIRECT_URL` is optional — only needed if a
-transaction-mode pooler sits in front of the app.
-
-`npm run db:seed` refuses to run against anything that doesn't look
-unmistakably local: the seeded accounts below have publicly-documented
-passwords, so seeding a real deployment by accident would hand out
-`SUPER_ADMIN` to anyone who reads this file. See `prisma/seed.ts` for the
-guard and its explicit opt-out.
-
-## Payments (Stripe)
-
-Test mode only. Card payments and cash-register collection both exist; a
-guest sees the card option only when `Business.acceptsOnlinePayment` is
-true. The webhook (`app/api/webhooks/stripe/route.ts`) is the only place a
-payment is ever marked `SUCCEEDED` — the client returning from Stripe
-proves nothing, it's a URL.
-
-Env vars (see `.env.example`): `STRIPE_SECRET_KEY`,
-`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`. Get test-mode
-keys from the [Stripe Dashboard](https://dashboard.stripe.com/test/apikeys).
-
-To receive webhooks locally, forward them with the
-[Stripe CLI](https://docs.stripe.com/stripe-cli):
-
-```bash
-stripe login
-stripe listen --forward-to localhost:3000/api/webhooks/stripe
-```
-
-`stripe listen` prints a `whsec_...` value on startup — put that in
-`STRIPE_WEBHOOK_SECRET` (it's different from the Dashboard's webhook
-secret; the CLI mints its own for local forwarding). Leave `stripe listen`
-running in a second terminal alongside `npm run dev`.
-
-Test cards ([full list](https://docs.stripe.com/testing)):
-
-| Card | Result |
-|---|---|
-| `4242 4242 4242 4242` | Succeeds immediately |
-| `4000 0025 0000 3155` | Requires 3D Secure — Stripe's own challenge modal appears mid-confirm |
-| `4000 0000 0000 9995` | Declined (insufficient funds) |
-
-Any future expiry date, any 3-digit CVC, any postal code.
-
-To replay an event (checking that a redelivery doesn't double-apply):
-
-```bash
-stripe trigger payment_intent.succeeded
-```
-
-## Admin panel
-
-`/admin` — for restaurant staff. Auth.js (NextAuth v5) with a Credentials provider, argon2id password hashing, JWT sessions. A new restaurant signs up on its own at `/admin/signup` (with email verification) and is walked through `/admin/asistente`, the onboarding wizard; staff accounts are created from the team screen.
-
-Sections: menu (`/admin/menu` dishes, `/admin/menu/categorias` with drag-to-reorder, `/admin/menu/modificadores`), orders (`/admin/pedidos`), kitchen display (`/admin/cocina`), reservations, tables and QR codes, promotions, testimonials, reports and cash register, settings, and team (`/admin/equipo`, BUSINESS_ADMIN/SUPER_ADMIN only). STAFF gets a read-only dish list with just the availability toggle — the one catalog edit their role is allowed.
-
-Dev accounts (seeded, password hash regenerated on every `npm run db:seed`):
+<details>
+<summary>Seeded accounts (local only)</summary>
 
 | Email | Password | Role |
 |---|---|---|
-| `super@marea.test` | `MareaSuper123!` | SUPER_ADMIN |
-| `admin@marea.test` | `MareaAdmin123!` | BUSINESS_ADMIN |
-| `mesero@marea.test` | `MareaTemp123!` | STAFF — forces a password change on first login |
-| `owner@marea.test` | `MareaOwner123!` | ORG_ADMIN — owner of the "Marea Group" chain: Marea and Cala, switchable |
-| `admin@cala.test` | `CalaAdmin123!` | BUSINESS_ADMIN of Cala only |
+| `owner@marea.test` | `MareaOwner123!` | Owner of the chain (Marea and Cala) |
+| `admin@marea.test` | `MareaAdmin123!` | Manager of Marea |
+| `mesera@marea.test` | `MareaMesera123!` | Waiter at Marea |
+| `admin@cala.test` | `CalaAdmin123!` | Manager of Cala |
+| `super@marea.test` | `MareaSuper123!` | Platform admin |
 
-The seed creates two businesses, so the bare address (`localhost:3000`) names
-neither: use `marea.localhost:3000` and `cala.localhost:3000`, with
-`BUSINESS_ROOT_DOMAIN=localhost` in `.env` (browsers resolve `*.localhost`).
+These passwords are public: the seed refuses to run against a database that does
+not look local.
+</details>
 
-Never reuse these outside a local/dev environment.
+Without Docker: Node 22+ and Postgres 17+, then `npm install`, `npm run db:migrate`,
+`npm run db:seed` and `npm run dev`. `npm test` runs the suite (it needs a database).
 
-## Design system
+## Documentation
 
-Colors, typography, spacing, and component tokens are documented in [`docs/design.md`](docs/design.md). Open [`docs/design.html`](docs/design.html) directly in a browser for a live, visual style guide of every token and component.
+| | |
+|---|---|
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Deploying on a VPS, Stripe webhooks, the platform subscription, running the public demo |
+| [`docs/RUNBOOK.md`](docs/RUNBOOK.md) | Operations: deploys and rollbacks, restoring from backup, read-only mode, stuck webhooks, rotating secrets |
+| [`docs/DATABASE.md`](docs/DATABASE.md) | Why the schema looks the way it does |
+| [`docs/design.md`](docs/design.md) | Design tokens; open [`docs/design.html`](docs/design.html) for the live style guide |
+| [`AGENTS.md`](AGENTS.md) | The rules that are not obvious from the code |
+| [`docs/PLAN-PRODUCCION.md`](docs/PLAN-PRODUCCION.md) | The production plan, phase by phase, with what was verified (Spanish) |
 
-Brand anchor: navy `#1B367B`, matched to the author's portfolio site so this project reads as part of the same visual family when shown as a preview there.
+## Status
 
-## Roadmap
+Feature-complete for a single restaurant or a small chain. Not built yet: Mexican
+electronic invoicing (CFDI 4.0), two-factor authentication, WhatsApp and SMS
+notifications, and an offline mode for waiters.
 
-The phase-by-phase status, with what was verified and what is still pending,
-lives in [`docs/PLAN-PRODUCCION.md`](docs/PLAN-PRODUCCION.md) (Spanish).
+---
 
-**Done**
+## Resumen en español
 
-- [x] Landing page (hero, about, menu, offers, testimonials, reservation form), driven by the database, with per-page metadata, JSON-LD, `sitemap.xml` and `robots.txt`
-- [x] Component library (Button, Input, Select, Modal, Table, Tabs, Toast, Nav, MenuCard, StatItem, TestimonialCard, OfferBadge) and dark mode
-- [x] Admin panel: auth, roles, menu management (categories, dishes, modifiers) and team
-- [x] Digital menu with QR codes per table
-- [x] Order flow with live status, a kitchen display and printed kitchen tickets (ESC/POS agent in `agent/`)
-- [x] Stripe payments (test mode), with Stripe Connect so each business is paid into its own account
-- [x] Table reservations with a schedule view and double-booking blocked by the database
-- [x] Email notifications through a background worker
-- [x] Sales reports and cash register shifts
-- [x] Per-dish inventory and promotions applied at checkout
-- [x] Guest reviews with moderation
-- [x] Multi-location: organizations, owner accounts, and Postgres Row-Level Security per business
-- [x] Security hardening: session revalidation, security headers, CSP and rate limiting
-- [x] CI with unit, integration (real Postgres) and E2E tests, plus coverage thresholds
-- [x] Operations: Docker Compose deploy, encrypted backups with a tested restore, privacy purges and a read-only mode
-- [x] Self-service signup with email verification and an onboarding wizard (sample data, menu import)
+**Marea** es una plataforma completa para operar un restaurante o una cadena desde
+una sola instalación: sitio web público, pedidos desde la mesa con código QR,
+reservaciones, pagos con tarjeta que llegan directo a la cuenta de Stripe de cada
+restaurante, tablero de pedidos y pantalla de cocina en tiempo real, corte de caja,
+reportes, y alta autoservicio con suscripción mensual.
 
-**Next**
+**En la demo** entras con un clic como dueño de una cadena de dos sucursales, como
+gerente, como mesero o como cocina, sin crear cuenta. Todo se reinicia cada noche.
 
-- [ ] Platform subscriptions and plans
-- [ ] CFDI 4.0 electronic invoicing (Mexico)
-- [ ] Two-factor authentication (TOTP)
-- [ ] WhatsApp and SMS notifications
-- [ ] Offline PWA for waiters
-- [ ] Optional AI assistant for FAQs
+Lo que vale la pena revisar del código:
 
-## Deployment
+- **Aislamiento entre restaurantes en la base de datos**, con seguridad a nivel de
+  fila de Postgres: una consulta que olvida filtrar no ve nada, en vez de ver todo.
+- **Pagos que no se aplican dos veces:** solo el webhook firmado de Stripe marca un
+  pago como cobrado, en la misma transacción que su efecto.
+- **Tiempo real sin consultas repetidas:** las cinco pantallas en reposo pasaron de
+  605 consultas por minuto a 2.
+- **Una prueba que recorre todas las acciones del servidor** y falla si alguna no
+  revisa permisos, el modo de mantenimiento o el estado de la suscripción.
+- **Cobro de la suscripción que nunca corta el servicio en hora de comida:** cada
+  cambio entra al cierre de la sucursal, según su horario.
+- **Más de 1,600 pruebas**, con integración contra un Postgres real, pruebas de
+  extremo a extremo contra la imagen de Docker de producción y pruebas contra el
+  sandbox de Stripe.
 
-Portable: `docker compose up --build` runs the whole stack (app, Postgres,
-a one-shot migration step) on any Docker host — not tied to Vercel. Full
-walkthrough in [`docs/DEPLOY.md`](docs/DEPLOY.md).
-
-From a clean checkout (volumes removed, no cached image layers), `docker
-compose up --build` through a seeded, responding landing page took **~167s**
-on the machine this was last tested on; with layer caching from a prior
-build, ~25s.
+Hecho por [Filiberto Sañudo](https://github.com/filibertosanudo).
