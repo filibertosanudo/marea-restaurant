@@ -386,6 +386,47 @@ and stops charging. Payments already taken can still be refunded from the app
 while Stripe allows it; afterwards the restaurateur refunds from their own Stripe
 dashboard, and the app says so.
 
+## Running the public demo
+
+The same stack, as a public portfolio demo: anyone can open it and look around
+as each role without an account, and whatever they change is gone the next
+morning. Never on a database with real data: the reset deletes everything.
+
+In `.env`, on top of the usual variables:
+
+```bash
+DEMO_MODE=1
+DEMO_SOURCE_URL=https://github.com/<you>/<repo>   # the bar's "See the code"
+```
+
+What changes with `DEMO_MODE=1` (`lib/demo/`):
+
+- `/admin/login` offers one button per seeded persona: the owner of the
+  two-branch chain, the manager, a waiter (order board) and the kitchen
+  display. Each signs in with its account's published password; the
+  platform's `super@marea.test` is never offered.
+- A bar on every page says it is a demo, with a link to the code. Orders are
+  paid at the counter: with two businesses on one deployment each needs its
+  own connected Stripe account to take cards (`lib/payments/availability.ts`).
+- Refused, with a note in the panel, because they would break the demo for
+  the next visitor: changing a password, the team, connecting Stripe, the
+  platform subscription, and signing up. Everything else works and resets.
+- The demo accounts are never locked by failed sign-ins on their email (every
+  visitor shares them); the per-IP limit still applies.
+
+Seed once after the first `up`, then reset every night from the host's cron.
+`demo-reset` is under the `demo` profile, so a plain `up` never starts it:
+
+```bash
+docker compose run --rm seed
+# crontab -e on the host: every day at 10:00 UTC (04:00 in Mexico City)
+0 10 * * * cd /opt/marea && docker compose --profile demo run --rm demo-reset >> /var/log/marea-demo-reset.log 2>&1
+```
+
+The reset drops every table, migrates from scratch and seeds again; it takes
+under a minute, during which the site answers errors. Sessions from before it
+end (the accounts are recreated), so a visitor at that hour signs in again.
+
 ## Alternatives
 
 ### Managed PaaS (Railway, Render)
