@@ -19,6 +19,7 @@ import {
 } from "@/lib/stripe/billing";
 import { PLANS, TRIAL_PLAN, planForLookupKey, quantityFor } from "@/lib/billing/plans";
 import { organizationBusinessIds } from "@/lib/billing/organization";
+import { assertNotDemo } from "@/lib/demo/mode";
 
 const PAGE = "/admin/suscripcion";
 
@@ -30,6 +31,7 @@ const PAGE = "/admin/suscripcion";
 
 export async function startTrialAction(): Promise<void> {
   const owner = await organizationOwner(await requireRoleInAnyState(UserRole.BUSINESS_ADMIN));
+  assertNotDemo("paying the platform subscription");
   let outcome = "error";
   if (billingEnabled()) {
     try {
@@ -46,6 +48,7 @@ export async function startTrialAction(): Promise<void> {
 
 export async function addCardAction(): Promise<void> {
   const owner = await organizationOwner(await requireRoleInAnyState(UserRole.BUSINESS_ADMIN));
+  assertNotDemo("paying the platform subscription");
   const row = await prisma.organizationSubscription.findUnique({ where: { organizationId: owner.organizationId }, select: { stripeCustomerAccountId: true } });
   let url = `${PAGE}?billing=error`;
   if (row && billingEnabled()) {
@@ -67,6 +70,7 @@ export async function addCardAction(): Promise<void> {
 
 export async function openPortalAction(): Promise<void> {
   const owner = await organizationOwner(await requireRoleInAnyState(UserRole.BUSINESS_ADMIN));
+  assertNotDemo("paying the platform subscription");
   const row = await prisma.organizationSubscription.findUnique({ where: { organizationId: owner.organizationId }, select: { stripeCustomerAccountId: true } });
   let url = `${PAGE}?billing=error`;
   if (row && billingEnabled()) {
@@ -90,6 +94,7 @@ export async function openPortalAction(): Promise<void> {
  */
 export async function reactivateAction(): Promise<void> {
   const owner = await organizationOwner(await requireRoleInAnyState(UserRole.BUSINESS_ADMIN));
+  assertNotDemo("paying the platform subscription");
   const row = await prisma.organizationSubscription.findUnique({ where: { organizationId: owner.organizationId } });
   let url = `${PAGE}?billing=error`;
   if (row?.stripeSubscriptionId && billingEnabled()) {

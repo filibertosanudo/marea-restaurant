@@ -10,6 +10,7 @@ import type { Business, StripeCapabilityStatus } from "@/lib/generated/prisma/cl
 import { platformKeyIsLive } from "@/lib/stripe/mode";
 import { createConnectedAccount, createOnboardingLink, readCardPaymentsStatus } from "@/lib/stripe/connect";
 import { isUniqueConstraintError } from "@/lib/payments/prisma-errors";
+import { assertNotDemo } from "@/lib/demo/mode";
 
 /**
  * Connecting a business to its own Stripe account (module 17b, phase 3).
@@ -66,6 +67,7 @@ async function saveStatus(business: Pick<Business, "id" | "slug">, accountId: st
  */
 export async function startStripeOnboardingAction(): Promise<StartOnboardingResult> {
   const session = await requireRole(...ADMIN_ROLES);
+  assertNotDemo("connecting a Stripe account");
   const business = await getBusinessForRequest();
 
   if (!(await isOrganizationVerified(business))) return { ok: false, error: "organization_unverified" };
@@ -130,6 +132,7 @@ export async function startStripeOnboardingAction(): Promise<StartOnboardingResu
  */
 export async function refreshStripeAccountAction(): Promise<RefreshStatusResult> {
   await requireRole(...ADMIN_ROLES);
+  assertNotDemo("connecting a Stripe account");
   const business = await getBusinessForRequest();
   if (!business.stripeAccountId) return { ok: false, error: "no_account" };
 

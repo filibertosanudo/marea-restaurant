@@ -16,6 +16,7 @@ import { expireBusinessCache } from "@/lib/business";
 import { assertWritable } from "@/lib/ops/read-only";
 import { ensureSubscription } from "@/lib/billing/start";
 import { billingEnabled } from "@/lib/stripe/billing";
+import { isDemo } from "@/lib/demo/mode";
 
 const SIGNUP_MAX_ATTEMPTS = 5;
 const SIGNUP_WINDOW_MS = 60 * 60 * 1000;
@@ -52,6 +53,9 @@ export async function signupAction(_prevState: SignupState, formData: FormData):
   // First line, no exception: a signup writes real rows, same as any other
   // mutation, and has no session for requireRole to check this through.
   await assertWritable();
+  // The demo's accounts are the seeded ones: a signup there would only wait on
+  // an email that is never delivered.
+  if (isDemo()) return { submitted: false, error: "demo" };
   const ipAddress = getClientIp(await headers());
 
   // Every submission counts toward the quota, matching a real one's cost —

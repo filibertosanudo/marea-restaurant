@@ -5,6 +5,7 @@ import { signIn, signOut, auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DUMMY_HASH, hashPassword, verifyPassword } from "@/lib/auth/password";
 import { changePasswordSchema } from "@/lib/auth/schemas";
+import { isDemo } from "@/lib/demo/mode";
 
 export type LoginState = { error?: string } | undefined;
 
@@ -40,6 +41,8 @@ export async function changePasswordAction(
   if (!session?.user) {
     return { error: "notAuthenticated" };
   }
+  // Every account in the demo is shared: a new password would lock the next visitor out.
+  if (isDemo()) return { error: "demo" };
 
   // Read fresh from the database rather than trusting the session's
   // mustChangePassword — the JWT can be up to REVALIDATE_INTERVAL_MS stale.
