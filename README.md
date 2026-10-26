@@ -33,9 +33,14 @@ what can be built for a restaurant, end to end.
 <details>
 <summary>More screens</summary>
 <p align="center">
+  <img src="docs/screenshots/reservations.jpg" alt="The day's reservations" width="49%">
+  <img src="docs/screenshots/cash-close.jpg" alt="Cash shift history" width="49%">
   <img src="docs/screenshots/kitchen.jpg" alt="The kitchen display" width="70%">
   <img src="docs/screenshots/menu-phone.jpg" alt="Ordering from the phone" width="25%">
 </p>
+
+The demo data is six weeks of generated orders, payments, cash shifts and
+reservations (`prisma/seed-history.ts`), the same every night.
 </details>
 
 ## What it does
