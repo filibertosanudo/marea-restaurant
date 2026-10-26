@@ -99,6 +99,12 @@ describe("writes the demo refuses", () => {
     expect(await prisma.organization.count({ where: { slug: "nope" } })).toBe(0);
   });
 
+  it("keeps signup closed outside the demo too, unless SIGNUP_ENABLED opens it", async () => {
+    const result = await signupAction(undefined, form({ businessName: "Closed", slug: "closed", name: "N", email: "c@example.test", password: "greenTurtleUmbrella99", confirmPassword: "greenTurtleUmbrella99", company: "", renderedAt: "0" }));
+    expect(result).toEqual({ submitted: false, error: "closed" });
+    expect(await prisma.organization.count({ where: { slug: "closed" } })).toBe(0);
+  });
+
   it("does not touch the team", async () => {
     demo.on = true;
     await makeBusiness({ slug: "marea" });

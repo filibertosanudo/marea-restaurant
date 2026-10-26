@@ -16,6 +16,10 @@ vi.mock("@/lib/billing/start", () => ({ ensureSubscription: vi.fn() }));
 vi.mock("@/lib/stripe/billing", () => ({ billingEnabled: () => true }));
 beforeEach(() => vi.mocked(ensureSubscription).mockReset());
 
+// Signup is off unless a deployment opens it (SIGNUP_ENABLED); these tests
+// are about what it does once open. Set before lib/env is first read.
+process.env.SIGNUP_ENABLED = "1";
+
 const PAST_RENDER = String(Date.now() - 10_000);
 
 // signupAction reads the admin-lang cookie for a successful signup's own
