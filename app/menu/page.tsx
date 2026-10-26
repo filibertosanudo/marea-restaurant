@@ -17,6 +17,7 @@ export default async function MenuPage() {
       lang={lang}
       currency={business.currency}
       tableLabel={table ? table.code : null}
+      businessName={business.name}
     />
   );
 }

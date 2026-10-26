@@ -12,6 +12,7 @@ import { ItemSheet } from "./ItemSheet";
 import { CartSheet } from "./CartSheet";
 import { StickyCartBar } from "./StickyCartBar";
 import { OrderControls } from "./OrderControls";
+import { initialOf } from "@/lib/brand";
 
 export function MenuBrowser({
   categories,
@@ -21,6 +22,7 @@ export function MenuBrowser({
   lang,
   currency,
   tableLabel,
+  businessName,
 }: {
   categories: PublicCategory[];
   dishes: PublicDish[];
@@ -29,6 +31,8 @@ export function MenuBrowser({
   lang: Lang;
   currency: string;
   tableLabel: string | null;
+  /** The restaurant whose menu this is: on a chain each branch shows its own. */
+  businessName: string;
 }) {
   const [activeCategory, setActiveCategory] = useState(categories[0]?.id ?? "");
   const [openDish, setOpenDish] = useState<PublicDish | null>(null);
@@ -46,10 +50,10 @@ export function MenuBrowser({
       <header className="sticky top-0 z-10 flex items-center justify-between gap-sm border-b border-border/20 bg-surface px-md py-sm">
         <div className="flex items-center gap-sm">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary font-display text-[12px] font-bold text-on-primary">
-            M
+            {initialOf(businessName)}
           </span>
           <span className="font-display text-[15px] font-semibold text-on-surface">
-            {dict.brand}
+            {businessName}
           </span>
           {tableLabel && (
             <span className="rounded-full border border-surface-ocean-border/40 bg-surface-ocean px-sm py-[3px] text-[11px] font-medium text-primary">

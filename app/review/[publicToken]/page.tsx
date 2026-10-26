@@ -6,6 +6,7 @@ import { toReviewableOrderDTO } from "@/lib/orders/dto";
 import { getOrderLang } from "@/lib/i18n/cookie";
 import { getReviewDictionary } from "@/lib/i18n/dictionaries";
 import { ReviewForm } from "@/components/review/ReviewForm";
+import { initialOf } from "@/lib/brand";
 
 // A capacity token — see app/o/[publicToken]/page.tsx's own metadata comment.
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -54,10 +55,10 @@ export default async function ReviewPage({
     <div className="flex min-h-screen flex-col items-center bg-surface-subtle px-lg pb-lg pt-[40px] text-center">
       <div className="mb-[36px] flex items-center gap-[7px] opacity-70">
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary font-display text-[10px] font-bold text-on-primary">
-          M
+          {initialOf(business.name)}
         </span>
         <span className="font-display text-[12px] font-semibold tracking-wide text-on-surface">
-          {dict.brand.toUpperCase()}
+          {business.name.toUpperCase()}
         </span>
       </div>
 

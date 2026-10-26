@@ -12,6 +12,7 @@ import { StatusStepper } from "@/components/order/StatusStepper";
 import { OrderStreamListener } from "@/components/order/OrderStreamListener";
 import { PaymentSection } from "@/components/order/PaymentSection";
 import type { OrderDictionary } from "@/lib/i18n/dictionaries";
+import { initialOf } from "@/lib/brand";
 
 // A capacity token — see Order.publicToken's own schema comment. Crawlable
 // on purpose (blocking it in robots.txt would stop a crawler from ever
@@ -48,10 +49,10 @@ export default async function OrderTrackingPage({
       {!isTerminal && <OrderStreamListener publicToken={publicToken} />}
       <div className="mb-[36px] flex items-center gap-[7px] opacity-70">
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary font-display text-[10px] font-bold text-on-primary">
-          M
+          {initialOf(business.name)}
         </span>
         <span className="font-display text-[12px] font-semibold tracking-wide text-on-surface">
-          {dict.brand.toUpperCase()}
+          {business.name.toUpperCase()}
         </span>
       </div>
 

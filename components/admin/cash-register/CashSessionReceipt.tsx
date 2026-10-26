@@ -4,6 +4,7 @@ import { formatMoney } from "@/lib/dto/money";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
 import type { Lang } from "@/lib/i18n/lang";
 import type { CashSessionDetailDTO } from "@/lib/dto/cash-register";
+import { initialOf } from "@/lib/brand";
 
 type Dict = AdminDictionary["cashRegister"];
 
@@ -18,12 +19,14 @@ export function CashSessionReceipt({
   currency,
   lang,
   dict,
+  businessName,
 }: {
   session: CashSessionDetailDTO;
   activity: { cashCollected: string; deposits: string; withdrawals: string };
   currency: string;
   lang: Lang;
   dict: Dict;
+  businessName: string;
 }) {
   const money = (value: string) => formatMoney(value, currency, lang);
   const dateFormatter = new Intl.DateTimeFormat(lang === "es" ? "es-MX" : "en-US", {
@@ -49,7 +52,7 @@ export function CashSessionReceipt({
       <div className="receipt-print-area">
         <div className="receipt-paper">
           <div className="receipt-brand">
-            <span className="receipt-brand-dot">M</span> MAREA
+            <span className="receipt-brand-dot">{initialOf(businessName)}</span> {businessName.toUpperCase()}
           </div>
           <div className="receipt-doc-title">{dict.receiptDocTitle}</div>
 

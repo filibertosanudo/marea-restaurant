@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import type { AdminDictionary } from "@/lib/i18n/dictionaries";
+import { initialOf } from "@/lib/brand";
 
 type SheetTable = { id: string; code: string; zone: string | null; qrSvg: string };
 type TableDict = AdminDictionary["tables"];
@@ -13,7 +14,7 @@ type TableDict = AdminDictionary["tables"];
  * server-side (page.tsx) — no client-side QR generation, so the qrToken
  * itself never needs a browser-side library or a round trip to render.
  */
-export function QrSheet({ tables, dict }: { tables: SheetTable[]; dict: TableDict }) {
+export function QrSheet({ tables, dict, businessName }: { tables: SheetTable[]; dict: TableDict; businessName: string }) {
   const [mode, setMode] = useState<"all" | "one">("all");
   const [selectedId, setSelectedId] = useState(tables[0]?.id ?? "");
 
@@ -71,7 +72,7 @@ export function QrSheet({ tables, dict }: { tables: SheetTable[]; dict: TableDic
             {visible.map((t) => (
               <div key={t.id} className="qr-card">
                 <div className="qr-card-brand">
-                  <span className="qr-card-dot">M</span> MAREA
+                  <span className="qr-card-dot">{initialOf(businessName)}</span> {businessName.toUpperCase()}
                 </div>
                 <div className="qr-card-mark" dangerouslySetInnerHTML={{ __html: t.qrSvg }} />
                 <div className="qr-card-cta">{dict.scanCta}</div>

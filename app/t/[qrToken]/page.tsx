@@ -39,6 +39,7 @@ export default async function TablePage({
         lang={lang}
         currency={business.currency}
         tableLabel={table.code}
+        businessName={business.name}
       />
     </>
   );
