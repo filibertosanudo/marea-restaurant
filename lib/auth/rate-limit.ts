@@ -1,6 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
+import { isDemoAccount } from "@/lib/demo/personas";
+import { isDemo } from "@/lib/demo/mode";
 
 /**
  * Sliding-window login rate limit backed by Postgres (LoginAttempt), so it
@@ -29,7 +31,11 @@ export async function isRateLimited(email: string, ipAddress: string): Promise<b
       where: { ipAddress, succeeded: false, createdAt: { gte: since } },
     }),
   ]);
-  return byEmail >= MAX_ATTEMPTS_PER_EMAIL || byIp >= MAX_ATTEMPTS_PER_IP;
+  // In the public demo every visitor shares the demo accounts, so a per-email
+  // lock would let one visitor typing wrong passwords lock all the others
+  // out. Those accounts keep the per-IP limit only.
+  const emailLimited = byEmail >= MAX_ATTEMPTS_PER_EMAIL && !(isDemo() && isDemoAccount(email));
+  return emailLimited || byIp >= MAX_ATTEMPTS_PER_IP;
 }
 
 export async function recordLoginAttempt(
