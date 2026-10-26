@@ -1,20 +1,25 @@
-# Marea — restaurant platform
+# Sobremesa — restaurant management system
 
 [![CI](https://github.com/filibertosanudo/marea-restaurant/actions/workflows/ci.yml/badge.svg)](https://github.com/filibertosanudo/marea-restaurant/actions/workflows/ci.yml)
 [![Restore test](https://github.com/filibertosanudo/marea-restaurant/actions/workflows/restore-test.yml/badge.svg)](https://github.com/filibertosanudo/marea-restaurant/actions/workflows/restore-test.yml)
 
-A complete platform to run a restaurant, or a chain of them, from one deployment:
-the public website, QR-code ordering at the table, reservations, card payments
-paid straight into each restaurant's own Stripe account, a live order board and
-kitchen display, cash register shifts, reports, and self-service signup with a
-monthly subscription.
+A complete system to run a restaurant, or a small chain: the public website,
+QR-code ordering at the table, reservations, card payments paid straight into the
+restaurant's own Stripe account, a live order board and kitchen display, cash
+register shifts, menu and stock management, and reports.
 
-Built by [Filiberto Sañudo](https://github.com/filibertosanudo) as the flagship of
-a portfolio of small, deployable business verticals.
+It is shown here through **Marea**, a fictional seafood restaurant built as the
+sample client: its website was designed first, then the whole system behind it.
+Each real client gets its own deployment, with its own website and brand on top of
+the same system. The same code can also run as a multi-restaurant platform with
+self-service signup and a monthly subscription, off by default.
 
-> **Live demo:** *link added once deployed.* One click signs you in as the owner
-> of a two-branch chain, the manager, a waiter or the kitchen; everything resets
-> every night.
+Built by [Filiberto Sañudo](https://github.com/filibertosanudo) as a portfolio piece:
+what can be built for a restaurant, end to end.
+
+> **Live demo:** *link added once deployed.* Marea's website, and its panel: one
+> click signs you in as the owner of its two branches, the manager, a waiter or
+> the kitchen; everything resets every night.
 >
 > **En español:** ver el [resumen al final](#resumen-en-español).
 
@@ -53,8 +58,13 @@ a portfolio of small, deployable business verticals.
 - Sales reports compared against the previous period, exportable to CSV.
 - Several branches under one account, each on its own subdomain, each paid into its
   own Stripe account (Stripe Connect, direct charges).
-- Sign up alone: email verification, a four-step setup wizard, sample data, menu
-  import from an Excel CSV, a 14-day trial and a monthly subscription.
+- Menu import from an Excel CSV, with a row-by-row preview before anything is written.
+
+**Platform mode (optional)**
+
+The same deployment can host many unrelated restaurants (`SIGNUP_ENABLED=1`):
+- They sign up alone: email verification, a four-step setup wizard, sample data,
+  a 14-day trial and a monthly subscription.
 - If a payment lapses, nothing breaks at lunch: the panel warns, configuration
   freezes on day 7 while orders keep flowing, the site pauses on day 15, and every
   step only ever takes effect after the branch's closing time.
@@ -146,7 +156,9 @@ docker compose run --rm seed
 Then open [http://marea.localhost:3000](http://marea.localhost:3000) (set
 `BUSINESS_ROOT_DOMAIN=localhost` and `AUTH_URL=http://marea.localhost:3000` in
 `.env`; browsers resolve `*.localhost` on their own). The seed creates two
-restaurants, Marea and Cala, in one chain; the admin panel is at `/admin/login`.
+fictional restaurants, Marea and Cala, in one chain; the admin panel is at
+`/admin/login`. `PRODUCT_NAME` sets the system's name in the panel (each
+restaurant's pages show its own), and `SIGNUP_ENABLED=1` opens platform mode.
 
 <details>
 <summary>Seeded accounts (local only)</summary>
@@ -187,14 +199,21 @@ notifications, and an offline mode for waiters.
 
 ## Resumen en español
 
-**Marea** es una plataforma completa para operar un restaurante o una cadena desde
-una sola instalación: sitio web público, pedidos desde la mesa con código QR,
-reservaciones, pagos con tarjeta que llegan directo a la cuenta de Stripe de cada
-restaurante, tablero de pedidos y pantalla de cocina en tiempo real, corte de caja,
-reportes, y alta autoservicio con suscripción mensual.
+**Sobremesa** es un sistema completo para operar un restaurante o una cadena
+pequeña: sitio web público, pedidos desde la mesa con código QR, reservaciones,
+pagos con tarjeta que llegan directo a la cuenta de Stripe del restaurante, tablero
+de pedidos y pantalla de cocina en tiempo real, corte de caja, menú, inventario y
+reportes.
 
-**En la demo** entras con un clic como dueño de una cadena de dos sucursales, como
-gerente, como mesero o como cocina, sin crear cuenta. Todo se reinicia cada noche.
+Se muestra a través de **Marea**, un restaurante de mariscos ficticio hecho como
+cliente de ejemplo: primero se diseñó su sitio web y después todo el sistema detrás.
+Cada cliente real recibe su propia instalación, con su sitio y su marca sobre el
+mismo sistema. El mismo código también puede operar como plataforma de varios
+restaurantes con registro propio y suscripción mensual, apagado por defecto.
+
+**En la demo** ves el sitio de Marea y su panel: entras con un clic como dueño de
+sus dos sucursales, como gerente, como mesero o como cocina, sin crear cuenta. Todo
+se reinicia cada noche.
 
 Lo que vale la pena revisar del código:
 
@@ -206,8 +225,8 @@ Lo que vale la pena revisar del código:
   605 consultas por minuto a 2.
 - **Una prueba que recorre todas las acciones del servidor** y falla si alguna no
   revisa permisos, el modo de mantenimiento o el estado de la suscripción.
-- **Cobro de la suscripción que nunca corta el servicio en hora de comida:** cada
-  cambio entra al cierre de la sucursal, según su horario.
+- **En modo plataforma, un cobro de suscripción que nunca corta el servicio en hora
+  de comida:** cada cambio entra al cierre de la sucursal, según su horario.
 - **Más de 1,600 pruebas**, con integración contra un Postgres real, pruebas de
   extremo a extremo contra la imagen de Docker de producción y pruebas contra el
   sandbox de Stripe.
