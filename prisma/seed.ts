@@ -663,7 +663,10 @@ async function main() {
         isFeatured: d.featured,
         preparationMinutes: d.prep,
         sortOrder: i,
-        imageUrl: `/menu/${d.slug}.jpg`,
+        // No photos ship with the repository: a path to a file that does not
+        // exist drew a broken image in the panel. Without one, every screen
+        // shows its own placeholder.
+        imageUrl: null,
       },
     });
     dishMap.set(d.slug, item.id);
