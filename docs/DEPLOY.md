@@ -392,12 +392,37 @@ The same stack, as a public portfolio demo: anyone can open it and look around
 as each role without an account, and whatever they change is gone the next
 morning. Never on a database with real data: the reset deletes everything.
 
-In `.env`, on top of the usual variables:
+It runs with a second compose file on top of the first,
+`docker-compose.demo.yml`, which puts Caddy in front with HTTPS
+(`docker/Caddyfile`), takes the app, the database and the mail catcher off the
+host's ports so Caddy is the only way in, turns `DEMO_MODE` on and makes
+everything restart with the server.
+
+In `.env`, on top of the usual variables (`POSTGRES_PASSWORD`,
+`APP_DB_PASSWORD`, `WORKER_DB_PASSWORD`, `AUTH_SECRET`):
 
 ```bash
-DEMO_MODE=1
+# The root the businesses hang off: marea.<it>, cala.<it>. A domain you own
+# (point it and *.it at the server), or, with no domain yet, the server's IP
+# written with dashes under sslip.io, which resolves to that IP for free:
+SITE_DOMAIN=203-0-113-7.sslip.io
 DEMO_SOURCE_URL=https://github.com/<you>/<repo>   # the bar's "See the code"
 ```
+
+Then, from the repository on the server:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build db migrate app worker caddy
+docker compose run --rm seed
+```
+
+The demo answers at `https://marea.<SITE_DOMAIN>` and `https://cala.<SITE_DOMAIN>`;
+the bare root redirects to Marea. Certificates come from Let's Encrypt the first
+time each name is visited (the first visit takes a few seconds), and only for
+names the app says it serves (`/api/tls-allowed`), so nobody can make the
+server request certificates for names that are not its own. Ports 80 and 443
+must be open. The scheduler is not needed: the nightly reset already clears
+what its purges would.
 
 What changes with `DEMO_MODE=1` (`lib/demo/`):
 
@@ -414,11 +439,10 @@ What changes with `DEMO_MODE=1` (`lib/demo/`):
 - The demo accounts are never locked by failed sign-ins on their email (every
   visitor shares them); the per-IP limit still applies.
 
-Seed once after the first `up`, then reset every night from the host's cron.
-`demo-reset` is under the `demo` profile, so a plain `up` never starts it:
+Reset every night from the host's cron. `demo-reset` is under the `demo`
+profile, so an `up` never starts it:
 
 ```bash
-docker compose run --rm seed
 # crontab -e on the host: every day at 10:00 UTC (04:00 in Mexico City)
 0 10 * * * cd /opt/marea && docker compose --profile demo run --rm demo-reset >> /var/log/marea-demo-reset.log 2>&1
 ```
