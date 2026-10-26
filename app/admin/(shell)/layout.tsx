@@ -10,6 +10,7 @@ import { getSubscriptionSummary } from "@/lib/billing/queries";
 import { degradeStateFor } from "@/lib/billing/degrade-guard";
 import { whenLevelStarts } from "@/lib/billing/degrade";
 import { prisma } from "@/lib/prisma";
+import { isDemo } from "@/lib/demo/mode";
 
 export default async function AdminShellLayout({
   children,
@@ -64,7 +65,16 @@ export default async function AdminShellLayout({
       user={{ name: session.user.name ?? "", email: session.user.email }}
       businesses={businesses.map((b) => ({ id: b.id, name: b.name }))}
       activeBusinessId={session.user.businessId}
-      banner={banner ? <SubscriptionBanner dict={dict.billing} input={banner} /> : null}
+      banner={
+        <>
+          {isDemo() && (
+            <div role="note" className="mx-lg mt-md rounded-md border border-border bg-surface-subtle px-md py-sm text-[12.5px] text-on-surface-muted">
+              {dict.demo.limits}
+            </div>
+          )}
+          {banner && <SubscriptionBanner dict={dict.billing} input={banner} />}
+        </>
+      }
     >
       {children}
     </AdminShell>

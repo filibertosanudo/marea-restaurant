@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { CSP_NONCE_HEADER } from "@/lib/security/csp";
 import { findPublicBusiness } from "@/lib/business";
 import { resolveSiteMetadataText } from "@/lib/seo/site-metadata";
+import { DemoBar } from "@/components/DemoBar";
 import "./globals.css";
 
 const montserratAlternates = Montserrat_Alternates({
@@ -72,6 +73,7 @@ export default async function RootLayout({
       <body
         className={`${montserratAlternates.variable} ${poppins.variable} font-sans`}
       >
+        <DemoBar />
         {children}
       </body>
     </html>
