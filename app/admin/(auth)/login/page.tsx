@@ -3,7 +3,7 @@ import { getDictionary } from "@/lib/i18n/dictionaries";
 import { LoginForm } from "./LoginForm";
 import { DemoAccess } from "@/components/admin/DemoAccess";
 import { isDemo } from "@/lib/demo/mode";
-import { productName } from "@/lib/product";
+import { productName, signupOpen } from "@/lib/product";
 import { initialOf } from "@/lib/brand";
 
 export default async function AdminLoginPage() {
@@ -34,7 +34,7 @@ export default async function AdminLoginPage() {
           <LoginForm dict={dict} />
         </div>
 
-        {!demo && (
+        {signupOpen() && (
           <p className="text-center text-[12px] text-on-surface-muted">
             {dict.auth.noAccountYet}{" "}
             <a href="/admin/signup" className="font-medium text-primary underline">

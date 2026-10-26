@@ -45,6 +45,7 @@ export const en = {
       signupSlugHint: "1 to 32 lowercase letters, digits and hyphens — it's your page's address.",
       signupYourName: "Your name",
       signupSubmit: "Create account",
+      signupClosed: "Sign-up is not open on this installation. Ask whoever runs it for an account.",
       signupRateLimited: "Too many attempts. Try again in a few minutes.",
       signupSuccessTitle: "Check your email",
       signupSuccessBody:

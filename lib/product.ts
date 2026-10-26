@@ -6,3 +6,7 @@ export function productName(): string {
   return env.PRODUCT_NAME;
 }
 
+/** Whether strangers may sign a restaurant up here (SIGNUP_ENABLED); never in the demo. */
+export function signupOpen(): boolean {
+  return env.SIGNUP_ENABLED && !env.DEMO_MODE;
+}

@@ -50,6 +50,7 @@ export const es = {
         "1 a 32 letras minúsculas, números y guiones — es la dirección de tu página.",
       signupYourName: "Tu nombre",
       signupSubmit: "Crear cuenta",
+      signupClosed: "El registro no está abierto en esta instalación. Pide una cuenta a quien la administra.",
       signupRateLimited: "Demasiados intentos. Intenta de nuevo en unos minutos.",
       signupSuccessTitle: "Revisa tu correo",
       signupSuccessBody:
