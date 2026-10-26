@@ -20,6 +20,7 @@ export function CashSessionReceipt({
   lang,
   dict,
   businessName,
+  timezone,
 }: {
   session: CashSessionDetailDTO;
   activity: { cashCollected: string; deposits: string; withdrawals: string };
@@ -27,11 +28,14 @@ export function CashSessionReceipt({
   lang: Lang;
   dict: Dict;
   businessName: string;
+  /** The business's own zone: times are printed for the people who were there. */
+  timezone: string;
 }) {
   const money = (value: string) => formatMoney(value, currency, lang);
   const dateFormatter = new Intl.DateTimeFormat(lang === "es" ? "es-MX" : "en-US", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: timezone,
   });
   const isZero = Number(session.difference) === 0;
   const isShort = Number(session.difference) < 0;

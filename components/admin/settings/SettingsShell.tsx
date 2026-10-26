@@ -101,7 +101,7 @@ export function SettingsShell({
       {tab === "business" && (
         <>
           <BusinessSettingsForm dict={dict} business={business} />
-          <StripeConnectCard dict={dict} state={stripe} lang={lang} />
+          <StripeConnectCard dict={dict} state={stripe} lang={lang} timezone={timezone} />
         </>
       )}
       {tab === "content" && <BusinessContentForm dict={dict} defaultLocale={lang} content={content} />}

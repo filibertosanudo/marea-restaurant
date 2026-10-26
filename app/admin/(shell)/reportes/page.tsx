@@ -77,7 +77,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   if (view === "cortes") {
     const sessions = (await listCashSessionsRaw(business.id)).map(toCashSessionHistoryRowDTO);
     const money = (value: string) => formatMoney(value, business.currency, lang);
-    const dateFormatter = new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" });
+    // In the business's own zone: the server's (UTC in a container) showed a lunch shift as opening at 6:45 PM.
+    const dateFormatter = new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short", timeZone: business.timezone });
     const th = "px-md py-[10px] text-[11px] font-medium uppercase tracking-[0.04em] text-on-surface-muted";
     const td = "px-md py-[8px]";
 
