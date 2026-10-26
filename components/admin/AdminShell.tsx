@@ -11,6 +11,7 @@ import { NAV_ICONS, LockIcon, SearchIcon, MenuBarsIcon, CloseIcon } from "./icon
 import { ThemeToggle } from "./ThemeToggle";
 import { LangSwitch } from "./LangSwitch";
 import { UserMenu } from "./UserMenu";
+import { initialOf } from "@/lib/brand";
 
 type AdminShellProps = {
   children: ReactNode;
@@ -20,6 +21,8 @@ type AdminShellProps = {
   user: { name: string; email: string };
   businesses: Array<{ id: string; name: string }>;
   activeBusinessId: string | null;
+  /** The system's name (PRODUCT_NAME), in the sidebar. */
+  productName: string;
   /** A notice above every page, such as the trial's days left. */
   banner?: ReactNode;
 };
@@ -86,6 +89,7 @@ export function AdminShell({
   user,
   businesses,
   activeBusinessId,
+  productName,
   banner,
 }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -97,10 +101,10 @@ export function AdminShell({
       <div className="hidden w-[236px] shrink-0 flex-col border-r border-border bg-surface p-[12px] md:flex">
         <div className="flex items-center gap-[10px] px-[8px] pb-[20px] pt-[8px]">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[13px] font-semibold text-on-primary">
-            M
+            {initialOf(productName)}
           </span>
           <span className="font-display text-[17px] font-semibold text-on-surface">
-            Marea
+            {productName}
           </span>
         </div>
         <SidebarLinks navItems={navItems} dict={dict} pathname={pathname} />
@@ -118,10 +122,10 @@ export function AdminShell({
             <div className="flex items-center justify-between px-[8px] pb-[20px] pt-[8px]">
               <div className="flex items-center gap-[10px]">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[13px] font-semibold text-on-primary">
-                  M
+                  {initialOf(productName)}
                 </span>
                 <span className="font-display text-[17px] font-semibold text-on-surface">
-                  Marea
+                  {productName}
                 </span>
               </div>
               <button

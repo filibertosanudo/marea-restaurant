@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { productName } from "@/lib/product";
 
-export const metadata: Metadata = {
-  title: "Marea Admin",
-};
+export function generateMetadata(): Metadata {
+  return { title: productName() };
+}
 
 export default function AdminRootLayout({
   children,
