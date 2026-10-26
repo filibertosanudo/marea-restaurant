@@ -27,7 +27,7 @@ const statusKey = { ACTIVE: "active", PENDING: "pending", RESTRICTED: "restricte
  * can do. It never shows or accepts an account id: everything acts on the account
  * the server already holds for the signed-in business.
  */
-export function StripeConnectCard({ dict, state, lang }: { dict: SettingsDict; state: StripeCardState; lang: string }) {
+export function StripeConnectCard({ dict, state, lang, timezone }: { dict: SettingsDict; state: StripeCardState; lang: string; timezone: string }) {
   const [error, setError] = useState<ConnectError | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -75,7 +75,8 @@ export function StripeConnectCard({ dict, state, lang }: { dict: SettingsDict; s
   const statusText = state.status ? dict.stripeStatuses[statusKey[state.status]] : null;
   const canStart = state.hasCountry && !pending;
   const checked = state.checkedAt
-    ? new Intl.DateTimeFormat(lang === "en" ? "en-US" : "es-MX", { dateStyle: "short", timeStyle: "short" }).format(new Date(state.checkedAt))
+    ? // The business's zone, never the browser's (AGENTS.md: no date is interpreted client-side).
+      new Intl.DateTimeFormat(lang === "en" ? "en-US" : "es-MX", { dateStyle: "short", timeStyle: "short", timeZone: timezone }).format(new Date(state.checkedAt))
     : null;
 
   return (

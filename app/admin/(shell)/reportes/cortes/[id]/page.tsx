@@ -34,6 +34,7 @@ export default async function CashSessionReceiptPage({ params }: { params: Promi
         activity={toCashSessionActivityDTO(raw.openingFloat, activity)}
         currency={business.currency}
         businessName={business.name}
+        timezone={business.timezone}
         lang={lang}
         dict={dict}
       />
