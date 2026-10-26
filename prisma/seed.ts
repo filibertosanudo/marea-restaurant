@@ -17,6 +17,7 @@ import { PrismaClient, Prisma } from "../lib/generated/prisma/client";
 // Prisma 6:  import { PrismaClient, Prisma } from "@prisma/client";
 import { hashPassword } from "../lib/auth/password";
 import { DEMO_PERSONAS } from "../lib/demo/personas";
+import { seedHistory } from "./seed-history";
 import { safeHostname } from "../lib/url";
 
 // Contraseñas de desarrollo para el personal sembrado — documentadas en el
@@ -1060,10 +1061,18 @@ async function main() {
 
   await seedSecondBusiness(business);
 
+  // Seis semanas de historia, para que los reportes, el corte de caja y la
+  // agenda no se vean vacíos (prisma/seed-history.ts). Sólo la primera vez.
+  const cala = await prisma.business.findUniqueOrThrow({ where: { slug: "cala" }, select: { id: true } });
+  const mareaHistory = await seedHistory(prisma, business.id, { days: 42, ordersPerDay: 28, reservationsPerDay: 9, daysAhead: 14 });
+  const calaHistory = await seedHistory(prisma, cala.id, { days: 42, ordersPerDay: 34, reservationsPerDay: 0, daysAhead: 0 });
+
   console.log("✅ Seed listo:");
   console.log(`   ${CATEGORIES.length} categorías · ${DISHES.length} platillos · ${PROMOS.length} promociones`);
   console.log(`   ${TESTIMONIALS.length} testimonios · ${tableIds.length} mesas · ${scenarios.length} pedidos · ${RESERVATIONS.length} reservaciones`);
   console.log("   + Cala (misma cadena, Marea Group): 2 categorías · 4 platillos · 4 mesas · 1 pedido");
+  if (mareaHistory) console.log(`   + historia de Marea: ${mareaHistory.orders} pedidos · ${mareaHistory.reservations} reservaciones`);
+  if (calaHistory) console.log(`   + historia de Cala: ${calaHistory.orders} pedidos`);
 }
 
 main()
