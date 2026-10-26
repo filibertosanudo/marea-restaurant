@@ -2,6 +2,7 @@ import { getAdminLang } from "@/lib/i18n/cookie";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { SignupForm } from "./SignupForm";
 import { isDemo } from "@/lib/demo/mode";
+import { signupOpen } from "@/lib/product";
 
 export default async function SignupPage() {
   const lang = await getAdminLang();
@@ -28,6 +29,8 @@ export default async function SignupPage() {
         <div className="rounded-lg bg-surface p-xl shadow-2">
           {isDemo() ? (
             <p className="text-[13px] text-on-surface">{dict.demo.signupDisabled}</p>
+          ) : !signupOpen() ? (
+            <p className="text-[13px] text-on-surface">{dict.auth.signupClosed}</p>
           ) : (
             <SignupForm dict={dict} renderedAt={renderedAt} />
           )}

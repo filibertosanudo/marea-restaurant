@@ -160,9 +160,11 @@ are not per business, the payment names its business.
 
 ## Stripe: the platform's own subscription
 
-Separate from card payments: each organization pays Marea a monthly
-subscription, billed on the **platform's** Stripe account (the one
-`STRIPE_SECRET_KEY` names). Three things have to exist in that account, in the
+Platform mode only: a deployment that hosts many unrelated restaurants, with
+public signup open (`SIGNUP_ENABLED=1`; off by default, since a deployment built
+for one client has no use for it). Separate from card payments: each
+organization pays the platform a monthly subscription, billed on the
+**platform's** Stripe account (the one `STRIPE_SECRET_KEY` names). Three things have to exist in that account, in the
 same mode as the key, before a restaurant signs up. Without them signup still
 works, but no trial starts; the owner sees "Start the free trial" on
 `/admin/suscripcion` and it fails until the prices exist.

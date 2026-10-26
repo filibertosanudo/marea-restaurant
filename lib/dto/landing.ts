@@ -31,6 +31,7 @@ export type LandingContent = {
 export type LandingContentByLang = Record<Lang, LandingContent>;
 
 export type LandingBusinessInfo = {
+  name: string;
   addressLine1: string | null;
   addressLine2: string | null;
   city: string | null;

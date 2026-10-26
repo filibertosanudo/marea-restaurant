@@ -77,6 +77,19 @@ process.env.DATABASE_POOL_MAX ??= "5";
 // `stripe.<anything>`, mocked or not.
 process.env.STRIPE_SECRET_KEY ??= "sk_test_placeholder";
 
+// A test file that sets a variable for itself (BUSINESS_ROOT_DOMAIN, AUTH_URL,
+// ...) must not leave it to the next file the same worker runs: modules are
+// evaluated again for every file, process.env is not, so a leftover value made
+// unrelated tests pass or fail depending on file order. Taken after the
+// defaults above, which every file keeps.
+const envAtStart = { ...process.env };
+afterAll(() => {
+  for (const key of Object.keys(process.env)) {
+    if (!(key in envAtStart)) delete process.env[key];
+  }
+  Object.assign(process.env, envAtStart);
+});
+
 ensureSchemaReady();
 
 beforeEach(async () => {

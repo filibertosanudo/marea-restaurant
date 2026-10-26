@@ -117,6 +117,11 @@ services:
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Marea}
       SMTP_HOST: mailhog
       SMTP_PORT: 1025
+      # The system's name in the panel, and whether strangers may sign a
+      # restaurant up (off unless set: a deployment for one client has no use
+      # for it). See .env.example.
+      PRODUCT_NAME: ${PRODUCT_NAME:-Sobremesa}
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-0}
       # The public portfolio demo (lib/demo/, docs/DEPLOY.md). Off unless set.
       DEMO_MODE: ${DEMO_MODE:-0}
       DEMO_SOURCE_URL: ${DEMO_SOURCE_URL:-}

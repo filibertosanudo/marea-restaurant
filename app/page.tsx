@@ -92,6 +92,7 @@ export default async function Home() {
         menuByLang={menuByLang}
         landingByLang={landingByLang}
         business={{
+          name: business.name,
           addressLine1: business.addressLine1,
           addressLine2: business.addressLine2,
           city: business.city,

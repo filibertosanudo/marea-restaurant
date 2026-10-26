@@ -1,7 +1,6 @@
 export const es = {
   admin: {
     auth: {
-      title: "Marea Admin",
       subtitle: "Acceso de personal",
       email: "Correo",
       password: "Contraseña",
@@ -22,7 +21,7 @@ export const es = {
       invalidCurrentPassword: "La contraseña actual no es correcta.",
       notAuthenticated: "Tu sesión expiró. Inicia sesión de nuevo.",
       updatePassword: "Actualizar contraseña",
-      noAccountYet: "¿Tu restaurante no está en Marea todavía?",
+      noAccountYet: "¿Restaurante nuevo?",
       signOut: "Cerrar sesión",
       forgotPassword: "¿Olvidaste tu contraseña?",
       forgotPasswordTitle: "Recupera tu contraseña",
@@ -51,6 +50,7 @@ export const es = {
         "1 a 32 letras minúsculas, números y guiones — es la dirección de tu página.",
       signupYourName: "Tu nombre",
       signupSubmit: "Crear cuenta",
+      signupClosed: "El registro no está abierto en esta instalación. Pide una cuenta a quien la administra.",
       signupRateLimited: "Demasiados intentos. Intenta de nuevo en unos minutos.",
       signupSuccessTitle: "Revisa tu correo",
       signupSuccessBody:
@@ -883,7 +883,7 @@ export const es = {
     },
     billing: {
       title: "Suscripción",
-      lead: "Tu plan de Marea, cobrado por Stripe. Los datos de tu tarjeta nunca llegan a este sistema.",
+      lead: "Tu plan, cobrado por Stripe. Los datos de tu tarjeta nunca llegan a este sistema.",
       plans: { basico: "Básico", pro: "Pro", cadena: "Cadena (por sucursal)" },
       statuses: {
         NOT_STARTED: "Sin iniciar",
@@ -946,7 +946,6 @@ export const es = {
     },
   },
   order: {
-    brand: "Marea",
     table: "Mesa {code}",
     takeaway: "Para llevar",
     add: "Agregar",
@@ -1064,7 +1063,6 @@ export const es = {
     cardSwitchToCash: "Pagar en caja en su lugar",
   },
   reservation: {
-    brand: "Marea",
     title: "Tu reservación",
     reservationNotFoundTitle: "No encontramos esta reservación",
     reservationNotFoundBody: "El enlace puede estar mal escrito o el código ya no corresponde a una reservación.",
@@ -1090,7 +1088,6 @@ export const es = {
     cancelGenericError: "Algo salió mal. Intenta de nuevo.",
   },
   review: {
-    brand: "Marea",
     title: "¿Cómo estuvo tu visita, {name}?",
     orderLabel: "Pedido {orderNumber}",
     quotePlaceholder: "Cuéntanos qué te gustó (opcional)",

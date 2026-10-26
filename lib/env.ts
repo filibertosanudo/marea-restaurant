@@ -131,6 +131,19 @@ const schema = z
     // persona, the few writes that would break the demo for the next visitor
     // refused, and a notice on every page. Spelled out on purpose rather than
     // coerced: z.coerce.boolean reads the string "false" as true.
+    // The system's own name, shown in the admin panel and the sign-in page.
+    // Not a restaurant's: each business's pages carry its own name. One
+    // deployment per client can carry the client's brand, or this product's.
+    PRODUCT_NAME: withDefault(z.string().min(1).max(40).default("Sobremesa")),
+    // Public self-service signup at /admin/signup (module 19). Off unless
+    // asked for: a deployment built for one client has no reason to let
+    // strangers create restaurants on it; a platform of many turns it on.
+    SIGNUP_ENABLED: withDefault(
+      z
+        .enum(["0", "1", "false", "true"])
+        .default("0")
+        .transform((value) => value === "1" || value === "true")
+    ),
     // Where the demo bar links to "see the code" (a public repository).
     DEMO_SOURCE_URL: optional(z.string().url()),
     DEMO_MODE: withDefault(

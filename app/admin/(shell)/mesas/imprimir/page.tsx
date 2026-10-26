@@ -30,7 +30,7 @@ export default async function TablesPrintPage() {
     <div className="p-lg">
       <h1 className="mb-[2px] font-display text-[22px] font-semibold text-on-surface">{dict.printPageTitle}</h1>
       <p className="mb-lg text-[12.5px] text-on-surface-muted">{dict.printLead}</p>
-      <QrSheet tables={withQr} dict={dict} />
+      <QrSheet tables={withQr} dict={dict} businessName={business.name} />
     </div>
   );
 }

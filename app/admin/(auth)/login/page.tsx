@@ -3,6 +3,8 @@ import { getDictionary } from "@/lib/i18n/dictionaries";
 import { LoginForm } from "./LoginForm";
 import { DemoAccess } from "@/components/admin/DemoAccess";
 import { isDemo } from "@/lib/demo/mode";
+import { productName, signupOpen } from "@/lib/product";
+import { initialOf } from "@/lib/brand";
 
 export default async function AdminLoginPage() {
   const lang = await getAdminLang();
@@ -15,11 +17,11 @@ export default async function AdminLoginPage() {
         <div className="flex flex-col items-center gap-[6px]">
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary">
             <span className="font-display text-lg font-semibold text-on-primary">
-              M
+              {initialOf(productName())}
             </span>
           </div>
           <h1 className="font-display text-[22px] font-semibold text-on-surface">
-            {dict.auth.title}
+            {productName()}
           </h1>
           <p className="text-[13px] text-on-surface-muted">
             {dict.auth.subtitle}
@@ -32,7 +34,7 @@ export default async function AdminLoginPage() {
           <LoginForm dict={dict} />
         </div>
 
-        {!demo && (
+        {signupOpen() && (
           <p className="text-center text-[12px] text-on-surface-muted">
             {dict.auth.noAccountYet}{" "}
             <a href="/admin/signup" className="font-medium text-primary underline">

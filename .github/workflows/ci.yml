@@ -106,6 +106,8 @@ jobs:
       # one the specs drive; multi-business-flow.spec.ts derives cala's.
       AUTH_URL: http://marea.localhost:3000
       BUSINESS_ROOT_DOMAIN: localhost
+      # e2e/signup-to-first-order.spec.ts signs a restaurant up; signup is off by default.
+      SIGNUP_ENABLED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

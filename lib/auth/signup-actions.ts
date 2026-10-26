@@ -17,6 +17,7 @@ import { assertWritable } from "@/lib/ops/read-only";
 import { ensureSubscription } from "@/lib/billing/start";
 import { billingEnabled } from "@/lib/stripe/billing";
 import { isDemo } from "@/lib/demo/mode";
+import { signupOpen } from "@/lib/product";
 
 const SIGNUP_MAX_ATTEMPTS = 5;
 const SIGNUP_WINDOW_MS = 60 * 60 * 1000;
@@ -56,6 +57,7 @@ export async function signupAction(_prevState: SignupState, formData: FormData):
   // The demo's accounts are the seeded ones: a signup there would only wait on
   // an email that is never delivered.
   if (isDemo()) return { submitted: false, error: "demo" };
+  if (!signupOpen()) return { submitted: false, error: "closed" };
   const ipAddress = getClientIp(await headers());
 
   // Every submission counts toward the quota, matching a real one's cost —

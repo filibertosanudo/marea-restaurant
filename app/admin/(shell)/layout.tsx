@@ -11,6 +11,7 @@ import { degradeStateFor } from "@/lib/billing/degrade-guard";
 import { whenLevelStarts } from "@/lib/billing/degrade";
 import { prisma } from "@/lib/prisma";
 import { isDemo } from "@/lib/demo/mode";
+import { productName } from "@/lib/product";
 
 export default async function AdminShellLayout({
   children,
@@ -65,6 +66,7 @@ export default async function AdminShellLayout({
       user={{ name: session.user.name ?? "", email: session.user.email }}
       businesses={businesses.map((b) => ({ id: b.id, name: b.name }))}
       activeBusinessId={session.user.businessId}
+      productName={productName()}
       banner={
         <>
           {isDemo() && (

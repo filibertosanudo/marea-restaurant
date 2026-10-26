@@ -1,7 +1,6 @@
 export const en = {
   admin: {
     auth: {
-      title: "Marea Admin",
       subtitle: "Staff sign-in",
       email: "Email",
       password: "Password",
@@ -21,7 +20,7 @@ export const en = {
       invalidCurrentPassword: "Current password is incorrect.",
       notAuthenticated: "Your session expired. Sign in again.",
       updatePassword: "Update password",
-      noAccountYet: "Your restaurant isn't on Marea yet?",
+      noAccountYet: "New restaurant?",
       signOut: "Sign out",
       forgotPassword: "Forgot your password?",
       forgotPasswordTitle: "Reset your password",
@@ -46,6 +45,7 @@ export const en = {
       signupSlugHint: "1 to 32 lowercase letters, digits and hyphens — it's your page's address.",
       signupYourName: "Your name",
       signupSubmit: "Create account",
+      signupClosed: "Sign-up is not open on this installation. Ask whoever runs it for an account.",
       signupRateLimited: "Too many attempts. Try again in a few minutes.",
       signupSuccessTitle: "Check your email",
       signupSuccessBody:
@@ -876,7 +876,7 @@ export const en = {
     },
     billing: {
       title: "Subscription",
-      lead: "Your Marea plan, billed by Stripe. Card details never reach this system.",
+      lead: "Your plan, billed by Stripe. Card details never reach this system.",
       plans: { basico: "Basic", pro: "Pro", cadena: "Chain (per branch)" },
       statuses: {
         NOT_STARTED: "Not started",
@@ -939,7 +939,6 @@ export const en = {
     },
   },
   order: {
-    brand: "Marea",
     table: "Table {code}",
     takeaway: "Takeaway",
     add: "Add",
@@ -1055,7 +1054,6 @@ export const en = {
     cardSwitchToCash: "Pay at the register instead",
   },
   reservation: {
-    brand: "Marea",
     title: "Your reservation",
     reservationNotFoundTitle: "We couldn't find that reservation",
     reservationNotFoundBody: "The link may be mistyped, or the code no longer matches a reservation.",
@@ -1081,7 +1079,6 @@ export const en = {
     cancelGenericError: "Something went wrong. Try again.",
   },
   review: {
-    brand: "Marea",
     title: "How was your visit, {name}?",
     orderLabel: "Order {orderNumber}",
     quotePlaceholder: "Tell us what stood out (optional)",

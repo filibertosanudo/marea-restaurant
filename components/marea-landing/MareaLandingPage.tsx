@@ -232,7 +232,7 @@ export function MareaLandingPage({
           </div>
           <div className="ml-foot-mid">
             <div>
-              <div className="brand">Marea</div>
+              <div className="brand">{business.name}</div>
               {landing.footer.blurb && <p>{landing.footer.blurb}</p>}
             </div>
             {(business.addressLine1 || landing.footer.hours) && (

@@ -9,6 +9,7 @@ import { getReservationDictionary } from "@/lib/i18n/dictionaries";
 import { getClientIp, isScopeRateLimited, recordScopeAttempt } from "@/lib/auth/rate-limit";
 import { CancelReservationButton } from "@/components/reservation/CancelReservationButton";
 import { ReservationStatusBadge } from "@/components/reservation/ReservationStatusBadge";
+import { initialOf } from "@/lib/brand";
 
 // Same guessing-surface reasoning as cancelReservationByCodeAction's own
 // scope — a rate-limited request 404s exactly like a genuinely wrong code,
@@ -45,10 +46,10 @@ export default async function ReservationLookupPage({
     <div className="flex min-h-screen flex-col items-center bg-surface-subtle px-lg pb-lg pt-[40px] text-center">
       <div className="mb-[36px] flex items-center gap-[7px] opacity-70">
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary font-display text-[10px] font-bold text-on-primary">
-          M
+          {initialOf(business.name)}
         </span>
         <span className="font-display text-[12px] font-semibold tracking-wide text-on-surface">
-          {dict.brand.toUpperCase()}
+          {business.name.toUpperCase()}
         </span>
       </div>
 
