@@ -127,6 +127,18 @@ const schema = z
     // the decision itself stays manual (privacy:anonymize-guests), this only
     // makes sure someone is told it's due.
     OPS_ALERT_EMAIL: optional(z.string().email()),
+    // A public portfolio demo (lib/demo/): one-click sign-in as each seeded
+    // persona, the few writes that would break the demo for the next visitor
+    // refused, and a notice on every page. Spelled out on purpose rather than
+    // coerced: z.coerce.boolean reads the string "false" as true.
+    // Where the demo bar links to "see the code" (a public repository).
+    DEMO_SOURCE_URL: optional(z.string().url()),
+    DEMO_MODE: withDefault(
+      z
+        .enum(["0", "1", "false", "true"])
+        .default("0")
+        .transform((value) => value === "1" || value === "true")
+    ),
   })
   .superRefine((value, ctx) => {
     // NEXT_RUNTIME is Next's own marker for its server process — set before

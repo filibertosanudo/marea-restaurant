@@ -16,6 +16,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, Prisma } from "../lib/generated/prisma/client";
 // Prisma 6:  import { PrismaClient, Prisma } from "@prisma/client";
 import { hashPassword } from "../lib/auth/password";
+import { DEMO_PERSONAS } from "../lib/demo/personas";
 import { safeHostname } from "../lib/url";
 
 // Contraseñas de desarrollo para el personal sembrado — documentadas en el
@@ -27,6 +28,9 @@ const DEV_PASSWORDS: Record<string, string> = {
   // Segundo negocio y su cadena (ver seedSecondBusiness).
   "owner@marea.test": "MareaOwner123!", // ORG_ADMIN de la cadena "Marea Group"
   "admin@cala.test": "CalaAdmin123!", // BUSINESS_ADMIN sólo de Cala
+  // Las cuentas de la demo pública (DEMO_MODE) toman su contraseña de
+  // lib/demo/personas.ts, la misma que usa el botón de acceso de un clic.
+  ...Object.fromEntries(DEMO_PERSONAS.map((p) => [p.email, p.password])),
 };
 
 // Deliberately just loopback addresses, not a Docker Compose service name
