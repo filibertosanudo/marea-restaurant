@@ -113,7 +113,11 @@ export function ImageField({
         <label className="mb-[4px] block text-[12px] text-on-surface-muted">{dict.menu.imageUrlAlt}</label>
         <input
           name="imageUrl"
-          type="url"
+          // Text, not "url": a sample dish's photo is a same-origin path
+          // ("/demo/…"), which the browser's URL check would refuse. The
+          // server validates the value either way (lib/menu/schemas.ts).
+          type="text"
+          inputMode="url"
           value={currentUrl}
           onChange={(e) => setCurrentUrl(e.target.value)}
           placeholder="https://…"

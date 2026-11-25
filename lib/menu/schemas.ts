@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Lang } from "@/lib/i18n/lang";
 import { isAllowedImageUrl } from "@/lib/env";
+import { isBundledDemoImage } from "@/lib/business/landing-images";
 
 // The business's default locale is the only one that's required; the rest
 // are optional but the UI flags them as incomplete. Schemas take the
@@ -65,6 +66,9 @@ export function buildMenuItemSchema(defaultLocale: Lang) {
       .string()
       .url()
       .refine(isAllowedImageUrl, "Must be an https url on an allowed host")
+      // A sample dish keeps the photo it shipped with when it is edited
+      // and saved from the panel (lib/business/landing-images.ts).
+      .or(z.string().refine(isBundledDemoImage))
       .optional()
       .or(z.literal("")),
     isAvailable: z.boolean().default(true),
