@@ -315,6 +315,8 @@ export const en = {
       statusCancelled: "Cancelled",
       statusNoShow: "No-show",
       overdueFlag: "Past due",
+      partyOne: "1 guest",
+      partyOther: "{count} guests",
       tableUnassigned: "Unassigned",
       notesLabel: "Notes",
       confirmAction: "Confirm",
