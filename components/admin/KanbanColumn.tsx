@@ -1,13 +1,11 @@
 import type { ReactNode } from "react";
 import type { BoardDensity } from "./OrderCard";
 
-// Column headers are the shell, not the ticket itself, so they don't need
-// the full 40-60px jump the finding calls for on the folio/lines — but they
-// still have to hold up next to cards that just got much bigger. See
-// BoardDensity in OrderCard.tsx for why this is a variant, not a duplicate
-// component.
+// Column headers are the shell, not the ticket itself: one step under the
+// cards they sit over. See BoardDensity in OrderCard.tsx for why this is a
+// variant, not a duplicate component.
 const SCALE = {
-  kitchen: { title: "text-[18px] tracking-wide", count: "px-md py-[4px] text-[22px]" },
+  desk: { title: "text-[13px] tracking-wide", count: "px-sm py-[2px] text-[16px]" },
   waiter: { title: "text-[13px] tracking-wide", count: "px-sm py-[2px] text-[15px]" },
 } as const;
 

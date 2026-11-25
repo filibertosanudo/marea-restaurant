@@ -257,7 +257,7 @@ export function OrdersBoard({
         </div>
       ) : (
         <>
-          {/* Desktop / kiosk: columns. */}
+          {/* Desktop: columns. */}
           <div className="hidden flex-1 grid-cols-4 gap-[1px] overflow-hidden bg-border/25 md:grid">
             {BOARD_COLUMNS.map(({ status }) => {
               const columnOrders = view.columns[status];
@@ -267,7 +267,7 @@ export function OrdersBoard({
                   title={dict[COLUMN_LABEL_KEY[status]]}
                   count={view.totals[status]}
                   emptyLabel={dict.emptyColumn}
-                  density="kitchen"
+                  density="desk"
                   footer={
                     hasMore(status) && (
                       <LoadMoreButton
@@ -290,7 +290,7 @@ export function OrdersBoard({
                       onCancel={setCancelTarget}
                       onViewPayment={setPaymentTarget}
                       onAdvance={advance}
-                      density="kitchen"
+                      density="desk"
                     />
                   ))}
                 </KanbanColumn>

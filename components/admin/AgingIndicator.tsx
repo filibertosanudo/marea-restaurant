@@ -33,7 +33,7 @@ export function AgingIndicator({
 }: {
   placedAt: string;
   newLabel?: string;
-  /** Kitchen density needs this legible at three meters too — see BoardDensity in OrderCard.tsx. Defaults to the original (waiter) size. */
+  /** Each surface sizes it to its own reading distance — see BoardDensity in OrderCard.tsx and the kitchen card. Defaults to the original (waiter) size. */
   sizeClassName?: string;
   dotClassName?: string;
 }) {
