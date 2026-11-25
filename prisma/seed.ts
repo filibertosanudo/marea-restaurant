@@ -18,6 +18,8 @@ import { PrismaClient, Prisma } from "../lib/generated/prisma/client";
 import { hashPassword } from "../lib/auth/password";
 import { DEMO_PERSONAS } from "../lib/demo/personas";
 import { seedHistory } from "./seed-history";
+import { businessLocalDateParts } from "../lib/reservations/availability";
+import { formatFolio } from "../lib/orders/folio-format";
 import { safeHostname } from "../lib/url";
 
 // Contraseñas de desarrollo para el personal sembrado — documentadas en el
@@ -101,6 +103,21 @@ const adapter = new PrismaPg({ connectionString: connectionUrl() });
 const prisma = new PrismaClient({ adapter });
 
 const BUSINESS_SLUG = "marea";
+
+/**
+ * Today's first `count` daily folios ("A-YYMMDD-001"…) in the business's own
+ * calendar, with OrderCounter moved past them so an order placed later today
+ * takes the next number instead of repeating one. The same format every new
+ * order gets, so the board never mixes "A-0001" with "A-001".
+ */
+async function claimTodaysFolios(businessId: string, timezone: string, count: number): Promise<string[]> {
+  const today = businessLocalDateParts(new Date(), timezone);
+  const localDate = `${today.year}-${String(today.month).padStart(2, "0")}-${String(today.day).padStart(2, "0")}`;
+  await prisma.$executeRaw`
+    INSERT INTO "OrderCounter" ("businessId", "localDate", "lastNumber") VALUES (${businessId}, ${localDate}, ${count})
+    ON CONFLICT ("businessId", "localDate") DO UPDATE SET "lastNumber" = GREATEST("OrderCounter"."lastNumber", EXCLUDED."lastNumber")`;
+  return Array.from({ length: count }, (_, i) => formatFolio(today, i + 1));
+}
 const D = (v: string) => new Prisma.Decimal(v);
 
 // ---------------------------------------------------------------------------
@@ -340,7 +357,7 @@ const TESTIMONIALS = [
 // ---------------------------------------------------------------------------
 //
 // Existe para que el aislamiento entre negocios se pruebe contra datos
-// reales y no contra un solo inquilino: los mismos folios ("A-0001"), otro
+// reales y no contra un solo inquilino: los mismos folios ("A-…-001"), otro
 // menú, otras mesas, otro personal. Marea y Cala forman la cadena "Marea
 // Group", cuyo dueño es owner@marea.test (ORG_ADMIN); nadie más ve las dos.
 
@@ -478,18 +495,17 @@ async function seedSecondBusiness(marea: { id: string }) {
   });
 
   // Un pedido con el MISMO folio que el primero de Marea: los folios son por
-  // negocio, y es la forma más barata de notarlo si algo los mezcla.
-  const exists = await prisma.order.findUnique({
-    where: { businessId_orderNumber: { businessId: cala.id, orderNumber: "A-0001" } },
-  });
-  if (!exists) {
+  // negocio, y es la forma más barata de notarlo si algo los mezcla. Sólo la
+  // primera vez: un seed repetido otro día no agrega otro.
+  if ((await prisma.order.count({ where: { businessId: cala.id } })) === 0) {
+    const [folio] = await claimTodaysFolios(cala.id, cala.timezone, 1);
     const unit = D("62.00");
     const subtotal = unit.mul(2);
     const tax = subtotal.mul(D("0.16")).toDecimalPlaces(2);
     const order = await prisma.order.create({
       data: {
         businessId: cala.id,
-        orderNumber: "A-0001",
+        orderNumber: folio,
         type: "DINE_IN",
         status: "PENDING",
         tableId: tableIds[0],
@@ -965,18 +981,18 @@ async function main() {
   // 10. Pedidos de ejemplo — uno por estado, para probar el tablero de cocina
   // -------------------------------------------------------------------------
   const scenarios = [
-    { number: "A-0001", status: "PENDING" as const, type: "DINE_IN" as const, table: 0, items: [["aguachile-verde", 1], ["agua-de-jamaica", 2]] },
-    { number: "A-0002", status: "PREPARING" as const, type: "DINE_IN" as const, table: 2, items: [["pescado-zarandeado", 1], ["michelada", 2]] },
-    { number: "A-0003", status: "READY" as const, type: "TAKEAWAY" as const, table: null, items: [["tacos-gobernador", 2]] },
-    { number: "A-0004", status: "DELIVERED" as const, type: "DINE_IN" as const, table: 5, items: [["pulpo-a-las-brasas", 1], ["pay-de-limon", 2]] },
-    { number: "A-0005", status: "CANCELLED" as const, type: "TAKEAWAY" as const, table: null, items: [["coctel-de-camaron", 1]] },
+    { status: "PENDING" as const, type: "DINE_IN" as const, table: 0, items: [["aguachile-verde", 1], ["agua-de-jamaica", 2]] },
+    { status: "PREPARING" as const, type: "DINE_IN" as const, table: 2, items: [["pescado-zarandeado", 1], ["michelada", 2]] },
+    { status: "READY" as const, type: "TAKEAWAY" as const, table: null, items: [["tacos-gobernador", 2]] },
+    { status: "DELIVERED" as const, type: "DINE_IN" as const, table: 5, items: [["pulpo-a-las-brasas", 1], ["pay-de-limon", 2]] },
+    { status: "CANCELLED" as const, type: "TAKEAWAY" as const, table: null, items: [["coctel-de-camaron", 1]] },
   ];
 
-  for (const s of scenarios) {
-    const exists = await prisma.order.findUnique({
-      where: { businessId_orderNumber: { businessId: business.id, orderNumber: s.number } },
-    });
-    if (exists) continue;
+  // Sólo la primera vez (la historia se crea después): un seed repetido otro
+  // día no agrega otra tanda con los folios de ese día.
+  const isFirstRun = (await prisma.order.count({ where: { businessId: business.id } })) === 0;
+  const folios = isFirstRun ? await claimTodaysFolios(business.id, business.timezone, scenarios.length) : [];
+  for (const [i, s] of (isFirstRun ? scenarios : []).entries()) {
 
     const lines = s.items.map(([slug, qty]) => {
       const dish = DISHES.find((d) => d.slug === slug)!;
@@ -995,7 +1011,7 @@ async function main() {
     const order = await prisma.order.create({
       data: {
         businessId: business.id,
-        orderNumber: s.number,
+        orderNumber: folios[i],
         type: s.type,
         status: s.status,
         customerId: customer.id,
@@ -1054,10 +1070,6 @@ async function main() {
       });
     }
   }
-
-  // The scenarios above use the legacy "A-0001".."A-0005" folios. Orders
-  // placed later get "A-YYMMDD-NNN" numbers from OrderCounter, a format that
-  // cannot equal a legacy one, so there is no counter to keep in sync here.
 
   // -------------------------------------------------------------------------
   // 11. Reservaciones — cubren solapamiento y estados

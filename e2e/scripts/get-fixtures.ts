@@ -14,7 +14,10 @@ async function main() {
     const orderToken = async (slug: string) =>
       (
         await db.order.findFirstOrThrow({
-          where: { business: { slug }, orderNumber: "A-0001" },
+          // The seed's first sample order: today's "-001", newer than every
+          // "-001" of the generated history.
+          where: { business: { slug }, orderNumber: { endsWith: "-001" } },
+          orderBy: { placedAt: "desc" },
           select: { publicToken: true },
         })
       ).publicToken;

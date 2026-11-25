@@ -104,6 +104,10 @@ export async function seedHistory(prisma: PrismaClient, businessId: string, opti
   const sessions: Prisma.CashSessionCreateManyInput[] = [];
   const counters: Array<{ localDate: string; lastNumber: number }> = [];
   const nowMinutes = businessLocalMinutesOfDay(now, tz);
+  // Today may already have folios (prisma/seed.ts hands the live sample
+  // orders the first ones), so today's history numbers after them.
+  const todayKey = `${today.year}-${String(today.month).padStart(2, "0")}-${String(today.day).padStart(2, "0")}`;
+  const todayBase = (await prisma.orderCounter.findUnique({ where: { businessId_localDate: { businessId, localDate: todayKey } } }))?.lastNumber ?? 0;
 
   for (let offset = -options.days; offset <= 0; offset++) {
     const date = dayOf(offset);
@@ -124,6 +128,7 @@ export async function seedHistory(prisma: PrismaClient, businessId: string, opti
     minutes.sort((a, b) => a - b);
     if (minutes.length === 0) continue;
 
+    const base = offset === 0 ? todayBase : 0;
     const sessionId = createId();
     const firstOpen = Math.min(...windows.map((w) => w.opensAt));
     const lastClose = Math.max(...windows.map((w) => w.closesAt));
@@ -154,7 +159,7 @@ export async function seedHistory(prisma: PrismaClient, businessId: string, opti
       orders.push({
         id,
         businessId,
-        orderNumber: formatFolio(date, index + 1),
+        orderNumber: formatFolio(date, base + index + 1),
         publicToken: createId(),
         type: dineIn ? "DINE_IN" : "TAKEAWAY",
         status: cancelled ? "CANCELLED" : "DELIVERED",
@@ -203,7 +208,7 @@ export async function seedHistory(prisma: PrismaClient, businessId: string, opti
       });
     });
 
-    counters.push({ localDate: `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`, lastNumber: minutes.length });
+    counters.push({ localDate: `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`, lastNumber: base + minutes.length });
 
     // One cash shift per day that had a cashier, closed after hours (today's stays with the live demo, not here).
     if (cashier && offset < 0) {
