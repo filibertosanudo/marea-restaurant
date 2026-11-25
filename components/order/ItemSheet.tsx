@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useActionState, useEffect, useState } from "react";
 import { formatMoney, addMoneyStrings, mulMoneyString } from "@/lib/dto/money";
 import type { PublicDish, PublicModifierGroup } from "@/lib/menu/public-menu";
@@ -102,11 +103,13 @@ export function ItemSheet({
       <div className="absolute inset-x-0 bottom-0 flex max-h-[88vh] flex-col rounded-t-xl bg-surface shadow-hero">
         <div className="mx-auto mt-[10px] h-[4px] w-9 shrink-0 rounded-full bg-border/50" />
         <div
-          className="h-36 shrink-0"
+          className="relative h-44 shrink-0 overflow-hidden"
           style={{ background: "linear-gradient(135deg, #b9843f, #6e4a1f)" }}
           role="img"
           aria-label={dish.name}
-        />
+        >
+          {dish.imageUrl && <Image src={dish.imageUrl} alt="" fill sizes="100vw" className="object-cover" />}
+        </div>
         <form action={formAction} className="flex min-h-0 flex-1 flex-col">
           <input type="hidden" name="menuItemId" value={dish.id} />
           <input type="hidden" name="quantity" value={quantity} />

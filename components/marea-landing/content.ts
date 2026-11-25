@@ -220,6 +220,7 @@ export type Dish = {
   category: string;
   price: string;
   img: string;
+  imageUrl?: string | null;
   name: string;
   desc: string;
 };
