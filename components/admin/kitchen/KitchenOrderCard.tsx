@@ -29,9 +29,8 @@ function isRecent(placedAt: string): boolean {
  *
  * Sized for the 20-orders-at-once case, not the 1-order case: legible at
  * three meters still means something has to give when the grid packs
- * several rows of cards into a 1080p column without scrolling, so this
- * scale sits below OrdersBoard's own "kitchen" density (that one only ever
- * shows a handful of cards in a single wide list, never a dense grid).
+ * several rows of cards into a 1080p column without scrolling. The dish
+ * line is the one thing a cook reads line by line, so it gets the room.
  */
 export function KitchenOrderCard({
   order,
@@ -77,7 +76,7 @@ export function KitchenOrderCard({
       // generation order, not on anything in this file. Keeping them on
       // different sides means both are always visible at once: mesa vs.
       // llevar on the left, new/stuck-too-long across the rest.
-      className={`flex flex-col gap-[5px] rounded-md border-y-[3px] border-r-[3px] border-l-[8px] bg-surface p-[8px] ${
+      className={`flex flex-col gap-[8px] rounded-md border-y-[3px] border-r-[3px] border-l-[8px] bg-surface p-[12px] ${
         isDineIn ? "border-l-info" : "border-l-accent-warm-border"
       } ${
         isNew
@@ -89,34 +88,34 @@ export function KitchenOrderCard({
     >
       <div className="flex items-start justify-between gap-sm">
         <div>
-          <div className="font-display text-[30px] font-extrabold leading-none tabular-nums text-on-surface">
+          <div className="font-display text-[36px] font-extrabold leading-none tabular-nums text-on-surface">
             {shortFolio(order.orderNumber)}
           </div>
-          <div className="mt-[3px] flex items-center gap-[5px] text-[13px] font-bold uppercase tracking-wide text-on-surface-muted">
-            {isDineIn ? <SingleTableIcon className="h-[14px] w-[14px]" /> : <TakeawayBagIcon className="h-[14px] w-[14px]" />}
+          <div className="mt-[4px] flex items-center gap-[6px] text-[15px] font-bold uppercase tracking-wide text-on-surface-muted">
+            {isDineIn ? <SingleTableIcon className="h-[16px] w-[16px]" /> : <TakeawayBagIcon className="h-[16px] w-[16px]" />}
             {isDineIn ? order.tableLabel : dict.takeaway}
           </div>
         </div>
         <AgingIndicator
           placedAt={order.placedAt}
           newLabel={isNew ? dict.new : undefined}
-          sizeClassName="gap-[5px] px-[9px] py-[4px] text-[16px]"
-          dotClassName="h-[7px] w-[7px]"
+          sizeClassName="gap-[6px] px-[10px] py-[5px] text-[18px]"
+          dotClassName="h-[8px] w-[8px]"
         />
       </div>
 
-      <ul className="flex flex-col gap-[3px]">
+      <ul className="flex flex-col gap-[6px]">
         {order.items.map((item) => (
           <li key={item.id}>
-            <div className="text-[19px] font-bold leading-tight text-on-surface">
+            <div className="text-[23px] font-bold leading-tight text-on-surface">
               <span className="text-primary">{item.quantity}×</span> {item.name}
             </div>
             {item.modifiers.length > 0 && (
-              <div className="ml-[24px] text-[12px] text-on-surface-muted">{item.modifiers.join(" · ")}</div>
+              <div className="ml-[28px] text-[15px] text-on-surface-muted">{item.modifiers.join(" · ")}</div>
             )}
             {item.notes && (
-              <div className="mt-[3px] flex items-start gap-[6px] rounded-sm border border-error/30 bg-error/10 px-[8px] py-[5px] text-[14px] font-bold leading-snug text-error">
-                <AllergyIcon className="mt-[2px] h-[14px] w-[14px]" />
+              <div className="mt-[3px] flex items-start gap-[6px] rounded-sm border border-error/30 bg-error/10 px-[8px] py-[5px] text-[16px] font-bold leading-snug text-error">
+                <AllergyIcon className="mt-[2px] h-[16px] w-[16px]" />
                 {item.notes}
               </div>
             )}
@@ -125,8 +124,8 @@ export function KitchenOrderCard({
       </ul>
 
       {order.notes && (
-        <div className="flex items-start gap-[6px] rounded-sm border border-error/30 bg-error/10 px-[8px] py-[6px] text-[13px] font-semibold leading-snug text-error">
-          <AllergyIcon className="mt-[1px] h-[13px] w-[13px]" />
+        <div className="flex items-start gap-[6px] rounded-sm border border-error/30 bg-error/10 px-[8px] py-[6px] text-[15px] font-semibold leading-snug text-error">
+          <AllergyIcon className="mt-[2px] h-[15px] w-[15px]" />
           {order.notes}
         </div>
       )}
@@ -136,14 +135,14 @@ export function KitchenOrderCard({
           type="button"
           onClick={advance}
           disabled={pending}
-          className={`min-h-[42px] rounded-md text-[18px] font-bold text-on-primary transition-colors disabled:opacity-50 ${
+          className={`min-h-[52px] rounded-md text-[20px] font-bold text-on-primary transition-colors disabled:opacity-50 ${
             nextStatus === "READY" ? "bg-success hover:bg-success" : "bg-primary hover:bg-primary-hover"
           }`}
         >
           {dict[advanceLabelKey]}
         </button>
       ) : (
-        <div className="flex min-h-[42px] items-center justify-center rounded-md bg-success/12 text-[14px] font-bold text-success">
+        <div className="flex min-h-[52px] items-center justify-center rounded-md bg-success/12 text-[17px] font-bold text-success">
           {dict.waitingPickup}
         </div>
       )}
