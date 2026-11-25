@@ -202,12 +202,16 @@ export async function getPublicBusinessForToken(kind: LegacyTokenKind, token: st
  * was issued for. The JWT's businessId is re-checked against the
  * membership every 60 s (auth.ts), which is what makes it safe to trust
  * here. A session with no business (SUPER_ADMIN without a membership)
- * falls back to the host, like a public request. Call it after
- * requireRole/requirePageRole, never instead of them.
+ * falls back to the host, like a public request. So does a revoked one,
+ * the same rule proxy.ts applies: its businessId is exactly the claim the
+ * revalidation refused, and it may name a business that no longer exists
+ * (a demo database reset overnight), which must not turn a public page
+ * that also calls this (the QR menu) into a 404 for that browser. Call it
+ * after requireRole/requirePageRole, never instead of them.
  */
 export const getBusinessForRequest = cache(async (): Promise<Business> => {
   const session = await getSession();
-  const sessionBusinessId = session?.user?.businessId;
+  const sessionBusinessId = session?.user && !session.user.revoked ? session.user.businessId : null;
   const business = sessionBusinessId ? await byId(sessionBusinessId) : await byHost();
   if (!business) notFound();
   return business;
