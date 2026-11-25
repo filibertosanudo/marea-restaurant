@@ -140,6 +140,16 @@ html {
 .ml-placeholder.navy span {
   color: rgb(var(--color-on-primary) / 0.72);
 }
+/* A real photo in a block sized by its parent (components/marea-landing/Media.tsx). */
+.ml-media {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.ml-media-img {
+  object-fit: cover;
+}
 
 /* Hero — fills the viewport on load so About Us doesn't peek in below
    the fold; the fixed nav pill floats over the top padding. */

@@ -9,15 +9,18 @@ import { listFeaturedTestimonialsForLanding } from "@/lib/testimonials/queries";
 import { getPublicOpeningHours } from "@/lib/reservations/queries";
 import { toLandingContentByLang } from "@/lib/dto/landing";
 import { resolveSiteMetadataText } from "@/lib/seo/site-metadata";
-import { buildRestaurantJsonLd } from "@/lib/seo/restaurant-jsonld";
+import { buildRestaurantJsonLd, toAbsoluteUrl } from "@/lib/seo/restaurant-jsonld";
 import { businessOrigin } from "@/lib/business-origin";
+import { landingImagesFor } from "@/lib/business/landing-images";
 
 export async function generateMetadata(): Promise<Metadata> {
   const business = await getPublicBusiness();
-  const [{ title, description }, image] = await Promise.all([
+  const [{ title, description }, storedImage] = await Promise.all([
     resolveSiteMetadataText(),
     getRepresentativeMenuImageUrl(business.id),
   ]);
+  // Social cards need an absolute URL; a sample dish photo is a same-origin path.
+  const image = storedImage ? toAbsoluteUrl(storedImage, businessOrigin(business)) : null;
 
   return {
     title,
@@ -99,6 +102,8 @@ export default async function Home() {
           phone: business.phone,
           email: business.email,
         }}
+        images={landingImagesFor(business.slug)}
+        defaultLang={business.defaultLocale === "en" ? "en" : "es"}
         maxPartySize={business.maxPartySize}
       />
     </>
