@@ -16,7 +16,7 @@ export function Tabs({ items, value, onChange }: TabsProps) {
             key={item.id}
             type="button"
             onClick={() => onChange(item.id)}
-            className={`rounded-full px-md py-[8px] text-[14px] font-medium transition-colors ${
+            className={`shrink-0 whitespace-nowrap rounded-full px-md py-[8px] text-[14px] font-medium transition-colors ${
               active
                 ? "bg-primary text-on-primary"
                 : "text-on-surface-muted hover:bg-surface-ocean hover:text-on-surface"
