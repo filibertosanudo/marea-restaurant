@@ -86,12 +86,12 @@ export function KitchenOrderCard({
             : "border-y-transparent border-r-transparent"
       }`}
     >
-      <div className="flex items-start justify-between gap-sm">
+      <div className="flex flex-wrap items-start justify-between gap-x-sm gap-y-[6px]">
         <div>
-          <div className="font-display text-[36px] font-extrabold leading-none tabular-nums text-on-surface">
+          <div className="whitespace-nowrap font-display text-[36px] font-extrabold leading-none tabular-nums text-on-surface">
             {shortFolio(order.orderNumber)}
           </div>
-          <div className="mt-[4px] flex items-center gap-[6px] text-[15px] font-bold uppercase tracking-wide text-on-surface-muted">
+          <div className="mt-[4px] flex items-center gap-[6px] whitespace-nowrap text-[15px] font-bold uppercase tracking-wide text-on-surface-muted">
             {isDineIn ? <SingleTableIcon className="h-[16px] w-[16px]" /> : <TakeawayBagIcon className="h-[16px] w-[16px]" />}
             {isDineIn ? order.tableLabel : dict.takeaway}
           </div>

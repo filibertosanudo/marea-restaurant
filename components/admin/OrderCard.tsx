@@ -198,12 +198,14 @@ export function OrderCard({
         isNew ? "border-info shadow-[0_0_0_3px_rgb(var(--color-info)/0.18)]" : "border-border/25"
       } ${isDelivered ? "opacity-60" : ""}`}
     >
-      <div className="mb-sm flex items-start justify-between gap-sm">
+      {/* Wraps, so a narrow column drops the clock under the folio instead of
+          breaking the folio itself over two lines. */}
+      <div className="mb-sm flex flex-wrap items-start justify-between gap-x-sm gap-y-[6px]">
         <div>
-          <div className={`font-display font-bold tabular-nums text-on-surface ${s.folio}`}>
+          <div className={`whitespace-nowrap font-display font-bold tabular-nums text-on-surface ${s.folio}`}>
             {shortFolio(order.orderNumber)}
           </div>
-          <div className={`mt-[2px] font-semibold uppercase text-on-surface-muted ${s.tableLabel}`}>
+          <div className={`mt-[2px] whitespace-nowrap font-semibold uppercase text-on-surface-muted ${s.tableLabel}`}>
             {order.tableLabel ? dict.table.replace("{code}", order.tableLabel) : dict.takeaway}
           </div>
         </div>
