@@ -96,7 +96,7 @@ export function MareaLandingPage({
       {/* HERO */}
       <header className="ml-hero ml-section" id="home">
         <div className="ml-hero-bg">
-          <Media src={images.hero} label={t.hero.photo} navy priority sizes="(max-width: 900px) 100vw, 60vw" />
+          <Media src={images.hero} label={t.hero.photo} navy hero sizes="(max-width: 900px) 100vw, 60vw" />
         </div>
         <div className="ml-hero-inner">
           <div className="ml-hero-right">
