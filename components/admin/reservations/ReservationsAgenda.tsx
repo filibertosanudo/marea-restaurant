@@ -99,14 +99,16 @@ function ReservationRow({
       } ${dimmed ? "opacity-60" : ""}`}
     >
       <div className="flex flex-wrap items-center gap-md">
-        <span className="w-[64px] shrink-0 font-display text-[16px] font-bold tabular-nums text-on-surface">
+        <span className="w-[88px] shrink-0 whitespace-nowrap font-display text-[16px] font-bold tabular-nums text-on-surface">
           {reservation.timeLabel}
         </span>
 
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14.5px] font-semibold text-on-surface">{reservation.guestName}</div>
           <div className="flex flex-wrap items-center gap-sm text-[12.5px] text-on-surface-muted">
-            <span className="font-semibold text-on-surface">{reservation.partySize}×</span>
+            <span className="font-semibold text-on-surface">
+              {reservation.partySize === 1 ? dict.partyOne : dict.partyOther.replace("{count}", String(reservation.partySize))}
+            </span>
             {reservation.isOverdue && (
               <span className="font-semibold text-warning">{dict.overdueFlag}</span>
             )}

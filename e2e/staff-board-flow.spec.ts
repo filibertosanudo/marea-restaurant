@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Staff logging in and working the kitchen board — the seeded A-0001 order
+ * Staff logging in and working the kitchen board — the seeded A-001 order
  * (PENDING, dine-in) advanced through PREPARING to READY, one tap per
  * legal step, exactly as advanceOrderStatusAction's own state machine
  * allows. Never skips a step: the board only ever offers the single next
@@ -22,7 +22,9 @@ test("staff logs in and advances an order from pending to ready", async ({ page,
   await expect(page).toHaveURL(/\/admin$/);
 
   await page.goto("/admin/pedidos");
-  const card = page.locator("div.rounded-md", { hasText: "A-0001" });
+  // Today's A-001 is the only one still open; the history's A-001s are all
+  // delivered, in the last column, so the first match is always this one.
+  const card = page.locator("div.rounded-md", { hasText: "A-001" }).first();
 
   await card.getByRole("button", { name: "Start preparing" }).click();
   await expect(card.getByRole("button", { name: "Mark ready" })).toBeVisible();

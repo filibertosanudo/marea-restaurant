@@ -24,8 +24,8 @@ export function KitchenColumn({
   return (
     <div className="flex min-w-0 flex-1 flex-col bg-surface-subtle">
       <div className="flex flex-none items-center justify-between px-[14px] py-[8px]">
-        <span className="text-[16px] font-bold uppercase tracking-wide text-on-surface-muted">{title}</span>
-        <span className="rounded-md bg-border/20 px-[10px] py-[2px] font-display text-[17px] font-extrabold tabular-nums text-on-surface">
+        <span className="text-[18px] font-bold uppercase tracking-wide text-on-surface-muted">{title}</span>
+        <span className="rounded-md bg-border/20 px-[12px] py-[2px] font-display text-[20px] font-extrabold tabular-nums text-on-surface">
           {count}
         </span>
       </div>
@@ -33,12 +33,14 @@ export function KitchenColumn({
         {count === 0 ? (
           <p className="py-[40px] text-center text-[18px] text-on-surface-muted">{emptyLabel}</p>
         ) : (
-          // 220px, not something rounder like 300: three columns on a
+          // 240px, not something rounder like 300: three columns on a
           // 1920px TV leave ~600px per column after padding/gaps, and a
           // wider minimum would round back down to a single track there —
           // defeating the entire point of a grid over a vertical list.
+          // auto-fit, not auto-fill: a quiet column's two orders share its
+          // width instead of sitting at the left of empty tracks.
           <>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-[6px]">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-[8px]">
               {children}
             </div>
             {footer && <div className="pt-[8px]">{footer}</div>}

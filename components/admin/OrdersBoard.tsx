@@ -257,8 +257,10 @@ export function OrdersBoard({
         </div>
       ) : (
         <>
-          {/* Desktop / kiosk: columns. */}
-          <div className="hidden flex-1 grid-cols-4 gap-[1px] overflow-hidden bg-border/25 md:grid">
+          {/* Desktop: columns, from lg. Four columns beside the sidebar on a
+              768px tablet are ~100px each, too narrow for a card; the list
+              below reads better there. */}
+          <div className="hidden flex-1 grid-cols-4 gap-[1px] overflow-hidden bg-border/25 lg:grid">
             {BOARD_COLUMNS.map(({ status }) => {
               const columnOrders = view.columns[status];
               return (
@@ -267,7 +269,7 @@ export function OrdersBoard({
                   title={dict[COLUMN_LABEL_KEY[status]]}
                   count={view.totals[status]}
                   emptyLabel={dict.emptyColumn}
-                  density="kitchen"
+                  density="desk"
                   footer={
                     hasMore(status) && (
                       <LoadMoreButton
@@ -290,7 +292,7 @@ export function OrdersBoard({
                       onCancel={setCancelTarget}
                       onViewPayment={setPaymentTarget}
                       onAdvance={advance}
-                      density="kitchen"
+                      density="desk"
                     />
                   ))}
                 </KanbanColumn>
@@ -354,7 +356,7 @@ function MobileOrderList({
   const filtered = view.columns[statusFilter];
 
   return (
-    <div className="flex flex-1 flex-col md:hidden">
+    <div className="flex flex-1 flex-col lg:hidden">
       <div className="flex flex-none gap-[6px] overflow-x-auto border-b border-border/20 bg-surface px-md py-sm">
         {BOARD_COLUMNS.map(({ status }) => {
           const count = view.totals[status];

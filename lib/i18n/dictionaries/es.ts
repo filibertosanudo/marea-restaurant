@@ -321,6 +321,8 @@ export const es = {
       statusCancelled: "Cancelada",
       statusNoShow: "No se presentó",
       overdueFlag: "Pasó su hora",
+      partyOne: "1 persona",
+      partyOther: "{count} personas",
       tableUnassigned: "Sin asignar",
       notesLabel: "Notas",
       confirmAction: "Confirmar",

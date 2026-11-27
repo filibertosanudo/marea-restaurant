@@ -15,14 +15,14 @@ import type { JobStatus } from "@/lib/generated/prisma/client";
 
 /**
  * The board's two surfaces are the same data, read from two different
- * distances: a kitchen display bolted to a wall and read at arm's length by
- * gloved hands, versus a waiter's own phone held a few inches away. Same
- * component, same props, one variant — not a `md:` breakpoint (the two
- * don't correspond to viewport width, a kiosk and a phone can both be
- * "desktop-sized" or not) and not a duplicated component (the markup and
- * behavior are identical, only the type scale changes).
+ * distances: a desk screen at the counter, a column of several orders read
+ * at a glance, versus a waiter's own phone held a few inches away. Same
+ * component, same props, one variant — not a duplicated component (the
+ * markup and behavior are identical, only the type scale changes). The
+ * screen read from across the kitchen is /admin/cocina, with its own card
+ * (components/admin/kitchen/KitchenOrderCard.tsx).
  */
-export type BoardDensity = "kitchen" | "waiter";
+export type BoardDensity = "desk" | "waiter";
 
 // A partial record indexed by the real status, not a const object reached
 // through a cast: a status with no label is `undefined` to handle, never an
@@ -43,32 +43,30 @@ function isRecent(placedAt: string): boolean {
 }
 
 // The waiter scale is exactly what this card already used before density
-// existed — unchanged on purpose, per the module's own requirement that the
-// compact view doesn't move. The kitchen scale is the fix: legible at three
-// meters, ~40-60px for the folio and the order lines, the rest in
-// proportion.
+// existed. The desk scale is one step up from it: a column a quarter of a
+// laptop wide has to hold four to six open orders without the folio
+// wrapping, which the old three-meter scale (a 52px folio, 44px dish names)
+// could not — one order filled a column. Three meters is the kitchen
+// screen's job now.
 const SCALE = {
-  kitchen: {
-    folio: "text-[52px] leading-none",
-    tableLabel: "text-[18px] tracking-wide",
-    aging: "text-[22px] gap-[8px] px-[14px] py-[8px]",
-    agingDot: "h-[10px] w-[10px]",
-    itemGap: "gap-[12px]",
-    // The other half of "40-60px for the folio and the order lines" — the
-    // dish name/quantity is what a line cook actually reads line by line,
-    // arguably more than the folio itself.
-    itemName: "text-[44px] leading-tight",
-    itemModifiers: "ml-[44px] text-[24px]",
-    notes: "gap-[10px] px-md py-[14px] text-[22px]",
-    allergyIcon: "h-[24px] w-[24px]",
-    paymentBadge: "px-md py-[7px] text-[19px]",
-    price: "text-[22px]",
-    collectButton: "min-h-[84px] text-[22px]",
-    advanceButton: "min-h-[96px] gap-[12px] text-[28px]",
-    advanceIcon: 28,
-    completed: "gap-[12px] text-[24px]",
-    completedIcon: 28,
-    cancelLink: "min-h-[46px] text-[18px]",
+  desk: {
+    folio: "text-[24px] leading-none",
+    tableLabel: "text-[12px] tracking-wide",
+    aging: "gap-[5px] px-[9px] py-[4px] text-[13px]",
+    agingDot: "h-[7px] w-[7px]",
+    itemGap: "gap-[6px]",
+    itemName: "text-[15px]",
+    itemModifiers: "ml-[24px] text-[12.5px]",
+    notes: "gap-[7px] px-sm py-[8px] text-[13px]",
+    allergyIcon: "",
+    paymentBadge: "min-h-[32px] px-sm py-[6px] text-[12px]",
+    price: "text-[13px]",
+    collectButton: "min-h-[44px] text-[14px]",
+    advanceButton: "min-h-[48px] gap-[8px] text-[15px]",
+    advanceIcon: 16,
+    completed: "gap-[8px] text-[13px]",
+    completedIcon: 16,
+    cancelLink: "min-h-[32px] text-[12.5px]",
   },
   waiter: {
     folio: "text-[20px]",
@@ -200,12 +198,14 @@ export function OrderCard({
         isNew ? "border-info shadow-[0_0_0_3px_rgb(var(--color-info)/0.18)]" : "border-border/25"
       } ${isDelivered ? "opacity-60" : ""}`}
     >
-      <div className="mb-sm flex items-start justify-between gap-sm">
+      {/* Wraps, so a narrow column drops the clock under the folio instead of
+          breaking the folio itself over two lines. */}
+      <div className="mb-sm flex flex-wrap items-start justify-between gap-x-sm gap-y-[6px]">
         <div>
-          <div className={`font-display font-bold tabular-nums text-on-surface ${s.folio}`}>
+          <div className={`whitespace-nowrap font-display font-bold tabular-nums text-on-surface ${s.folio}`}>
             {shortFolio(order.orderNumber)}
           </div>
-          <div className={`mt-[2px] font-semibold uppercase text-on-surface-muted ${s.tableLabel}`}>
+          <div className={`mt-[2px] whitespace-nowrap font-semibold uppercase text-on-surface-muted ${s.tableLabel}`}>
             {order.tableLabel ? dict.table.replace("{code}", order.tableLabel) : dict.takeaway}
           </div>
         </div>
@@ -259,12 +259,12 @@ export function OrderCard({
         <span className={`font-medium ${order.printStatus ? PRINT_STYLE[order.printStatus] : "text-on-surface-muted"}`}>
           {order.printStatus ? dict[PRINT_LABEL_KEY[order.printStatus]] : ""}
         </span>
-        <div className="flex items-center gap-sm">
+        <div className="flex flex-wrap items-center justify-end gap-x-sm gap-y-[2px]">
           <a
             href={`/admin/pedidos/${order.id}/imprimir`}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-on-surface-muted underline decoration-border/50 underline-offset-2 transition-colors hover:text-on-surface"
+            className="whitespace-nowrap font-medium text-on-surface-muted underline decoration-border/50 underline-offset-2 transition-colors hover:text-on-surface"
           >
             {dict.viewPrintable}
           </a>
@@ -272,7 +272,7 @@ export function OrderCard({
             type="button"
             onClick={reprint}
             disabled={reprintPending}
-            className="font-medium text-on-surface-muted underline decoration-border/50 underline-offset-2 transition-colors hover:text-on-surface disabled:opacity-50"
+            className="whitespace-nowrap font-medium text-on-surface-muted underline decoration-border/50 underline-offset-2 transition-colors hover:text-on-surface disabled:opacity-50"
           >
             {dict.reprintTicket}
           </button>
@@ -295,10 +295,9 @@ export function OrderCard({
         </div>
       ) : (
         <div className="flex flex-col gap-[8px]">
-          {/* Oversized on purpose — this surface is read at arm's length by
-              gloved hands, not clicked at a desk, so it steps outside the
-              admin panel's usual dense button padding (button-primary-admin)
-              while keeping the same rounded-sm/color tokens. */}
+          {/* Larger than the panel's usual dense buttons (button-primary-admin):
+              on the waiter's phone these are tapped in a hurry, and on the
+              desk they are the one thing each card asks for. */}
           {order.canCollectCash && (
             <>
               <button
