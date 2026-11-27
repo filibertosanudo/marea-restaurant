@@ -46,6 +46,11 @@ const nextConfig = {
     // turns Next's image optimizer into an SSRF proxy for any URL an
     // admin can get into MenuItem.imageUrl.
     remotePatterns: mediaHostname ? [{ protocol: "https", hostname: mediaHostname }] : [],
+    // AVIF first: the landing's hero photo is its LCP element, and AVIF is
+    // about half the bytes of WebP at the same look. 60 is the hero's own
+    // quality (components/marea-landing/Media.tsx); 75 stays the default.
+    formats: ["image/avif", "image/webp"],
+    qualities: [60, 75],
   },
   // Content-Security-Policy is set per-request in proxy.ts instead — it
   // needs a fresh nonce every time, which a static header list can't give it.

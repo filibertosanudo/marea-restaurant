@@ -1,12 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import { formatMoney } from "@/lib/dto/money";
 import type { PublicDish } from "@/lib/menu/public-menu";
 
-// A handful of warm/ocean gradients standing in for dish photography —
-// this app has no image pipeline yet (see components/marea-landing's
-// Placeholder), so the placeholder itself gets some visual variety instead
-// of one flat block repeated down the list.
+// A handful of warm/ocean gradients standing in for a dish with no photo,
+// so the placeholder gets some visual variety instead of one flat block
+// repeated down the list.
 const PHOTO_GRADIENTS = [
   "linear-gradient(135deg, #cf7b52, #8a4a2c)",
   "linear-gradient(135deg, #4d7c8a, #23434d)",
@@ -36,11 +36,14 @@ export function DishCard({
   return (
     <article className="overflow-hidden rounded-lg bg-surface shadow-1">
       <div
-        className="relative h-32"
+        className="relative h-36 overflow-hidden"
         style={{ background: gradientFor(dish.id) }}
         role="img"
         aria-label={dish.name}
       >
+        {dish.imageUrl && (
+          <Image src={dish.imageUrl} alt="" fill sizes="(max-width: 640px) 100vw, 480px" className="object-cover" />
+        )}
         {dish.tags.length > 0 && (
           <div className="absolute left-[10px] top-[10px] flex flex-wrap gap-[6px]">
             {dish.tags.slice(0, 2).map((tag) => (

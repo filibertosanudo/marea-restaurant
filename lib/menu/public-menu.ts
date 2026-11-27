@@ -40,12 +40,11 @@ export type PublicModifierGroup = {
 export type PublicTag = { id: string; slug: string; label: string; color: string | null };
 
 // Mirrors the landing's Dish type (components/marea-landing/content.ts) —
-// `img` stays a placeholder label (the dish name), not a real image URL:
-// the landing only ever rendered a text Placeholder here, so swapping in a
-// real <img> would be a design change, not a data-source change. Extended
-// (not replaced) with what the order flow needs: id to add to cart, and
-// modifiers/tags for the detail sheet — Dish/PublicMenuByLang consumers
-// that only read the original fields are unaffected.
+// `img` stays the placeholder label (the dish name) drawn when there is no
+// photo; `imageUrl` is the photo itself, null when the dish has none.
+// Extended (not replaced) with what the order flow needs: id to add to
+// cart, and modifiers/tags for the detail sheet — Dish/PublicMenuByLang
+// consumers that only read the original fields are unaffected.
 export type PublicDish = {
   id: string;
   category: string;
@@ -54,6 +53,7 @@ export type PublicDish = {
   priceValue: string;
   compareAtPrice: string | null;
   img: string;
+  imageUrl: string | null;
   name: string;
   desc: string;
   tags: PublicTag[];
@@ -128,6 +128,7 @@ export function toPublicMenuByLang(categories: RawCategory[]): PublicMenuByLang 
           priceValue: decimalToString(item.basePrice) ?? "0.00",
           compareAtPrice: decimalToString(item.compareAtPrice),
           img: name,
+          imageUrl: item.imageUrl,
           name,
           desc: t?.description ?? "",
           tags: item.tags.map(({ tag }) => {

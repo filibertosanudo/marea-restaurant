@@ -9,9 +9,10 @@ import { StatItem } from "@/components/ui/StatItem";
 import { STR, type Lang } from "./content";
 import type { PublicMenuByLang } from "@/lib/menu/public-menu";
 import type { LandingContentByLang, LandingBusinessInfo } from "@/lib/dto/landing";
+import type { LandingImages } from "@/lib/business/landing-images";
 import { Controls } from "./Controls";
 import { SectionHead } from "./SectionHead";
-import { Placeholder } from "./Placeholder";
+import { Media } from "./Media";
 import { OfferCard } from "./OfferCard";
 import { Dish } from "./Dish";
 import { Highlight } from "./Highlight";
@@ -27,15 +28,20 @@ export function MareaLandingPage({
   menuByLang,
   landingByLang,
   business,
+  images,
+  defaultLang,
   maxPartySize,
 }: {
   menuByLang: PublicMenuByLang;
   landingByLang: LandingContentByLang;
   business: LandingBusinessInfo;
+  images: LandingImages;
+  /** The business's own language: what a first-time visitor sees before choosing. */
+  defaultLang: Lang;
   maxPartySize: number;
 }) {
-  const [cat, setCat] = useState("mains");
-  const [lang, setLang] = useState<Lang>("en");
+  const [cat, setCat] = useState(() => menuByLang[defaultLang].categories[0]?.id ?? "");
+  const [lang, setLang] = useState<Lang>(defaultLang);
   const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
@@ -90,7 +96,7 @@ export function MareaLandingPage({
       {/* HERO */}
       <header className="ml-hero ml-section" id="home">
         <div className="ml-hero-bg">
-          <Placeholder label={t.hero.photo} navy />
+          <Media src={images.hero} label={t.hero.photo} navy hero sizes="(max-width: 900px) 100vw, 60vw" />
         </div>
         <div className="ml-hero-inner">
           <div className="ml-hero-right">
@@ -178,7 +184,7 @@ export function MareaLandingPage({
             />
             <div className="ml-offer-stage">
               <div className="ml-offer-media">
-                <Placeholder label={t.offers.dish} />
+                <Media src={images.offers} label={t.offers.dish} sizes="(max-width: 768px) 80vw, 480px" />
               </div>
               {landing.offers.map((o, i) => (
                 <div className={`ml-offer-pos ml-offer-pos-${i + 1}`} key={o.title}>
@@ -196,7 +202,7 @@ export function MareaLandingPage({
           <div className="ml-wrap">
             <SectionHead center eyebrow={t.tmls.eyebrow} title={t.tmls.title} />
             <div className="ml-tmls-media">
-              <Placeholder label={t.tmls.media} />
+              <Media src={images.testimonials} label={t.tmls.media} sizes="300px" />
             </div>
             <div className="ml-tmls-track-wrap">
               <div className="ml-tmls-track">
@@ -212,7 +218,7 @@ export function MareaLandingPage({
       {/* RESERVATION */}
       <section className="ml-band subtle ml-section ml-reserve-section" id="reservation">
         <div className="ml-reserve-media">
-          <Placeholder label={t.reserve.media} />
+          <Media src={images.reservation} label={t.reserve.media} sizes="(max-width: 900px) 100vw, 42vw" />
         </div>
         <div className="ml-reserve-inner">
           <div className="ml-reserve-form-wrap">
