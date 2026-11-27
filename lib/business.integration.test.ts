@@ -110,6 +110,17 @@ describe("getBusinessForRequest", () => {
     expect((await getBusinessForRequest()).id).toBe(cala.id);
   });
 
+  it("ignores the business of a revoked session and answers by the host", async () => {
+    await makeBusiness({ slug: "marea" });
+    const cala = await makeBusiness({ slug: "cala" });
+    const staff = await makeStaff("BUSINESS_ADMIN");
+    // The claim the revalidation refused, naming a business that is gone.
+    setTestSession(sessionUserFromRow(staff, { businessId: "gone", revoked: true }));
+
+    setTestHost("cala.localhost:3000");
+    expect((await getBusinessForRequest()).id).toBe(cala.id);
+  });
+
   it("refuses a session whose business no longer exists", async () => {
     const staff = await makeStaff("BUSINESS_ADMIN");
     setTestSession(sessionUserFromRow(staff, { businessId: "gone" }));

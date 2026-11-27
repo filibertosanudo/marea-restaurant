@@ -38,12 +38,12 @@ test("a guest sees the menu of the business whose address they opened, and its o
   const tokens = orderTokens();
 
   await page.goto("/menu");
-  await expect(page.getByText("Oyster Sampler").first()).toBeVisible();
+  await expect(page.getByText("Aguachile").first()).toBeVisible();
   await expect(page.locator("body")).not.toContainText("Flat White");
 
   await page.goto(`${cala}/menu`);
   await expect(page.getByText("Flat White").first()).toBeVisible();
-  await expect(page.locator("body")).not.toContainText("Oyster Sampler");
+  await expect(page.locator("body")).not.toContainText("Aguachile");
 
   // Each business's order link works on its own address...
   expect((await page.goto(`${cala}/o/${tokens.cala}`))?.status()).toBe(200);
@@ -58,7 +58,7 @@ test("cala's administrator works on cala and never sees marea", async ({ page, b
 
   await page.goto("/admin/menu");
   await expect(page.getByText("Flat White").first()).toBeVisible();
-  await expect(page.locator("body")).not.toContainText("Oyster Sampler");
+  await expect(page.locator("body")).not.toContainText("Aguachile");
 
   await page.goto("/admin/mesas");
   await expect(page.getByText("C-01").first()).toBeVisible();
@@ -97,7 +97,7 @@ test("the owner of the chain moves between the two businesses without signing in
 
   await page.goto("/admin/menu");
   await expect(page.getByText("Flat White").first()).toBeVisible();
-  await expect(page.locator("body")).not.toContainText("Oyster Sampler");
+  await expect(page.locator("body")).not.toContainText("Aguachile");
 
   // The chain-wide report names both branches.
   await page.goto("/admin/reportes/organizacion?range=month");

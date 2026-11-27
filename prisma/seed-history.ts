@@ -37,7 +37,7 @@ function rng(seedText: string) {
 
 const FIRST = ["Ana", "Luis", "María", "José", "Sofía", "Diego", "Valeria", "Carlos", "Fernanda", "Jorge", "Camila", "Miguel", "Daniela", "Ricardo", "Regina", "Andrés", "Paola", "Emilio", "Lucía", "Héctor", "Ximena", "Rodrigo", "Mariana", "Tomás"];
 const LAST = ["García", "Hernández", "López", "Martínez", "Ramírez", "Flores", "Torres", "Rivera", "Gómez", "Díaz", "Morales", "Ortiz", "Castillo", "Vargas", "Ruiz", "Mendoza", "Aguilar", "Navarro"];
-const CANCEL_REASONS = ["Customer left before it was ready", "Ordered by mistake", "Item ran out", "Duplicate order"];
+const CANCEL_REASONS = ["El cliente se fue antes de que estuviera listo", "Se pidió por error", "Se acabó el platillo", "Pedido duplicado"];
 
 export type HistoryOptions = {
   /** Days of history before today. */
@@ -56,7 +56,7 @@ type Window = { opensAt: number; closesAt: number };
 const WEEKDAY_WEIGHT = [1.25, 0.6, 0.75, 0.85, 0.95, 1.35, 1.55];
 
 export async function seedHistory(prisma: PrismaClient, businessId: string, options: HistoryOptions): Promise<{ orders: number; reservations: number } | null> {
-  const business = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { slug: true, timezone: true, taxRate: true, currency: true } });
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { slug: true, timezone: true, taxRate: true, currency: true, defaultLocale: true } });
   const now = new Date();
   const tz = business.timezone;
   const today = businessLocalDateParts(now, tz);
@@ -73,7 +73,7 @@ export async function seedHistory(prisma: PrismaClient, businessId: string, opti
   const [hours, tables, dishes, members] = await Promise.all([
     prisma.openingHour.findMany({ where: { businessId, isClosed: false }, select: { dayOfWeek: true, opensAt: true, closesAt: true } }),
     prisma.restaurantTable.findMany({ where: { businessId, isActive: true, deletedAt: null }, select: { id: true, seats: true }, orderBy: { code: "asc" } }),
-    prisma.menuItem.findMany({ where: { businessId, deletedAt: null }, select: { id: true, basePrice: true, translations: { where: { locale: "en" }, select: { name: true } } }, orderBy: { sortOrder: "asc" } }),
+    prisma.menuItem.findMany({ where: { businessId, deletedAt: null }, select: { id: true, basePrice: true, translations: { where: { locale: business.defaultLocale }, select: { name: true } } }, orderBy: { sortOrder: "asc" } }),
     prisma.businessMembership.findMany({ where: { businessId, isActive: true }, select: { userId: true, role: true } }),
   ]);
   if (dishes.length === 0) return null;

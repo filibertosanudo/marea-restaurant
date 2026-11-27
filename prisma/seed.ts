@@ -104,204 +104,234 @@ const BUSINESS_SLUG = "marea";
 const D = (v: string) => new Prisma.Decimal(v);
 
 // ---------------------------------------------------------------------------
-// Catálogo, copiado 1:1 de content.ts (STR.en / STR.es)
+// Catálogo de Marea: una marisquería de Mazatlán, cliente de ejemplo
 // ---------------------------------------------------------------------------
 
 const CATEGORIES = [
-  { slug: "starters", sortOrder: 1, en: "Starters", es: "Entradas" },
-  { slug: "soups", sortOrder: 2, en: "Soups & Salads", es: "Sopas y Ensaladas" },
-  { slug: "mains", sortOrder: 3, en: "Main Dishes", es: "Platos Fuertes" },
-  { slug: "sides", sortOrder: 4, en: "Side Dishes", es: "Guarniciones" },
-  { slug: "desserts", sortOrder: 5, en: "Desserts", es: "Postres" },
-  { slug: "beverages", sortOrder: 6, en: "Beverages", es: "Bebidas" },
+  { slug: "crudos", sortOrder: 1, en: "Raw bar", es: "Crudos" },
+  { slug: "tostadas", sortOrder: 2, en: "Tostadas", es: "Tostadas" },
+  { slug: "tacos", sortOrder: 3, en: "Tacos", es: "Tacos" },
+  { slug: "fuertes", sortOrder: 4, en: "Mains", es: "Fuertes" },
+  { slug: "postres", sortOrder: 5, en: "Desserts", es: "Postres" },
+  { slug: "bebidas", sortOrder: 6, en: "Drinks", es: "Bebidas" },
 ];
 
+// Precios en MXN antes de IVA (el negocio suma su 16% al cobrar).
+// `image` nombra una foto de public/demo/ (docs/demo-photos.md).
 const DISHES = [
   {
-    slug: "oyster-sampler",
-    category: "starters",
-    price: "16.00",
-    featured: false,
+    slug: "aguachile-verde",
+    category: "crudos",
+    price: "245.00",
+    featured: true,
     prep: 10,
-    tags: ["shellfish", "gluten-free"],
-    en: {
-      name: "Oyster Sampler",
-      desc: "A chilled selection of six oysters on the half shell with mignonette and fresh lemon.",
-    },
-    es: {
-      name: "Ostras Surtidas",
-      desc: "Una selección fría de seis ostras en su concha con mignonette y limón fresco.",
-    },
+    tags: ["shellfish", "gluten-free", "spicy"],
+    image: "aguachile",
+    en: { name: "Green Aguachile", desc: "Raw shrimp cured in lime with serrano chile, cucumber and red onion. Served with tostadas." },
+    es: { name: "Aguachile Verde", desc: "Camarón crudo curtido en limón con chile serrano, pepino y cebolla morada. Con tostadas." },
   },
   {
-    slug: "lobster-bisque",
-    category: "soups",
-    price: "14.00",
-    featured: false,
-    prep: 12,
-    tags: ["shellfish"],
-    en: {
-      name: "Lobster Bisque",
-      desc: "Velvety lobster bisque finished with a touch of cream and cognac.",
-    },
-    es: {
-      name: "Bisque de Langosta",
-      desc: "Bisque de langosta aterciopelada con un toque de crema y coñac.",
-    },
-  },
-  {
-    slug: "lobster-thermidor",
-    category: "mains",
-    price: "42.00",
-    featured: true,
-    prep: 30,
-    tags: ["shellfish", "chefs-choice"],
-    en: {
-      name: "Lobster Thermidor",
-      desc: "Grilled lobster tail with creamy mustard sauce, Parmesan cheese, and garlic butter, served with truffle mashed potatoes.",
-    },
-    es: {
-      name: "Langosta Thermidor",
-      desc: "Cola de langosta a la parrilla con cremosa salsa de mostaza, queso parmesano y mantequilla de ajo, con puré de papa trufado.",
-    },
-  },
-  {
-    slug: "seared-chilean-sea-bass",
-    category: "mains",
-    price: "38.00",
-    featured: true,
-    prep: 25,
-    tags: ["gluten-free"],
-    en: {
-      name: "Seared Chilean Sea Bass",
-      desc: "Tender Chilean sea bass fillet, seared to perfection, with lemon butter sauce, sautéed asparagus, and wild rice.",
-    },
-    es: {
-      name: "Róbalo Chileno Sellado",
-      desc: "Filete de róbalo chileno sellado a la perfección, con salsa de mantequilla al limón, espárragos salteados y arroz salvaje.",
-    },
-  },
-  {
-    slug: "seafood-paella-royale",
-    category: "mains",
-    price: "36.00",
-    featured: true,
-    prep: 35,
-    tags: ["shellfish"],
-    en: {
-      name: "Seafood Paella Royale",
-      desc: "Saffron-infused Spanish rice with jumbo shrimp, mussels, calamari and chorizo, garnished with fresh herbs.",
-    },
-    es: {
-      name: "Paella de Mariscos Royale",
-      desc: "Arroz español al azafrán con camarón jumbo, mejillones, calamar y chorizo, decorado con hierbas frescas.",
-    },
-  },
-  {
-    slug: "garlic-butter-crab-legs",
-    category: "mains",
-    price: "48.00",
-    featured: true,
-    prep: 28,
-    tags: ["shellfish", "chefs-choice"],
-    en: {
-      name: "Garlic Butter Crab Legs",
-      desc: "Juicy Alaskan king crab legs, drenched in garlic butter sauce, served with grilled corn and herb-roasted potatoes.",
-    },
-    es: {
-      name: "Patas de Cangrejo al Ajo",
-      desc: "Jugosas patas de cangrejo real de Alaska bañadas en mantequilla de ajo, con elote a la parrilla y papas a las hierbas.",
-    },
-  },
-  {
-    slug: "garlic-herb-fries",
-    category: "sides",
-    price: "9.00",
+    slug: "coctel-de-camaron",
+    category: "crudos",
+    price: "210.00",
     featured: false,
     prep: 8,
-    tags: ["vegetarian"],
-    en: {
-      name: "Garlic Herb Fries",
-      desc: "Crispy fries tossed in garlic butter and fresh herbs.",
-    },
-    es: {
-      name: "Papas al Ajo y Hierbas",
-      desc: "Papas crujientes bañadas en mantequilla de ajo y hierbas frescas.",
-    },
+    tags: ["shellfish", "gluten-free"],
+    image: "coctel-camaron",
+    en: { name: "Shrimp Cocktail", desc: "Poached shrimp in our tomato and lime sauce with avocado, onion and cilantro." },
+    es: { name: "Coctel de Camarón", desc: "Camarón cocido en nuestra salsa de jitomate y limón, con aguacate, cebolla y cilantro." },
   },
   {
-    slug: "key-lime-tart",
-    category: "desserts",
-    price: "10.00",
+    slug: "ceviche-de-sierra",
+    category: "crudos",
+    price: "185.00",
+    featured: false,
+    prep: 10,
+    tags: ["gluten-free"],
+    image: "ceviche",
+    en: { name: "Sierra Ceviche", desc: "Mazatlán style: finely chopped sierra fish with carrot, cucumber, tomato and lime." },
+    es: { name: "Ceviche de Sierra", desc: "Estilo Mazatlán: sierra picada fina con zanahoria, pepino, jitomate y limón." },
+  },
+  {
+    slug: "ostiones-en-su-concha",
+    category: "crudos",
+    price: "220.00",
+    featured: false,
+    prep: 8,
+    tags: ["shellfish"],
+    image: "ostiones",
+    en: { name: "Oysters on the Half Shell", desc: "Half a dozen fresh oysters with lime, house hot sauce and saltines." },
+    es: { name: "Ostiones en su Concha", desc: "Media docena de ostiones frescos con limón, salsa de la casa y galletas saladas." },
+  },
+  {
+    slug: "tostada-de-atun",
+    category: "tostadas",
+    price: "175.00",
+    featured: true,
+    prep: 8,
+    tags: [],
+    image: "tostada-atun",
+    en: { name: "Tuna Tostada", desc: "Fresh tuna, avocado, chipotle mayo and crispy onion on a corn tostada." },
+    es: { name: "Tostada de Atún", desc: "Atún fresco, aguacate, mayonesa de chipotle y cebolla crujiente sobre tostada de maíz." },
+  },
+  {
+    slug: "tacos-gobernador",
+    category: "tacos",
+    price: "195.00",
+    featured: true,
+    prep: 12,
+    tags: ["shellfish"],
+    image: "tacos-gobernador",
+    en: { name: "Gobernador Tacos", desc: "Three tacos of shrimp sautéed with poblano pepper and melted cheese, on corn tortillas." },
+    es: { name: "Tacos Gobernador", desc: "Tres tacos de camarón salteado con chile poblano y queso gratinado, en tortilla de maíz." },
+  },
+  {
+    slug: "tacos-de-pescado",
+    category: "tacos",
+    price: "165.00",
+    featured: false,
+    prep: 10,
+    tags: [],
+    image: "tacos-pescado",
+    en: { name: "Battered Fish Tacos", desc: "Three Ensenada-style tacos with cabbage, cream and pico de gallo." },
+    es: { name: "Tacos de Pescado Capeado", desc: "Tres tacos estilo Ensenada con col, crema y pico de gallo." },
+  },
+  {
+    slug: "pescado-zarandeado",
+    category: "fuertes",
+    price: "480.00",
+    featured: true,
+    prep: 40,
+    tags: ["gluten-free", "chefs-choice"],
+    image: "zarandeado",
+    en: { name: "Zarandeado Fish", desc: "Whole snook, butterflied and grilled over mangrove charcoal with our chile marinade. Serves 2 to 3." },
+    es: { name: "Pescado Zarandeado", desc: "Robalo entero abierto, asado al carbón de mangle con nuestro adobo. Para 2 o 3 personas." },
+  },
+  {
+    slug: "pulpo-a-las-brasas",
+    category: "fuertes",
+    price: "365.00",
+    featured: true,
+    prep: 30,
+    tags: ["gluten-free", "chefs-choice"],
+    image: "pulpo",
+    en: { name: "Grilled Octopus", desc: "Charred octopus with garlic and guajillo oil, roasted potatoes and a green salad." },
+    es: { name: "Pulpo a las Brasas", desc: "Pulpo asado con aceite de ajo y guajillo, papas al horno y ensalada verde." },
+  },
+  {
+    slug: "camarones-para-pelar",
+    category: "fuertes",
+    price: "295.00",
+    featured: false,
+    prep: 15,
+    tags: ["shellfish", "gluten-free", "spicy"],
+    image: "camarones",
+    en: { name: "Peel-and-Eat Shrimp", desc: "Half a kilo of boiled shrimp with lime, house salsa and chile powder." },
+    es: { name: "Camarones para Pelar", desc: "Medio kilo de camarón cocido con limón, salsa de la casa y chile en polvo." },
+  },
+  {
+    slug: "mojarra-frita",
+    category: "fuertes",
+    price: "260.00",
+    featured: false,
+    prep: 20,
+    tags: ["gluten-free"],
+    image: "mojarra",
+    en: { name: "Fried Whole Mojarra", desc: "Crispy whole fish with rice, salad, tomato and lime." },
+    es: { name: "Mojarra Frita", desc: "Mojarra entera dorada, con arroz, ensalada, jitomate y limón." },
+  },
+  {
+    slug: "pay-de-limon",
+    category: "postres",
+    price: "95.00",
     featured: false,
     prep: 5,
     tags: ["vegetarian"],
-    en: {
-      name: "Key Lime Tart",
-      desc: "Tangy key lime custard on a buttery graham crust.",
-    },
-    es: {
-      name: "Tarta de Limón",
-      desc: "Cremoso de limón agrio sobre una base de galleta amantequillada.",
-    },
+    image: "pay-limon",
+    en: { name: "Lime Pie", desc: "Creamy lime filling on a crushed María cookie crust." },
+    es: { name: "Pay de Limón", desc: "Relleno cremoso de limón sobre base de galleta María." },
   },
   {
-    slug: "citrus-spritz",
-    category: "beverages",
-    price: "8.00",
+    slug: "flan-napolitano",
+    category: "postres",
+    price: "85.00",
+    featured: false,
+    prep: 5,
+    tags: ["vegetarian", "gluten-free"],
+    image: "flan",
+    en: { name: "Flan Napolitano", desc: "Classic vanilla flan with caramel." },
+    es: { name: "Flan Napolitano", desc: "Flan de vainilla clásico con caramelo." },
+  },
+  {
+    slug: "michelada",
+    category: "bebidas",
+    price: "110.00",
     featured: false,
     prep: 4,
+    tags: [],
+    image: "michelada",
+    en: { name: "Michelada", desc: "Mexican beer with lime, house sauces and a chile-salt rim." },
+    es: { name: "Michelada", desc: "Cerveza con limón, salsas de la casa y escarchado de chile." },
+  },
+  {
+    slug: "agua-de-jamaica",
+    category: "bebidas",
+    price: "45.00",
+    featured: false,
+    prep: 2,
     tags: ["non-alcoholic", "vegan"],
-    en: {
-      name: "Citrus Spritz",
-      desc: "A refreshing non-alcoholic spritz with citrus and mint.",
-    },
-    es: {
-      name: "Spritz Cítrico",
-      desc: "Un refrescante spritz sin alcohol con cítricos y menta.",
-    },
+    image: "jamaica",
+    en: { name: "Hibiscus Agua Fresca", desc: "Chilled hibiscus flower water, lightly sweetened." },
+    es: { name: "Agua de Jamaica", desc: "Agua fresca de flor de jamaica, poco dulce." },
   },
 ];
 
 const TAGS = [
-  { slug: "shellfish", en: "Shellfish", es: "Crustáceos", color: "#e07a5f" },
+  { slug: "shellfish", en: "Shellfish", es: "Mariscos", color: "#e07a5f" },
   { slug: "gluten-free", en: "Gluten free", es: "Sin gluten", color: "#81b29a" },
   { slug: "vegetarian", en: "Vegetarian", es: "Vegetariano", color: "#6a994e" },
   { slug: "vegan", en: "Vegan", es: "Vegano", color: "#386641" },
   { slug: "non-alcoholic", en: "Non-alcoholic", es: "Sin alcohol", color: "#3d5a80" },
-  { slug: "chefs-choice", en: "Chef's choice", es: "Sugerencia del chef", color: "#f2cc8f" },
+  { slug: "chefs-choice", en: "Chef's choice", es: "Recomendación del chef", color: "#f2cc8f" },
+  { slug: "spicy", en: "Spicy", es: "Picante", color: "#d62828" },
 ];
 
 const TESTIMONIALS = [
   {
-    name: "Elena Petrenko",
-    en: "The freshest seafood I've had — the ambiance matched the flavor perfectly.",
-    es: "El marisco más fresco que he probado — el ambiente igualó al sabor a la perfección.",
+    name: "Mariana López",
+    sourceLocale: "es",
+    en: "The best green aguachile I've had in Mazatlán, and the view from the palapa is priceless.",
+    es: "El aguachile verde es el mejor que he probado en Mazatlán, y la vista desde la palapa no tiene precio.",
   },
   {
-    name: "Andriy Kovalenko",
-    en: "Every dish tastes like it came straight from the ocean.",
-    es: "Cada platillo sabe como si viniera directo del océano.",
+    name: "Jorge Ibarra",
+    sourceLocale: "es",
+    en: "We ordered the zarandeado for four and nothing was left. Quick service even though it was packed.",
+    es: "Pedimos el zarandeado para cuatro y no sobró nada. Atención rápida aunque estaba lleno.",
   },
   {
-    name: "Marco Dubois",
-    en: "This place redefined what I thought seafood could taste like — impeccable freshness in every bite.",
-    es: "Este lugar redefinió lo que pensaba que podía saber el marisco — frescura impecable en cada bocado.",
+    name: "Daniela Osuna",
+    sourceLocale: "es",
+    en: "Ordering from the table with the QR code was so easy; the food arrived in minutes.",
+    es: "Pedir desde la mesa con el QR fue facilísimo; la comida llegó en minutos.",
   },
   {
-    name: "Sofia Ramirez",
-    en: "The lobster thermidor alone is worth the trip. Service was warm and attentive all night.",
-    es: "La langosta thermidor por sí sola vale el viaje. El servicio fue cálido y atento toda la noche.",
+    name: "Roberto Félix",
+    sourceLocale: "es",
+    en: "I come every time I'm in town. The gobernador tacos are a must.",
+    es: "Vengo cada vez que estoy en el puerto. Los tacos gobernador, obligatorios.",
   },
   {
-    name: "James Whitfield",
-    en: "A true gem by the water — the paella rivals anything I've had on the coast of Spain.",
-    es: "Una verdadera joya junto al mar — la paella rivaliza con cualquiera que haya probado en la costa de España.",
+    name: "Claire Thompson",
+    sourceLocale: "en",
+    en: "Fresh, honest seafood and a menu in English for us. We booked twice in the same week.",
+    es: "Mariscos frescos y honestos, y el menú en inglés para nosotros. Reservamos dos veces en la misma semana.",
   },
   {
-    name: "Nadia Osei",
-    en: "From the oysters to the dessert, everything felt thoughtfully crafted. We'll be back.",
-    es: "Desde las ostras hasta el postre, todo se sintió cuidadosamente elaborado. Volveremos.",
+    name: "Ana Sofía Rentería",
+    sourceLocale: "es",
+    en: "The grilled octopus was perfect. We'll be back for my mom's birthday.",
+    es: "El pulpo a las brasas estaba perfecto. Volveremos para el cumpleaños de mi mamá.",
   },
 ];
 
@@ -322,10 +352,10 @@ const CALA_CATEGORIES = [
 ];
 
 const CALA_DISHES = [
-  { slug: "flat-white", category: "coffee", price: "4.50", en: { name: "Flat White", desc: "Double ristretto with silky steamed milk." }, es: { name: "Flat White", desc: "Doble ristretto con leche vaporizada sedosa." } },
-  { slug: "cold-brew", category: "coffee", price: "5.00", en: { name: "Cold Brew", desc: "Steeped for eighteen hours, served over ice." }, es: { name: "Cold Brew", desc: "Reposado dieciocho horas, servido con hielo." } },
-  { slug: "avocado-toast", category: "bites", price: "9.00", en: { name: "Avocado Toast", desc: "Sourdough, smashed avocado, lime and chili flakes." }, es: { name: "Pan con Aguacate", desc: "Masa madre, aguacate, limón y hojuelas de chile." } },
-  { slug: "conchas", category: "bites", price: "3.50", en: { name: "Conchas", desc: "Two house-made sweet rolls, still warm." }, es: { name: "Conchas", desc: "Dos conchas hechas en casa, todavía tibias." } },
+  { slug: "flat-white", category: "coffee", price: "62.00", en: { name: "Flat White", desc: "Double ristretto with silky steamed milk." }, es: { name: "Flat White", desc: "Doble ristretto con leche vaporizada sedosa." } },
+  { slug: "cold-brew", category: "coffee", price: "68.00", en: { name: "Cold Brew", desc: "Steeped for eighteen hours, served over ice." }, es: { name: "Cold Brew", desc: "Reposado dieciocho horas, servido con hielo." } },
+  { slug: "avocado-toast", category: "bites", price: "135.00", en: { name: "Avocado Toast", desc: "Sourdough, smashed avocado, lime and chili flakes." }, es: { name: "Pan con Aguacate", desc: "Masa madre, aguacate, limón y hojuelas de chile." } },
+  { slug: "conchas", category: "bites", price: "48.00", en: { name: "Conchas", desc: "Two house-made sweet rolls, still warm." }, es: { name: "Conchas", desc: "Dos conchas hechas en casa, todavía tibias." } },
 ];
 
 async function seedSecondBusiness(marea: { id: string }) {
@@ -347,13 +377,15 @@ async function seedSecondBusiness(marea: { id: string }) {
       type: "CAFE",
       defaultLocale: "es",
       supportedLocales: ["en", "es"],
-      currency: "USD",
-      timezone: "America/Hermosillo",
+      currency: "MXN",
+      timezone: "America/Mazatlan",
       taxRate: D("0.1600"),
       email: "hola@cala.test",
-      phone: "+1 555 000 1111",
-      addressLine1: "9 Salt Lane",
-      addressLine2: "Old Town, Portside 90210",
+      phone: "+52 669 981 2041",
+      addressLine1: "Av. Camarón Sábalo 204",
+      addressLine2: "Zona Dorada",
+      city: "Mazatlán, Sinaloa",
+      country: "MX",
       acceptsOnlinePayment: false, // sin cuenta de Stripe propia todavía (módulo 17b)
       acceptsPayAtCounter: true,
       organizationId: organization.id,
@@ -451,7 +483,7 @@ async function seedSecondBusiness(marea: { id: string }) {
     where: { businessId_orderNumber: { businessId: cala.id, orderNumber: "A-0001" } },
   });
   if (!exists) {
-    const unit = D("4.50");
+    const unit = D("62.00");
     const subtotal = unit.mul(2);
     const tax = subtotal.mul(D("0.16")).toDecimalPlaces(2);
     const order = await prisma.order.create({
@@ -466,13 +498,13 @@ async function seedSecondBusiness(marea: { id: string }) {
         subtotal,
         taxTotal: tax,
         total: subtotal.add(tax),
-        currency: "USD",
+        currency: "MXN",
         items: { create: [{ menuItemId: dishIds.get("flat-white")!, nameSnapshot: "Flat White", unitPrice: unit, quantity: 2, lineTotal: subtotal }] },
         statusEvents: { create: [{ toStatus: "PENDING" }] },
       },
     });
     await prisma.payment.create({
-      data: { businessId: cala.id, orderId: order.id, provider: "CASH_REGISTER", status: "PENDING", amount: order.total, currency: "USD" },
+      data: { businessId: cala.id, orderId: order.id, provider: "CASH_REGISTER", status: "PENDING", amount: order.total, currency: "MXN" },
     });
   }
 }
@@ -490,15 +522,17 @@ async function main() {
       slug: BUSINESS_SLUG,
       name: "Marea",
       type: "SEAFOOD_RESTAURANT",
-      defaultLocale: "en",
-      supportedLocales: ["en", "es"],
-      currency: "USD", // el landing muestra precios en USD
-      timezone: "America/Hermosillo",
-      taxRate: D("0.0800"),
+      defaultLocale: "es",
+      supportedLocales: ["es", "en"],
+      currency: "MXN",
+      timezone: "America/Mazatlan",
+      taxRate: D("0.1600"),
       email: "hola@marea.test",
-      phone: "+1 555 000 0000",
-      addressLine1: "142 Harbour Pier Road",
-      addressLine2: "Marina District, Portside 90210",
+      phone: "+52 669 981 2040",
+      addressLine1: "Paseo Olas Altas 1120",
+      addressLine2: "Centro Histórico",
+      city: "Mazatlán, Sinaloa",
+      country: "MX",
       acceptsOnlinePayment: true,
       acceptsPayAtCounter: true,
       // Past module 19's wizard: seed data behaves like a live business.
@@ -514,15 +548,15 @@ async function main() {
       create: {
         businessId: business.id,
         locale: "en",
-        tagline: "Fresh from the ocean, every day.",
+        tagline: "Mazatlán seafood, fresh every day.",
         shortBlurb:
-          "Boutique seafood, sourced daily from local waters and served by the sea.",
-        aboutTitle: "Fresh from local waters, daily.",
+          "A seaside seafood house on Olas Altas: aguachiles, zarandeado fish and the catch of the day.",
+        aboutTitle: "Today's catch, family recipes.",
         aboutBody:
-          "Fresh, delicately prepared seafood sourced daily from local waters.",
-        metaTitle: "Marea — Boutique Seafood",
+          "Since 1998 we have cooked whatever the boats bring in each morning: aguachiles made to order, zarandeado fish over mangrove charcoal and tostadas the way the family makes them. Nothing frozen, nothing from last week.",
+        metaTitle: "Marea — Seafood in Mazatlán",
         metaDescription:
-          "Dive into freshness — an ocean of flavors awaits at our restaurant.",
+          "Seaside seafood on Olas Altas, Mazatlán. Aguachiles, zarandeado fish and tostadas. Book a table or order from yours.",
       },
     }),
     prisma.businessTranslation.upsert({
@@ -531,15 +565,15 @@ async function main() {
       create: {
         businessId: business.id,
         locale: "es",
-        tagline: "Frescura del océano, todos los días.",
+        tagline: "Mariscos de Mazatlán, frescos todos los días.",
         shortBlurb:
-          "Mariscos boutique, obtenidos a diario de aguas locales y servidos junto al mar.",
-        aboutTitle: "Frescura de aguas locales, cada día.",
+          "Marisquería frente al mar en Olas Altas: aguachiles, zarandeado y la pesca del día.",
+        aboutTitle: "Pesca del día, recetas de la casa.",
         aboutBody:
-          "Mariscos frescos y delicadamente preparados, obtenidos a diario de aguas locales.",
-        metaTitle: "Marea — Mariscos Boutique",
+          "Desde 1998 cocinamos lo que traen las pangas cada mañana: aguachiles al momento, pescado zarandeado al carbón de mangle y tostadas como las hace la familia. Nada congelado, nada de la semana pasada.",
+        metaTitle: "Marea — Mariscos en Mazatlán",
         metaDescription:
-          "Sumérgete en la frescura — un océano de sabores te espera en nuestro restaurante.",
+          "Marisquería frente al mar en Olas Altas, Mazatlán. Aguachiles, pescado zarandeado y tostadas. Reserva o pide desde tu mesa.",
       },
     }),
   ]);
@@ -655,7 +689,7 @@ async function main() {
   for (const [i, d] of DISHES.entries()) {
     const item = await prisma.menuItem.upsert({
       where: { businessId_slug: { businessId: business.id, slug: d.slug } },
-      update: { basePrice: D(d.price), isFeatured: d.featured, isAvailable: true },
+      update: { basePrice: D(d.price), isFeatured: d.featured, isAvailable: true, imageUrl: `/demo/${d.image}.jpg` },
       create: {
         businessId: business.id,
         categoryId: categoryMap.get(d.category)!,
@@ -664,10 +698,9 @@ async function main() {
         isFeatured: d.featured,
         preparationMinutes: d.prep,
         sortOrder: i,
-        // No photos ship with the repository: a path to a file that does not
-        // exist drew a broken image in the panel. Without one, every screen
-        // shows its own placeholder.
-        imageUrl: null,
+        // Las fotos de ejemplo viven en public/demo/ y se guardan como ruta
+        // del mismo origen (lib/business/landing-images.ts, isBundledDemoImage).
+        imageUrl: `/demo/${d.image}.jpg`,
       },
     });
     dishMap.set(d.slug, item.id);
@@ -741,10 +774,10 @@ async function main() {
 
   const OPTIONS = [
     { group: sizeGroup.id, slug: "regular", delta: "0.00", isDefault: true, en: "Regular", es: "Normal" },
-    { group: sizeGroup.id, slug: "large", delta: "6.00", isDefault: false, en: "Large", es: "Grande" },
-    { group: extrasGroup.id, slug: "extra-butter", delta: "2.00", isDefault: false, en: "Extra garlic butter", es: "Mantequilla de ajo extra" },
-    { group: extrasGroup.id, slug: "extra-lemon", delta: "0.00", isDefault: false, en: "Extra lemon", es: "Limón extra" },
-    { group: extrasGroup.id, slug: "truffle-upgrade", delta: "8.00", isDefault: false, en: "Truffle upgrade", es: "Con trufa" },
+    { group: sizeGroup.id, slug: "large", delta: "20.00", isDefault: false, en: "Large", es: "Grande" },
+    { group: extrasGroup.id, slug: "extra-avocado", delta: "35.00", isDefault: false, en: "Extra avocado", es: "Aguacate extra" },
+    { group: extrasGroup.id, slug: "extra-lime", delta: "0.00", isDefault: false, en: "Extra lime", es: "Limón extra" },
+    { group: extrasGroup.id, slug: "extra-shrimp", delta: "60.00", isDefault: false, en: "Extra shrimp", es: "Camarón extra" },
   ];
   for (const [i, o] of OPTIONS.entries()) {
     const opt = await prisma.modifierOption.upsert({
@@ -768,7 +801,7 @@ async function main() {
   }
 
   // Qué platillos aceptan qué grupos
-  const withExtras = ["lobster-thermidor", "garlic-butter-crab-legs", "seafood-paella-royale"];
+  const withExtras = ["aguachile-verde", "tostada-de-atun", "tacos-gobernador"];
   for (const slug of withExtras) {
     await prisma.menuItemModifierGroup.upsert({
       where: { menuItemId_groupId: { menuItemId: dishMap.get(slug)!, groupId: extrasGroup.id } },
@@ -777,9 +810,9 @@ async function main() {
     });
   }
   await prisma.menuItemModifierGroup.upsert({
-    where: { menuItemId_groupId: { menuItemId: dishMap.get("citrus-spritz")!, groupId: sizeGroup.id } },
+    where: { menuItemId_groupId: { menuItemId: dishMap.get("agua-de-jamaica")!, groupId: sizeGroup.id } },
     update: {},
-    create: { menuItemId: dishMap.get("citrus-spritz")!, groupId: sizeGroup.id, sortOrder: 0 },
+    create: { menuItemId: dishMap.get("agua-de-jamaica")!, groupId: sizeGroup.id, sortOrder: 0 },
   });
 
   // -------------------------------------------------------------------------
@@ -812,48 +845,52 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
-  // 8. Promociones — las 4 que hoy están hardcodeadas en `offers`
+  // 8. Promociones
   // -------------------------------------------------------------------------
   const PROMOS = [
     {
-      slug: "champagne-oysters-set",
-      type: "BUNDLE_PRICE" as const,
-      value: "39.00",
-      days: [] as number[],
-      items: ["oyster-sampler"],
-      sortOrder: 1,
-      en: { title: "Champagne & Oysters Set", badge: "$39", desc: "6 fresh oysters paired with a glass of premium champagne." },
-      es: { title: "Set de Champagne y Ostras", badge: "$39", desc: "6 ostras frescas acompañadas de una copa de champagne premium." },
-    },
-    {
-      slug: "lobster-night",
+      slug: "martes-de-aguachile",
       type: "PERCENTAGE" as const,
       value: "50.00",
-      days: [4], // jueves
-      items: ["lobster-thermidor"],
-      sortOrder: 2,
-      en: { title: "Lobster Night", badge: "50% OFF", desc: "50% off on our signature Lobster Thermidor when you dine in on Thursdays." },
-      es: { title: "Noche de Langosta", badge: "50% DESC.", desc: "50% de descuento en nuestra Langosta Thermidor al cenar los jueves." },
+      days: [2], // martes
+      items: ["aguachile-verde"],
+      orderType: "DINE_IN" as const,
+      sortOrder: 1,
+      en: { title: "Aguachile Tuesday", badge: "50% OFF", desc: "Green aguachile at half price every Tuesday when you dine in." },
+      es: { title: "Martes de Aguachile", badge: "50% DESC.", desc: "Aguachile verde a mitad de precio todos los martes, comiendo en el restaurante." },
     },
     {
-      slug: "seafood-lovers-platter",
+      slug: "zarandeado-con-jamaica",
       type: "BUNDLE_PRICE" as const,
-      value: "59.00",
-      days: [],
-      items: ["garlic-butter-crab-legs", "seafood-paella-royale"],
-      sortOrder: 3,
-      en: { title: "Seafood Lovers' Platter", badge: "$59 (for 2)", desc: "An exquisite mix of lobster, prawns, mussels and calamari, served with garlic butter sauce." },
-      es: { title: "Tabla para Amantes del Mar", badge: "$59 (para 2)", desc: "Una exquisita mezcla de langosta, camarón, mejillones y calamar, con salsa de mantequilla de ajo." },
+      value: "499.00",
+      days: [] as number[],
+      items: ["pescado-zarandeado", "agua-de-jamaica"],
+      orderType: null,
+      sortOrder: 2,
+      en: { title: "Zarandeado for the Table", badge: "$499", desc: "A whole zarandeado fish to share, with an hibiscus agua fresca." },
+      es: { title: "Zarandeado para la Mesa", badge: "$499", desc: "Un pescado zarandeado entero para compartir, con agua de jamaica." },
     },
     {
-      slug: "sushi-sashimi-weekend",
+      slug: "tostada-y-michelada",
+      type: "BUNDLE_PRICE" as const,
+      value: "249.00",
+      days: [] as number[],
+      items: ["tostada-de-atun", "michelada"],
+      orderType: null,
+      sortOrder: 3,
+      en: { title: "Tostada & Michelada", badge: "$249", desc: "A tuna tostada and an ice-cold michelada, for the afternoon." },
+      es: { title: "Tostada y Michelada", badge: "$249", desc: "Una tostada de atún y una michelada bien fría, para la tarde." },
+    },
+    {
+      slug: "fin-de-semana-para-llevar",
       type: "PERCENTAGE" as const,
-      value: "20.00",
+      value: "15.00",
       days: [5, 6, 0], // viernes, sábado, domingo
-      items: [],
+      items: [] as string[],
+      orderType: "TAKEAWAY" as const,
       sortOrder: 4,
-      en: { title: "Sushi & Sashimi Weekend", badge: "20% OFF", desc: "Enjoy a selection of fresh sushi and sashimi every Friday–Sunday at a special discount." },
-      es: { title: "Fin de Semana de Sushi", badge: "20% DESC.", desc: "Disfruta una selección de sushi y sashimi frescos de viernes a domingo a precio especial." },
+      en: { title: "Weekend Takeaway", badge: "15% OFF", desc: "15% off your whole order to go, Friday through Sunday." },
+      es: { title: "Fin de Semana para Llevar", badge: "15% DESC.", desc: "15% en todo tu pedido para llevar, de viernes a domingo." },
     },
   ];
 
@@ -870,7 +907,7 @@ async function main() {
         isActive: true,
         isFeatured: true,
         sortOrder: p.sortOrder,
-        appliesToOrderType: p.slug === "lobster-night" ? "DINE_IN" : null,
+        appliesToOrderType: p.orderType,
       },
     });
     for (const [locale, tr] of [["en", p.en], ["es", p.es]] as const) {
@@ -912,7 +949,7 @@ async function main() {
           status: "APPROVED",
           isFeatured: true,
           sortOrder: i,
-          sourceLocale: "en",
+          sourceLocale: t.sourceLocale,
         },
       }));
     for (const [locale, quote] of [["en", t.en], ["es", t.es]] as const) {
@@ -928,11 +965,11 @@ async function main() {
   // 10. Pedidos de ejemplo — uno por estado, para probar el tablero de cocina
   // -------------------------------------------------------------------------
   const scenarios = [
-    { number: "A-0001", status: "PENDING" as const, type: "DINE_IN" as const, table: 0, items: [["oyster-sampler", 1], ["citrus-spritz", 2]] },
-    { number: "A-0002", status: "PREPARING" as const, type: "DINE_IN" as const, table: 2, items: [["lobster-thermidor", 2], ["garlic-herb-fries", 1]] },
-    { number: "A-0003", status: "READY" as const, type: "TAKEAWAY" as const, table: null, items: [["seafood-paella-royale", 1]] },
-    { number: "A-0004", status: "DELIVERED" as const, type: "DINE_IN" as const, table: 5, items: [["garlic-butter-crab-legs", 1], ["key-lime-tart", 2]] },
-    { number: "A-0005", status: "CANCELLED" as const, type: "TAKEAWAY" as const, table: null, items: [["lobster-bisque", 1]] },
+    { number: "A-0001", status: "PENDING" as const, type: "DINE_IN" as const, table: 0, items: [["aguachile-verde", 1], ["agua-de-jamaica", 2]] },
+    { number: "A-0002", status: "PREPARING" as const, type: "DINE_IN" as const, table: 2, items: [["pescado-zarandeado", 1], ["michelada", 2]] },
+    { number: "A-0003", status: "READY" as const, type: "TAKEAWAY" as const, table: null, items: [["tacos-gobernador", 2]] },
+    { number: "A-0004", status: "DELIVERED" as const, type: "DINE_IN" as const, table: 5, items: [["pulpo-a-las-brasas", 1], ["pay-de-limon", 2]] },
+    { number: "A-0005", status: "CANCELLED" as const, type: "TAKEAWAY" as const, table: null, items: [["coctel-de-camaron", 1]] },
   ];
 
   for (const s of scenarios) {
@@ -946,14 +983,14 @@ async function main() {
       const unit = D(dish.price);
       return {
         menuItemId: dishMap.get(slug as string)!,
-        nameSnapshot: dish.en.name,
+        nameSnapshot: dish.es.name,
         unitPrice: unit,
         quantity: qty as number,
         lineTotal: unit.mul(qty as number),
       };
     });
     const subtotal = lines.reduce((a, l) => a.add(l.lineTotal), D("0"));
-    const tax = subtotal.mul(D("0.08")).toDecimalPlaces(2);
+    const tax = subtotal.mul(business.taxRate).toDecimalPlaces(2);
 
     const order = await prisma.order.create({
       data: {
@@ -970,7 +1007,7 @@ async function main() {
         subtotal,
         taxTotal: tax,
         total: subtotal.add(tax),
-        currency: "USD",
+        currency: business.currency,
         readyAt: ["READY", "DELIVERED"].includes(s.status) ? new Date() : null,
         completedAt: s.status === "DELIVERED" ? new Date() : null,
         cancelledAt: s.status === "CANCELLED" ? new Date() : null,
@@ -997,7 +1034,7 @@ async function main() {
           provider: "STRIPE",
           status: "SUCCEEDED",
           amount: order.total,
-          currency: "USD",
+          currency: business.currency,
           stripePaymentIntentId: `pi_seed_${order.orderNumber}`,
           paymentMethodBrand: "visa",
           paymentMethodLast4: "4242",
@@ -1012,7 +1049,7 @@ async function main() {
           provider: "CASH_REGISTER",
           status: "PENDING",
           amount: order.total,
-          currency: "USD",
+          currency: business.currency,
         },
       });
     }
@@ -1046,7 +1083,7 @@ async function main() {
         tableId: tableIds[r.table],
         guestName: r.name,
         guestEmail: `${r.name.split(" ")[0].toLowerCase()}@example.com`,
-        guestPhone: "+52 662 000 0000",
+        guestPhone: "+52 669 000 0000",
         partySize: r.party,
         reservedFor: start,
         durationMinutes: 90,

@@ -15,7 +15,12 @@ function nextOpenDateString(): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-test("guest books, then looks up and cancels a reservation by confirmation code", async ({ page }) => {
+test("guest books, then looks up and cancels a reservation by confirmation code", async ({ page, baseURL }) => {
+  // The seeded business opens in Spanish; this spec asserts the English
+  // strings: the landing reads its language from localStorage, /r/[code]
+  // from the order-language cookie.
+  await page.addInitScript(() => localStorage.setItem("marea-lang", "en"));
+  await page.context().addCookies([{ name: "marea-order-lang", value: "en", url: baseURL ?? "http://marea.localhost:3000" }]);
   await page.goto("/");
 
   await page.locator("#r-name").fill("Playwright Guest");
