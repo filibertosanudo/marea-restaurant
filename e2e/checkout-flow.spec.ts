@@ -19,8 +19,10 @@ function getFirstTable(): { id: string; code: string; qrToken: string } {
  * payment — payment method selection happens on that later page and isn't
  * part of "checkout" here.
  */
-test("guest scans a table's QR, adds a dish, and checks out", async ({ page }) => {
+test("guest scans a table's QR, adds a dish, and checks out", async ({ page, baseURL }) => {
   const table = getFirstTable();
+  // The seeded business opens in Spanish; this spec asserts the English strings.
+  await page.context().addCookies([{ name: "marea-order-lang", value: "en", url: baseURL ?? "http://marea.localhost:3000" }]);
 
   await page.goto(`/t/${table.qrToken}`);
   await expect(page.getByText(`Table ${table.code}`)).toBeVisible();
